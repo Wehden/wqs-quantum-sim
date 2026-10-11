@@ -1,0 +1,12 @@
+.venv
+.git
+var
+__pycache__
+.pytest_cache
+**/__pycache__
+
+local
+.env*
+*.key
+*.pem
+test-results

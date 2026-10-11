@@ -1,0 +1,35 @@
+#!/usr/local/bin/python3
+"""Bound SkyPilot setup-log followers without relying on cross-label signals.
+
+Ubuntu/containerd's stacked AppArmor labels can deny the setup shell's SIGTERM
+of its log follower. Exit when the startup step finishes instead. All other
+GNU tail behavior is passed through unchanged.
+"""
+import os
+from pathlib import Path
+import sys
+import time
+
+markers = {
+    '/tmp/apt-ssh-setup.log': '/tmp/apt_ssh_setup_complete',
+    '/tmp/runtime-setup.log': '/tmp/ray_skypilot_installation_complete',
+    '/tmp/env-setup.log': '/tmp/env_setup_complete',
+}
+args = sys.argv[1:]
+if len(args) == 4 and args[:3] == ['-f', '-n', '+1'] and args[3] in markers:
+    source = Path(args[3])
+    complete = Path(markers[args[3]])
+    failed = source.with_suffix('.failed')
+    with source.open('rb') as stream:
+        while True:
+            ended = complete.exists() or failed.exists()
+            chunk = stream.read(65536)
+            if chunk:
+                sys.stdout.buffer.write(chunk)
+                sys.stdout.buffer.flush()
+            elif ended:
+                break
+            else:
+                time.sleep(0.2)
+else:
+    os.execv('/usr/bin/tail', ['tail', *args])

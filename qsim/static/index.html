@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>wqsim</title><meta name="description" content="Run CPU quantum simulations with Clifft from Unitary Foundation or Google’s qsim. Request an API key or explore other simulators and quantum hardware services."><link rel="alternate" type="text/markdown" href="/agents.md" title="wqsim agent API guide"><link rel="stylesheet" href="/static/style.css"><script defer src="/static/key-request.js"></script></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header><a href="/" class="brand">wqsim<span> / quantum simulation</span></a><nav class="top-nav" aria-label="Main navigation"><a href="#start">Developer guide</a><a href="#reference">API reference</a><a class="nav-cta" href="#keys">Request API key</a></nav></header>
+<main id="content"><section class="hero" aria-labelledby="hero-title"><div class="hero-copy"><h1 id="hero-title">Quantum simulation on CPU</h1>
+<p><strong>Clifft 0.11</strong> is an <strong>exact simulator for near-Clifford circuits</strong>: circuits built mostly from efficiently simulatable Clifford gates, with additional non-Clifford operations such as T gates. It keeps the actively simulated part of the quantum state compact. Runtime and memory depend on this active width and the circuit’s structure, so qubit count alone does not tell you how difficult a simulation will be.</p>
+<p><strong>Google’s qsim 0.22.1</strong> is a full state-vector simulator. It supports general unitary circuits, including circuits with many non-Clifford gates. Memory grows exponentially with the total qubit count. Our CPU service exposes selected basis probabilities through OpenQASM 2, using single-precision simulation. <a href="#google-qsim">Try the qsim example.</a></p>
+<p>Use Stim circuits for sampling or supported OpenQASM 2 circuits for basis probabilities. Explore algorithm prototypes and error-correction experiments, then collect results from your own scripts. Measurement samples still have finite-shot statistical variation, even with an exact simulator.</p>
+<p class="credit">With thanks to <a href="https://unitary.foundation/">Unitary Foundation</a>, which builds and maintains <a href="https://github.com/unitaryfoundation/clifft">Clifft</a>, and to its open-source contributors. Google’s <a href="https://github.com/quantumlib/qsim" target="_blank" rel="noopener noreferrer">qsim project ↗</a> is available under the Apache 2.0 license.</p>
+<div class="supported-modes" aria-labelledby="supported-modes-title"><h2 id="supported-modes-title">Supported Modes</h2><p class="mode-links"><a href="#stim-sampling">Stim API</a> <span aria-hidden="true">|</span> <a href="#qasm2-probabilities">OpenQASM2 API</a></p><p><strong>Stim:</strong> Use measurement samples to explore outcome frequencies, noisy circuits, and quantum error correction. Each run can return measurements, detectors, and observables.</p><p><strong>OpenQASM 2:</strong> Get probabilities for selected bitstrings from supported unitary circuits. Useful for checking circuit behavior or calculating expectation values in algorithms such as VQE. This mode does not accept measurement instructions.</p><p>New to circuit syntax? <a href="#write-circuits">Learn to write a request with worked examples.</a></p><p class="project-links">Public project sites: <a href="https://github.com/quantumlib/Stim" target="_blank" rel="noopener noreferrer">Stim project ↗</a> <span aria-hidden="true">|</span> <a href="https://openqasm.com/" target="_blank" rel="noopener noreferrer">OpenQASM project ↗</a></p></div><div class="getting-started"><h2>A short path to your first result</h2><ol><li><strong>Request access.</strong> Tell us what you plan to simulate.</li><li><strong>Receive your key.</strong> Approved requests receive a key by email.</li><li><strong>Run a circuit.</strong> Follow the developer example, then download your results.</li></ol></div><p class="returning">Already have a key? <a href="#start">Open the developer quick start →</a></p></div>
+<section id="keys" class="access-card" aria-labelledby="access-title"><p class="eyebrow">GET STARTED</p><h2 id="access-title">Request an API key</h2><p>Tell us what you want to simulate. We’ll review your request and email your key if approved.</p>
+<form id="key-request-form"><label for="request-name">Name</label><input id="request-name" name="name" maxlength="100" autocomplete="name" required><label for="request-email">Email</label><input id="request-email" name="email" type="email" maxlength="254" autocomplete="email" required><label for="request-purpose">What would you like to simulate?</label><textarea id="request-purpose" name="purpose" minlength="10" maxlength="2000" rows="3" required></textarea><p class="note">Your details are shared with the service operator for review. Please leave out credentials and confidential circuit data.</p><button type="submit">Request API key</button><p id="request-status" role="status" aria-live="polite"></p></form>
+<p class="access-note">Access requires approval. Each API identity can access only its own jobs.</p></section></section>
+<section class="explore-options" aria-labelledby="explore-title"><p class="eyebrow">KEEP EXPLORING</p><h2 id="explore-title">More ways to simulate and run on quantum hardware</h2><p>wqsim provides CPU simulation. For other environments or experiments on a physical quantum processor, explore these options directly:</p>
+<ul class="provider-list"><li><h3><a href="https://aws.amazon.com/braket/">Amazon Braket on AWS</a></h3><p>Circuit simulators and access to real quantum processors through AWS. A place to develop experiments in simulation and explore different hardware technologies.</p></li>
+<li><h3><a href="https://quantum.cloud.ibm.com/">IBM Quantum Platform</a></h3><p>Access IBM quantum computers, with Qiskit documentation and learning resources to help you build and run circuits.</p></li>
+<li><h3><a href="https://github.com/unitaryfoundation/clifft">Run Clifft yourself</a></h3><p>Install the open-source simulator on your own machine and work directly with its Python API. Explore the upstream documentation for its full capabilities.</p></li></ul>
+<p class="note">These are separate tools and services, accessed through their own APIs and accounts. wqsim does not submit jobs to quantum hardware.</p></section>
+<div class="layout"><nav class="docs-nav" aria-label="Developer documentation"><span class="eyebrow">DEVELOPER GUIDE</span><a href="#start">Quick start</a><a href="#python">Python client</a><a href="#write-circuits">Writing circuits</a><a href="#formats">Stim &amp; OpenQASM 2</a><a href="#streaming">Streaming &amp; retries</a><a href="#reference">API reference</a><a href="#execution">Execution &amp; limits</a></nav><div class="documentation">
+<section id="start"><p class="eyebrow">DEVELOPER DOCUMENTATION</p><h2 class="developer-title">Your first simulation</h2><p class="lead">Run simulations from your scripts and applications. Submit a circuit, watch its progress, and download samples or exact basis probabilities when the job completes.</p><div class="endpoint"><span>BASE URL</span><code>https://simulation.example.invalid</code></div><p>Have your API key ready. The examples below take you from a circuit to a downloaded result. <a href="#keys">Need a key? Request access.</a></p>
+<h3>Choose your task</h3><p>For measurement samples, submit a <strong>Stim</strong> circuit. For exact probabilities of selected basis strings, submit a supported <strong>OpenQASM 2</strong> unitary circuit. Each submission runs independently; your application coordinates multiple jobs.</p><h2>Quick start: sample a Bell pair</h2><p>Use an invitation key. The shell examples need <code>curl</code>, <code>jq</code>, and <code>uuidgen</code>. Read your key into an environment variable instead of putting it in a URL.</p><pre><code>read -rsp &quot;wqsim API key: &quot; QSIM_API_KEY
+export QSIM_API_KEY
+BASE=https://simulation.example.invalid</code></pre>
+<h3>1. Submit</h3><p><code>POST /api/jobs/stim</code> returns HTTP <code>202</code> with a job ID. This Bell circuit samples two correlated measurement bits.</p><pre><code>REQUEST_ID=$(uuidgen) # Save this with the body; reuse both on retries.
+RESPONSE=$(curl --fail-with-body -sS &quot;$BASE/api/jobs/stim&quot; \
+  -H &quot;Authorization: Bearer $QSIM_API_KEY&quot; \
+  -H &quot;Idempotency-Key: $REQUEST_ID&quot; \
+  -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;name&quot;:&quot;Bell pair&quot;,&quot;circuit&quot;:&quot;H 0\nCX 0 1\nM 0 1&quot;,&quot;shots&quot;:1000,&quot;seed&quot;:42}&#x27;)
+JOB_ID=$(printf &#x27;%s&#x27; &quot;$RESPONSE&quot; | jq -r &#x27;.id&#x27;)
+printf &#x27;%s\n&#x27; &quot;$RESPONSE&quot;</code></pre>
+<h3>2. Poll</h3><p>Check the returned <code>status</code> every few seconds. States are <code>QUEUED</code>, <code>LAUNCHING</code>, <code>RUNNING</code>, then <code>SUCCEEDED</code>, <code>FAILED</code>, or <code>CANCELLED</code>. Failed jobs include an <code>error</code>.</p><pre><code>curl --fail-with-body -sS &quot;$BASE/api/jobs/$JOB_ID&quot; \
+  -H &quot;Authorization: Bearer $QSIM_API_KEY&quot; | jq</code></pre>
+<h3>3. Download</h3><p>A successful job provides a NumPy archive containing <code>measurements</code>, <code>detectors</code>, <code>observables</code>, and <code>exp_vals</code>. The job response also includes a summary with outcome counts and a sample preview.</p><pre><code># Download only after status is SUCCEEDED.
+curl --fail -sS &quot;$BASE/api/jobs/$JOB_ID/result&quot; \
+  -H &quot;Authorization: Bearer $QSIM_API_KEY&quot; -o result.npz</code></pre>
+<h3>Cancel a job</h3><p>Cancellation is recorded immediately. Compute teardown can wait for an in-flight provisioning call to finish.</p><pre><code>curl --fail-with-body -sS -X POST &quot;$BASE/api/jobs/$JOB_ID/cancel&quot; \
+  -H &quot;Authorization: Bearer $QSIM_API_KEY&quot;</code></pre></section>
+<section id="python"><h2>Python client</h2><p>Install <code>httpx</code> and <code>numpy</code>, set <code>QSIM_API_KEY</code>, and run:</p><pre><code>import io
+import os
+import time
+import uuid
+
+import httpx
+import numpy as np
+
+with httpx.Client(
+    base_url=&quot;https://simulation.example.invalid&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;QSIM_API_KEY&#x27;]}&quot;},
+    timeout=30,
+) as client:
+    request_id = str(uuid.uuid4())  # Persist this and the body for retries.
+    response = client.post(&quot;/api/jobs/stim&quot;, headers={&quot;Idempotency-Key&quot;: request_id}, json={
+        &quot;name&quot;: &quot;Bell pair&quot;,
+        &quot;circuit&quot;: &quot;H 0\nCX 0 1\nM 0 1&quot;,
+        &quot;shots&quot;: 1000,
+        &quot;seed&quot;: 42,
+    })
+    response.raise_for_status()
+    job_id = response.json()[&quot;id&quot;]
+    deadline = time.monotonic() + 1500
+    while True:
+        response = client.get(f&quot;/api/jobs/{job_id}&quot;)
+        response.raise_for_status()
+        job = response.json()
+        if job[&quot;status&quot;] == &quot;SUCCEEDED&quot;:
+            break
+        if job[&quot;status&quot;] in {&quot;FAILED&quot;, &quot;CANCELLED&quot;}:
+            raise RuntimeError(job[&quot;error&quot;] or job[&quot;status&quot;])
+        if time.monotonic() &gt; deadline:
+            raise TimeoutError(f&quot;Job {job_id} is still tracked by wqsim&quot;)
+        time.sleep(5)
+
+    response = client.get(f&quot;/api/jobs/{job_id}/result&quot;)
+    response.raise_for_status()
+    with np.load(io.BytesIO(response.content), allow_pickle=False) as result:
+        print(result[&quot;measurements&quot;][:10])
+
+    # To cancel a pending or running job instead:
+    # response = client.post(f&quot;/api/jobs/{job_id}/cancel&quot;)
+    # response.raise_for_status()</code></pre><p class="note">A client timeout does not cancel the server-side job. Save its ID to resume polling or request cancellation.</p></section>
+<section id="write-circuits"><h2>Learn to write a circuit request</h2><p>A request has two parts: a circuit describing the quantum operations, and JSON fields specifying the result you want. Choose sampling for repeated measurement outcomes, or a probability query for exact probabilities of selected basis states.</p>
+<p>Both endpoints take JSON and require your <code>Authorization: Bearer …</code> header and a saved <code>Idempotency-Key</code>. Use the <a href="#start">quick-start submission and polling steps</a> with either request body below. A <code>202</code> response means the job was accepted; circuit compilation errors appear later in its job status.</p>
+<h3>Stim: “What outcomes do I get when I measure?”</h3><p>Start with qubit 0 in state <code>|0⟩</code>. <code>H 0</code> applies a Hadamard gate, creating an equal superposition. <code>M 0</code> measures that qubit. Stim uses numbered qubits and one instruction per line:</p><pre><code>H 0
+M 0</code></pre><p>Send this JSON body to <code>POST /api/jobs/stim</code>. The <code>\n</code> represents a newline inside the JSON string; a Python client can pass a normal multiline string with <code>json=</code>.</p><pre><code>{
+  &quot;name&quot;: &quot;Sample one qubit&quot;,
+  &quot;circuit&quot;: &quot;H 0\nM 0&quot;,
+  &quot;shots&quot;: 1000,
+  &quot;seed&quot;: 42
+}</code></pre><p><code>shots</code> requests 1,000 repetitions, and <code>seed</code> sets the sampler’s random seed. Expect roughly half 0s and half 1s, not necessarily exactly 500 of each. The summary contains outcome counts; the downloaded NPZ contains individual measurements. Try removing <code>H 0</code>: all measurements should then be 0.</p>
+<p>Learn the syntax in the <a href="https://github.com/quantumlib/Stim/blob/main/doc/file_format_stim_circuit.md" target="_blank" rel="noopener noreferrer">Stim circuit-format guide ↗</a>. For gates accepted by this engine, use <a href="https://unitaryfoundation.github.io/clifft/stable/reference/gates/" target="_blank" rel="noopener noreferrer">Clifft’s supported-gate reference ↗</a>. wqsim uses Clifft’s Stim-compatible input, including its extensions; the standalone Stim simulator has a different gate set.</p>
+<h3>OpenQASM 2: “What is the probability of each selected state?”</h3><p>Declare a one-qubit register and rotate it by <code>pi/3</code> about the Y axis. The header selects OpenQASM 2; <code>qelib1.inc</code> supplies standard gates. Each statement ends with a semicolon:</p><pre><code>OPENQASM 2.0;
+include &quot;qelib1.inc&quot;;
+qreg q[1];
+ry(pi/3) q[0];</code></pre><p>Send this JSON body to <code>POST /api/jobs/qasm2</code>:</p><pre><code>{
+  &quot;name&quot;: &quot;One-qubit rotation&quot;,
+  &quot;circuit&quot;: &quot;OPENQASM 2.0; include \&quot;qelib1.inc\&quot;; qreg q[1]; ry(pi/3) q[0];&quot;,
+  &quot;bitstrings&quot;: [
+    &quot;0&quot;,
+    &quot;1&quot;
+  ],
+  &quot;bit_order&quot;: &quot;big&quot;
+}</code></pre><p><code>bitstrings</code> specifies the states to query, in result order. This example returns probabilities approximately <code>[0.75, 0.25]</code>, within floating-point precision. There are no shots or measurement instructions: the endpoint evaluates probabilities directly. Change the angle to <code>pi</code> to get approximately <code>[0, 1]</code>. For more qubits, each bitstring must match the register’s total qubit count; selected probabilities need not sum to 1 unless the selection covers the full distribution.</p>
+<p>Learn the language from the <a href="https://github.com/openqasm/openqasm/tree/OpenQASM2.x" target="_blank" rel="noopener noreferrer">OpenQASM 2 specification and examples ↗</a>, then check <a href="https://unitaryfoundation.github.io/clifft/stable/guide/circuit-inputs/#openqasm-2" target="_blank" rel="noopener noreferrer">Clifft’s OpenQASM 2 importer ↗</a> for the accepted subset. wqsim does not accept OpenQASM 3, classical registers, measurement, reset, conditional operations, or custom gate declarations. Use finite numeric angles or supported constant expressions, rather than unresolved parameters.</p>
+<p class="note">wqsim currently runs Clifft 0.11 and Google qsim 0.22.1. Upstream documentation may describe additional workflows; the <a href="#formats">endpoint reference below</a> defines what this service exposes.</p></section>
+<section id="formats"><h2>Stim and OpenQASM 2</h2>
+<p>Each submission is an independent durable job. Clients manage call sequences, batches, dependencies, and quantum state; the service does not retain a quantum session between calls.</p>
+<h3 id="stim-sampling">Stim sampling</h3><p><code>POST /api/jobs/stim</code> accepts <code>circuit</code>, optional <code>name</code>, <code>shots</code> (1–10,000), and <code>seed</code>. Put measurement instructions in the circuit. Results include measurement, detector, observable, and expectation-value arrays.</p>
+<h3 id="google-qsim">Run with Google’s qsim</h3><p>Add <code>"engine": "qsim"</code> to an OpenQASM 2 probability request. Omit it or choose <code>"clifft"</code> to use Clifft. Google qsim runs on CPUs through the same job interface; status streams, idempotent retries, and NPZ downloads work the same way.</p>
+<pre><code>curl -sS "$BASE/api/jobs/qasm2" \
+  -H "Authorization: Bearer $QSIM_API_KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H 'Content-Type: application/json' \
+  -d '{"engine":"qsim","name":"qsim rotation","circuit":"OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; ry(pi/3) q[0];","bitstrings":["0","1"]}'</code></pre>
+<p>Expected probabilities: approximately <code>[0.75, 0.25]</code>. Save the idempotency key before retrying a submission. The result summary identifies the engine and version. qsim uses single-precision arithmetic, so allow a numerical tolerance when comparing engines. It computes probabilities from amplitudes without shot noise; it does not promise bit-for-bit equality with Clifft.</p>
+<p>This initial qsim integration accepts unitary OpenQASM 2 circuits imported through Cirq, with 1–26 declared qubits, including idle qubits. Registers follow declaration order and qubits follow numeric index order. It does not accept Stim, executable Python, measurement, reset, classical registers, conditions, or custom gate definitions. Native qsim features beyond these probability queries are not exposed. See the <a href="https://quantumai.google/qsim" target="_blank" rel="noopener noreferrer">qsim documentation ↗</a>.</p>
+<h3 id="qasm2-probabilities">OpenQASM 2 basis probabilities</h3><p><code>POST /api/jobs/qasm2</code> accepts <code>circuit</code>, optional <code>name</code>, required <code>bitstrings</code> (1–256 binary strings of equal length), optional <code>engine</code> (<code>clifft</code> by default, or <code>qsim</code>), and optional <code>bit_order</code> (<code>big</code> by default). Each string must match the circuit’s qubit count. For <code>big</code>, its first character maps to qubit 0; for <code>little</code>, its last character maps to qubit 0.</p>
+<p>Clifft’s OpenQASM 2 importer supports unitary <code>qelib1.inc</code> circuits. Classical registers, measurements, reset, conditions, and custom gate definitions are not supported. This endpoint returns computed probabilities for the requested basis strings, without measurement sampling. Use Stim for circuits with measurements. See <a href="https://unitaryfoundation.github.io/clifft/stable/guide/circuit-inputs/">Clifft’s supported input formats</a>.</p>
+<pre><code>curl --fail-with-body -sS "$BASE/api/jobs/qasm2" \
+  -H "Authorization: Bearer $QSIM_API_KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Bell probabilities","circuit":"OPENQASM 2.0; include \"qelib1.inc\"; qreg q[2]; h q[0]; cx q[0],q[1];","bitstrings":["00","01","10","11"],"bit_order":"big"}'</code></pre>
+<p>Save the idempotency key and request body before submitting; the example generates a fresh job. The completed summary reports probabilities <code>[0.5, 0, 0, 0.5]</code>. Its NPZ archive contains <code>bitstrings</code> and <code>probabilities</code>. Probability queries do not accept <code>shots</code> or <code>seed</code> on this endpoint.</p>
+</section>
+<section id="streaming"><h2>Transactional submission and streaming</h2>
+<p>Both format endpoints require an <code>Idempotency-Key</code>: 1–128 ASCII letters, digits, dots, underscores, colons, or hyphens. Generate one per intended job and persist it with the request body. Repeating that key with the same normalized body under the same API identity returns the same job ID, even after a connection timeout or process restart. Changing the body with that key returns <code>409</code>. Idempotency keys are scoped to each API identity.</p>
+<p>Acceptance returns <code>202</code>, a <code>Location</code> job URL, and <code>Idempotency-Replayed: true</code> or <code>false</code>. Acceptance means the job is durably queued, not that the circuit has compiled or succeeded. Retrying does not restart a failed or cancelled job; new work requires a new key. Reservations persist while the job exists and for at least 30 days from submission. During that window, retrying a deleted job returns <code>410</code>. After reservation expiry, an old key may create new work.</p>
+<h3>Watch progress with server-sent events</h3>
+<pre><code>curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
+  -H "Authorization: Bearer $QSIM_API_KEY"
+
+# After a disconnect, resume after the last fully processed event ID:
+curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
+  -H "Authorization: Bearer $QSIM_API_KEY" \
+  -H "Last-Event-ID: 2"</code></pre>
+<p>Events have increasing per-job <code>id</code> values and JSON <code>data</code>. <code>status</code> reports queued, launching, and running states. <code>result</code> reports success with the final summary and authenticated <code>result_url</code> for the complete NPZ arrays. <code>terminal</code> reports failure or cancellation. A reconnect replays events after your cursor; no cursor replays all retained events. Save the ID only after processing the event, and deduplicate if your client retries processing.</p>
+<p>Comments keep idle connections alive. Streams close at completion or after five minutes; a <code>reconnect</code> event requests reconnection with the same job and cursor. If a connection drops without that event, reconnect the same way. Disconnecting does not cancel or resubmit work. A revoked key closes the stream with an <code>error</code> event. Job deletion removes its event history. Each identity may open eight streams; the service allows 64 in total.</p>
+<p><strong>Incremental measurement samples are not available in Clifft 0.11’s CPU API.</strong> Its sampler returns complete arrays. Streaming therefore provides durable progress and a final result summary, followed by a separate streamed artifact download. The service does not split your simulation into independently seeded batches. <code>GET /api/capabilities</code> reports this limitation programmatically.</p>
+</section>
+<section id="reference"><h2>API reference</h2><p>Simulation and identity routes require <code>Authorization: Bearer &lt;key&gt;</code>. Job access is scoped to the key’s identity. <code>POST /api/key-requests</code> is anonymous: it accepts <code>name</code>, <code>email</code>, and <code>purpose</code>, and returns <code>202</code> with a pending-review acknowledgement. It never returns a key; no public request lookup or approval route is provided.</p><div class="table-wrap"><table><thead><tr><th>Method</th><th>Path</th><th>Behavior</th></tr></thead><tbody>
+<tr><td>GET</td><td><code>/api/me</code></td><td>Authenticated identity and engine information.</td></tr>
+<tr><td>GET</td><td><code>/api/capabilities</code></td><td>Formats, operations, and streaming support.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/stim</code></td><td>Idempotent Stim sampling submission; requires Idempotency-Key.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/qasm2</code></td><td>Idempotent unitary OpenQASM 2 probability query; requires Idempotency-Key.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs</code></td><td>General submission; Idempotency-Key optional for compatibility. Without it each call creates new work.</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/{id}/events</code></td><td>Resumable SSE progress and final result summary.</td></tr>
+<tr><td>GET</td><td><code>/api/jobs</code></td><td>List your saved jobs.</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/{id}</code></td><td>Status, error, and completed result summary.</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/{id}/result</code></td><td>Download the successful job’s .npz artifact.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/{id}/cancel</code></td><td>Cancel a queued or active job; returns 202.</td></tr>
+<tr><td>DELETE</td><td><code>/api/jobs/{id}</code></td><td>Remove a terminal job after compute cleanup; returns 204.</td></tr>
+</tbody></table></div><h3>General submission body</h3><p>The general route also accepts <code>operation</code>: <code>sample</code> (default) or <code>basis_probabilities</code>. Probability queries require <code>bitstrings</code> and support <code>bit_order</code>; <code>qasm2</code> requires the probability operation. Shots and seed apply only to sampling.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>
+<tr><td><code>circuit</code></td><td>Required text, 1–65,536 characters.</td><td>Required</td></tr>
+<tr><td><code>name</code></td><td>1–80 characters.</td><td>Untitled circuit</td></tr>
+<tr><td><code>input_format</code></td><td><code>stim</code> or supported <code>qasm2</code>.</td><td>stim</td></tr>
+<tr><td><code>shots</code></td><td>Integer, 1–10,000.</td><td>1000</td></tr>
+<tr><td><code>seed</code></td><td>Integer, 0–9,223,372,036,854,775,807.</td><td>42</td></tr>
+</tbody></table></div><h3>Response codes</h3><p><code>401</code>: missing, invalid, or revoked key. <code>404</code>: no job visible to your identity. <code>409</code>: idempotency conflict, result not ready, or cleanup incomplete. <code>410</code>: idempotent job deleted or expired. <code>400</code>: invalid event cursor. <code>413</code>: request too large. <code>422</code>: invalid fields. <code>429</code>: event-stream or request-rate limit. <code>503</code>: service configuration unavailable.</p></section>
+<section id="execution"><h2>Execution &amp; limits</h2><p>Simulation execution is asynchronous. A submitted job may wait in the queue before it starts. Poll the returned job ID to follow progress.</p><ul><li>Simulations run concurrently as cluster capacity permits. Placement failures stay queued and retry automatically.</li><li>Idle compute is reused with a fresh simulation process per job. Cold starts still add latency.</li><li>300-second simulation deadline; 20-minute deadline per dispatch attempt.</li><li>Clifft: at most 4,096 qubits, active width 22, and 1,000,000 output cells.</li><li>Google qsim: 1–26 declared qubits, single precision, two CPU threads. Both engines use the 2 CPU / 4 GiB worker profile and a 3 GiB process memory limit.</li><li>No fixed saved-job count cap or active-job concurrency limit.</li><li>Completed jobs expire after 30 days. Download results you need to retain.</li></ul><p>Clifft 0.11.0 provides CPU fixed-shot sampling and unitary basis-probability queries. Post-selection and experimental GPU backends are not exposed. Exact simulation still produces finite-shot statistical variation.</p></section>
+</div></div></main><footer><span>Clifft 0.11.0 + Google qsim 0.22.1 · CPU simulation API</span><a href="/agents.md" download="qsim-agent-guide.md">Agent API reference (.md)</a></footer></body></html>

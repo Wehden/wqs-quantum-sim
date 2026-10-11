@@ -218,3 +218,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Runtime, deployment and private operator material
+var/
+local/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.sqlite*
+*.db
+*.npz
+*.log
+kubeconfig*
+*credentials*
+*secret*.yaml
+*secret*.json
+.venv/
+__pycache__/
+.pytest_cache/
+test-results/

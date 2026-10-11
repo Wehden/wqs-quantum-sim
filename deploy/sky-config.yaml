@@ -1,0 +1,14 @@
+# Example only. Set the endpoint and context in an ignored local copy.
+api_server:
+  endpoint: http://skypilot.example.invalid:46580
+allowed_clouds: [kubernetes]
+kubernetes:
+  namespace: qsim-jobs
+  networking: portforward
+  set_pod_resource_limits: true
+  pod_config:
+    spec:
+      automountServiceAccountToken: false
+      activeDeadlineSeconds: 1200
+      nodeSelector:
+        kubernetes.io/arch: amd64

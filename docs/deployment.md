@@ -1,0 +1,60 @@
+# Deployment
+
+This repository supplies application images and example SkyPilot configuration.
+It does not contain a live cluster inventory or an unattended deployment installer.
+
+Build `api`, `controller`, and `worker` targets in `deploy/Dockerfile` and push them
+to your own registry. Pin the deployed images by digest. The controller image
+includes the SkyPilot client. The worker includes both simulation engines.
+
+Run one API and one controller with a shared persistent data directory. SQLite
+and the controller's file lock require storage with compatible locking semantics.
+The API serves port 8080. The controller runs `python -m qsim.controller`.
+
+| Setting | Purpose |
+| --- | --- |
+| `QSIM_DATA` | Persistent job database and result directory (default `var`) |
+| `QSIM_TOKEN_FILE` | Private invitation hash registry (default `var/users.json`) |
+| `QSIM_CALLBACK_URL` | API origin reachable by workers; loopback default is development-only |
+| `QSIM_WORKER_IMAGE` | Published immutable worker image; default `worker:local` is not a deployment image |
+| `QSIM_SKY_INFRA` | SkyPilot infrastructure selection, default `k8s`; supply your context |
+| `SKYPILOT_CONFIG` | Path to your private SkyPilot configuration |
+| `QSIM_TRUSTED_PROXY_CIDRS` | Explicit trusted proxy ranges, when using forwarded client addresses |
+
+Copy `deploy/sky-config.yaml` into ignored `local/`, then configure your SkyPilot
+API server, Kubernetes context, and workload namespace there. Set `SKYPILOT_CONFIG`
+to that copy. Confirm scheduling and image access before accepting submissions.
+No arbitrary node placements are encoded in the application.
+
+Publish only the API and documentation through your authenticated TLS ingress.
+Block `/internal/` at the public boundary: it carries worker callbacks and must
+be reachable only through the worker network. Never route the separate operator
+console to the public ingress. Scope service-account permissions and network
+policies to the application's needs.
+
+## Optional operator console and mail
+
+The console (`qsim.adminweb:app`) trusts its protected operator network. A Host
+allowlist is not an authentication boundary: restrict access at the network or
+identity-aware proxy. Set `QSIM_ADMIN_ORIGINS` to exact comma-separated origins.
+Mount independent `session-key` and Fernet `encryption-key` files under
+`QSIM_ADMIN_SECRET_DIR`. Never regenerate the encryption key with pending deliveries.
+The Kubernetes invitation updater currently expects namespace `qsim` and Secret
+`qsim-users`; provision those with least-privilege RBAC if using this console.
+
+Configure `QSIM_REVIEW_EMAIL`, `QSIM_SMTP_SENDER`, `QSIM_SMTP_HOST`,
+`QSIM_SMTP_PORT` (default 587), `QSIM_SMTP_USERNAME`, and
+`QSIM_SMTP_PASSWORD_FILE`. Delivery uses STARTTLS. `QSIM_PUBLIC_URL`,
+`QSIM_CONSOLE_URL`, and `QSIM_MAIL_DOMAIN` set email links and message identity.
+The static developer and agent guides contain reserved example base URLs;
+replace them in your private deployment build. No operator credentials belong
+in frontend assets.
+
+## Backups and upgrades
+
+Back up the SQLite database consistently together with results and private
+invitation/encryption material. Keep backups outside Git. `scripts/backup.py`
+is an optional helper for deployments following its documented resource names.
+Test restoration independently. Roll back image digests while preserving data.
+Workers are reused only when their image matches the configured digest; old
+workers complete and expire through normal SkyPilot lifecycle handling.
