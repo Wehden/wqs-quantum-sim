@@ -1,6 +1,7 @@
 """Read-only SkyPilot reporting, isolated from the dispatcher and web requests."""
 import json
 import math
+import os
 import re
 import time
 from . import settings
@@ -69,6 +70,34 @@ def summarize(clusters, history):
             'history_days': 30}
 
 
+def pod_placements(pods):
+    """Map our single-node SkyPilot workers to actual Kubernetes node names."""
+    candidates = {}
+    for pod in pods:
+        metadata, spec, status = pod.metadata, pod.spec, pod.status
+        labels = metadata.labels or {}
+        match = re.fullmatch(r'(qs-[0-9a-f]{20})-[a-z0-9]+', labels.get('skypilot-cluster-name', ''))
+        if not match or labels.get('workload') != 'qsim' or labels.get('ray-node-type') != 'head':
+            continue
+        if metadata.deletion_timestamp or status.phase not in ('Pending', 'Running'):
+            continue
+        candidates.setdefault(match[1], set()).add(spec.node_name)
+    # Ambiguous placements are unknown, never counted on two hosts.
+    return {cluster: next(iter(nodes)) for cluster, nodes in candidates.items() if len(nodes) == 1}
+
+
+def collect_placements():
+    try:
+        from kubernetes import client, config
+        config.load_incluster_config()
+        pods = client.CoreV1Api().list_namespaced_pod(
+            os.environ.get('QSIM_WORKER_NAMESPACE', 'qsim-jobs'),
+            label_selector='workload=qsim,ray-node-type=head', _request_timeout=15)
+        return {'observed_at': time.time(), 'clusters': pod_placements(pods.items)}
+    except Exception as error:
+        return {'observed_at': time.time(), 'clusters': {}, 'error': type(error).__name__}
+
+
 def write_snapshot(value):
     path = settings.DATA / 'skypilot-observation.json'
     temporary = path.with_suffix('.tmp')
@@ -82,7 +111,8 @@ def collect(sky):
     clusters = sky.get(sky.status(cluster_names=['qs-*'], refresh=StatusRefreshMode.AUTO, all_users=True))
     history = sky.get(sky.cost_report(days=30))
     snapshot = summarize(clusters, history)
-    snapshot.update(observed_at=time.time(), jobs=[], queue_errors=[], queues_complete=False)
+    snapshot.update(observed_at=time.time(), jobs=[], queue_errors=[], queues_complete=False,
+                    placements=collect_placements())
     write_snapshot(snapshot)
     # Native queue only needs reachable UP workers; preserve separate Qsim states.
     requests = [(w['name'], sky.queue(w['name'], skip_finished=True, all_users=True))

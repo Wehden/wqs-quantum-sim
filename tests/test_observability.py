@@ -16,3 +16,24 @@ def test_native_resources_scope_and_no_double_counting():
     assert result['history']['worker_hours']==2
     assert result['history']['unknown_resource_records']==1
     assert len(result['workers'])==1
+
+
+def test_pod_placement_uses_actual_nodes_and_rejects_ambiguous_or_dead_workers():
+    from qsim.observability import pod_placements
+    def pod(cluster, node, phase='Running', deleting=None, **labels):
+        return NS(metadata=NS(labels={'workload':'qsim','ray-node-type':'head','skypilot-cluster-name':cluster+'-abc123',**labels},deletion_timestamp=deleting),spec=NS(node_name=node),status=NS(phase=phase))
+    a,b,c,d,e=['qs-'+letter*20 for letter in 'abcde']
+    result=pod_placements([pod(a,'node-a'),pod(a,'node-a'),pod(b,None,'Pending'),
+        pod(c,'node-c','Failed'),pod(c,'node-c','Succeeded'),pod(d,'node-d',deleting='now'),
+        pod(e,'node-a'),pod(e,'node-b'),pod('unrelated','node-z'),pod(c,'node-c',workload='other')])
+    assert result=={a:'node-a',b:None}
+
+
+def test_placement_failure_is_reported_without_exception_details(monkeypatch):
+    from kubernetes import config
+    from qsim.observability import collect_placements
+    def fail():raise RuntimeError('private connection details')
+    monkeypatch.setattr(config,'load_incluster_config',fail)
+    result=collect_placements()
+    assert result['error']=='RuntimeError' and result['clusters']=={}
+    assert 'private' not in str(result)

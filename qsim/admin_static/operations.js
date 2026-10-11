@@ -13,6 +13,10 @@ async function refreshOperations() {
   operationsBusy=true;
   try {
     const data=await call('operations?offset='+operationsOffset), sky=data.skypilot, counts=data.counts;
+    const placement=data.jobs_by_hostname;
+    tableRows($('hostname-rows'),placement?.hosts || [],[r=>r.hostname,r=>r.launching,r=>r.running,r=>r.total]);
+    $('hostname-status').textContent=placement ? `${placement.total_active} active jobs. Queued or not yet assigned: ${placement.unplaced}. Placement unknown: ${placement.unknown}. Node assignments observed ${date(placement.observed_at)}.${placement.stale ? ' Placement data unavailable or stale; host counts are withheld.' : ''}` : 'Waiting for node placement data.';
+    $('hostname-status').className=placement?.stale?'error':'status';
     $('job-metrics').replaceChildren(...['QUEUED','LAUNCHING','RUNNING','SUCCEEDED','FAILED','CANCELLED'].map(s=>metric(s,amount(counts[s] || 0))));
     $('resource-metrics').replaceChildren(
       metric('CPUs allocated · UP workers',amount(sky.current?.cpus)),

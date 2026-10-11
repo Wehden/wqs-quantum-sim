@@ -1,0 +1,31 @@
+# Example for an observer in qsim and workers in qsim-jobs.
+# Bind only this service account to the observer pod. Do not use it on the public API.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qsim-observer
+  namespace: qsim
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qsim-observer-pods
+  namespace: qsim-jobs
+rules:
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qsim-observer-pods
+  namespace: qsim-jobs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: qsim-observer-pods
+subjects:
+  - kind: ServiceAccount
+    name: qsim-observer
+    namespace: qsim
