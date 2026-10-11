@@ -58,3 +58,7 @@ is an optional helper for deployments following its documented resource names.
 Test restoration independently. Roll back image digests while preserving data.
 Workers are reused only when their image matches the configured digest; old
 workers complete and expire through normal SkyPilot lifecycle handling.
+
+The console navigation separates Jobs (`#jobs`) from Approvals (`#approvals`).
+Jobs opens by default. Existing `#request-<id>` notification links open Approvals
+and focus the request directly. Only the active page polls its data.
