@@ -11,30 +11,27 @@ concurrency:
   cancel-in-progress: true
 jobs:
   route:
-    name: Choose CI lane
+    name: Choose and explain CI path
     runs-on: ubuntu-24.04
     outputs:
-      runner: ${{ steps.choose.outputs.runner }}
+      lane: ${{ steps.choose.outputs.lane }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - id: choose
         env:
           LOCAL_ENABLED: ${{ vars.WQS_LOCAL_CI_ENABLED }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
-          kind = os.environ['GITHUB_EVENT_NAME']
-          trusted_pr = kind == 'pull_request' and event['pull_request']['head']['repo']['full_name'] == os.environ['GITHUB_REPOSITORY']
-          trusted_push = kind == 'push' and os.environ['GITHUB_REF'] == 'refs/heads/main'
-          local = os.environ.get('LOCAL_ENABLED') == 'true' and (trusted_pr or trusted_push)
-          runner = ['self-hosted','Linux','X64','wqs-local'] if local else ['ubuntu-24.04']
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write('runner=' + json.dumps(runner) + '\n')
-          PY
-  test:
-    name: Both engines / Python 3.12
+        run: python3 tools/ci/route.py
+  local:
+    name: Standpunkt / Clifft + Google qsim / Python 3.12
     needs: route
-    runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
+    if: needs.route.outputs.lane == 'local'
+    runs-on: [self-hosted, Linux, X64, wqs-local]
+    continue-on-error: true
+    outputs:
+      tests: ${{ steps.tests.outcome }}
+      artifact: ${{ steps.artifact.outcome }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,11 +49,78 @@ jobs:
         if: runner.environment == 'github-hosted'
         run: python -m pip install uv==0.11.6
       - name: Test both simulators and API contracts
+        id: tests
         run: bash tools/ci/check.sh
       - name: Retain test results
+        id: artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          name: test-results-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/*.xml
           retention-days: 14
+  hosted:
+    name: GitHub-hosted / Clifft + Google qsim / Python 3.12
+    needs: [route, local]
+    if: >-
+      always() && !cancelled() && needs.route.result == 'success' &&
+      (needs.route.outputs.lane == 'hosted' || needs.local.outputs.tests != 'success' || needs.local.outputs.artifact != 'success')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: runner.environment == 'github-hosted'
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: runner.environment == 'github-hosted'
+        with:
+          node-version: '22'
+      - name: Install pinned environment tool
+        if: runner.environment == 'github-hosted'
+        run: python -m pip install uv==0.11.6
+      - name: Test both simulators and API contracts
+        id: tests
+        run: bash tools/ci/check.sh
+      - name: Retain test results
+        id: artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/*.xml
+          retention-days: 14
+  result:
+    name: CI result and path
+    needs: [route, local, hosted]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report actual execution and gate the result
+        env:
+          ROUTE: ${{ needs.route.outputs.lane }}
+          ROUTE_RESULT: ${{ needs.route.result }}
+          LOCAL_TESTS: ${{ needs.local.outputs.tests }}
+          LOCAL_ARTIFACT: ${{ needs.local.outputs.artifact }}
+          HOSTED_RESULT: ${{ needs.hosted.result }}
+        run: |
+          python3 - <<'PY'
+          import os
+          local_ok = os.environ['LOCAL_TESTS'] == 'success' and os.environ['LOCAL_ARTIFACT'] == 'success'
+          if os.environ['ROUTE'] == 'local' and local_ok:
+              detail = 'Standpunkt: passed. GitHub-hosted test suite: skipped (fallback not needed).'
+              passed = os.environ['HOSTED_RESULT'] == 'skipped'
+          elif os.environ['ROUTE'] == 'local':
+              detail = 'Standpunkt: unsuccessful. GitHub-hosted retry: ' + os.environ['HOSTED_RESULT'] + '.'
+              passed = os.environ['HOSTED_RESULT'] == 'success'
+          else:
+              detail = 'Standpunkt: skipped by routing. GitHub-hosted test suite: ' + os.environ['HOSTED_RESULT'] + '.'
+              passed = os.environ['HOSTED_RESULT'] == 'success'
+          print(detail)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## Actual CI path\n\n' + detail + '\n\nBoth test lanes cover Clifft, Google qsim, and API/console behavior. Routing and this result report run on GitHub-hosted infrastructure.\n')
+          raise SystemExit(0 if passed and os.environ['ROUTE_RESULT'] == 'success' else 1)
+          PY
