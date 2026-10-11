@@ -9,11 +9,10 @@ function tableRows(target, rows, columns) {
   for(const row of rows) {const tr=node('tr','');for(const column of columns) tr.append(node('td',String(column(row) ?? '—')));target.append(tr);}
 }
 async function refreshOperations() {
-  if(operationsBusy) return;
+  if(!sessionReady || consolePage() !== 'jobs' || operationsBusy) return;
   operationsBusy=true;
   try {
     const data=await call('operations?offset='+operationsOffset), sky=data.skypilot, counts=data.counts;
-    $('operations').hidden=false;
     $('job-metrics').replaceChildren(...['QUEUED','LAUNCHING','RUNNING','SUCCEEDED','FAILED','CANCELLED'].map(s=>metric(s,amount(counts[s] || 0))));
     $('resource-metrics').replaceChildren(
       metric('CPUs allocated · UP workers',amount(sky.current?.cpus)),
@@ -38,4 +37,5 @@ $('operations-refresh').onclick=refreshOperations;
 let operationsStarted=false;
 function startOperations(){if(operationsStarted)return;operationsStarted=true;refreshOperations();setInterval(refreshOperations,15000);}
 window.addEventListener('qsim-session',startOperations);
+window.addEventListener('qsim-page',refreshOperations);
 if(csrf)startOperations();

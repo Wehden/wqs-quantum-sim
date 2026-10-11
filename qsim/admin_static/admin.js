@@ -1,4 +1,15 @@
-let csrf = '', timer, focusedRequest = '';
+let csrf = '', timer, focusedRequest = '', sessionReady = false;
+const consolePage = () => location.hash === '#approvals' || /^#request-[a-f0-9]{32}$/.test(location.hash) ? 'approvals' : 'jobs';
+function showConsolePage() {
+  const approvals = consolePage() === 'approvals';
+  $('review').hidden = !sessionReady || !approvals;
+  $('operations').hidden = !sessionReady || approvals;
+  $('nav-jobs').setAttribute('aria-current', approvals ? 'false' : 'page');
+  $('nav-approvals').setAttribute('aria-current', approvals ? 'page' : 'false');
+  if (!sessionReady) return;
+  if (approvals) refresh().catch(error => $('notice').textContent = error.message);
+  window.dispatchEvent(new Event('qsim-page'));
+}
 const identityDrafts = new Map();
 const editingIdentity = () => document.activeElement?.id?.startsWith('identity-');
 const linkedRequest = () => /^#request-([a-f0-9]{32})$/.exec(location.hash)?.[1];
@@ -14,7 +25,7 @@ async function call(path, body) {
   try {value = JSON.parse(await response.text());}
   catch {throw new Error('Console temporarily unavailable. Please retry shortly.');}
   if(!response.ok) {
-    if(response.status === 401) { clearInterval(timer);$('review').hidden=true;const panel=$('operations');if(panel)panel.hidden=true; }
+    if(response.status === 401) { sessionReady=false; clearInterval(timer);$('review').hidden=true;const panel=$('operations');if(panel)panel.hidden=true; }
     throw new Error(typeof value.detail === 'string' ? value.detail:'Request could not be completed');
   }
   return value;
@@ -24,6 +35,7 @@ async function action(id, name, body={}) {
   catch(error) { $('notice').textContent=error.message; }
 }
 async function refresh(automatic=false) {
+  if(!sessionReady || consolePage() !== 'approvals') return;
   if(automatic && editingIdentity()) return;
   const rows=await call('requests'), linked=linkedRequest();
   let linkedError='';
@@ -59,7 +71,7 @@ async function refresh(automatic=false) {
   }
   focusLinkedRequest();
 }
-window.addEventListener('hashchange',()=>{focusedRequest='';refresh().catch(error=>$('notice').textContent=error.message);});
-async function signedIn(user) {csrf=user.csrf;$('who').textContent='Internal network operator session';$('review').hidden=false;clearInterval(timer);timer=setInterval(()=>refresh(true).catch(e=>$('notice').textContent=e.message),15000);window.dispatchEvent(new Event('qsim-session'));await refresh();}
+window.addEventListener('hashchange',()=>{focusedRequest='';$('notice').textContent='';showConsolePage();});
+async function signedIn(user) {csrf=user.csrf;$('who').textContent='Internal network operator session';sessionReady=true;showConsolePage();clearInterval(timer);timer=setInterval(()=>refresh(true).catch(e=>$('notice').textContent=e.message),15000);window.dispatchEvent(new Event('qsim-session'));}
 $('refresh').onclick=()=>refresh().catch(e=>$('notice').textContent=e.message);
 call('session',{}).then(signedIn).catch(error=>{$('notice').textContent=error.message;});
