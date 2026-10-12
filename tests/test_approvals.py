@@ -191,3 +191,30 @@ def test_operations_private_paginated_and_stale(clients):
     assert admin.get('/operations').json()['skypilot']['stale'] is False
     (settings.DATA/'skypilot-observation.json').write_text(json.dumps({'observed_at':now-181}))
     assert admin.get('/operations').json()['skypilot']['stale'] is True
+
+
+def test_hostname_counts_cover_all_jobs_and_withhold_stale_placement(clients):
+    public,admin=clients;bootstrap(admin);now=time.time()
+    with store.connect() as db:
+        for i in range(105):
+            state='RUNNING' if i<101 else ['LAUNCHING','QUEUED','RUNNING','SUCCEEDED'][i-101]
+            cluster='qs-a' if i<101 else ['qs-b',None,'qs-missing','qs-a'][i-101]
+            db.execute('INSERT INTO jobs (id,owner,name,status,created,updated,request,callback_hash) VALUES (?,?,?,?,?,?,?,?)',
+                       (str(i),'owner','test',state,now,now,'private circuit','private token'))
+            db.execute('INSERT INTO job_dispatch(job_id,cluster) VALUES(?,?)',(str(i),cluster))
+    snapshot={'observed_at':now,'placements':{'observed_at':now,'clusters':{'qs-a':'node-a','qs-b':'node-b','qs-idle':'node-idle'}}}
+    path=settings.DATA/'skypilot-observation.json';path.write_text(json.dumps(snapshot))
+    data=admin.get('/operations?offset=100').json();groups=data['jobs_by_hostname']
+    assert len(data['jobs'])==5
+    assert groups['hosts']==[
+        {'hostname':'node-a','running':101,'launching':0,'total':101},
+        {'hostname':'node-b','running':0,'launching':1,'total':1},
+        {'hostname':'node-idle','running':0,'launching':0,'total':0}]
+    assert groups['total_active']==104 and groups['unplaced']==1 and groups['unknown']==1
+    assert 'private circuit' not in json.dumps(data) and 'private token' not in json.dumps(data)
+    snapshot['placements']['observed_at']=now-181;path.write_text(json.dumps(snapshot))
+    groups=admin.get('/operations').json()['jobs_by_hostname']
+    assert groups['stale'] is True and groups['hosts']==[] and groups['unknown']==103
+    snapshot['placements'].update(observed_at=now,error='ApiException');path.write_text(json.dumps(snapshot))
+    assert admin.get('/operations').json()['jobs_by_hostname']['hosts']==[]
+    assert public.get('/operations').status_code==404

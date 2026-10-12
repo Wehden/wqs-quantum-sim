@@ -62,3 +62,20 @@ workers complete and expire through normal SkyPilot lifecycle handling.
 The console navigation separates Jobs (`#jobs`) from Approvals (`#approvals`).
 Jobs opens by default. Existing `#request-<id>` notification links open Approvals
 and focus the request directly. Only the active page polls its data.
+
+## Jobs by hostname
+
+The Jobs page groups active simulation jobs by the actual Kubernetes node name.
+The query covers every active job, independent of the paginated job table.
+Queued or unassigned work is counted separately; missing, ambiguous, or stale
+placement is shown as unknown. Failed/completed pods are excluded from current
+placement. Idle workers count as zero jobs; this is not a lifetime job history.
+
+Run the observer with the `qsim-observer` service account, a projected service-account
+token, and read-only pod-list permission in the worker namespace. See
+`deploy/observer-rbac.example.yaml`; adapt namespace names to your deployment.
+Set `QSIM_WORKER_NAMESPACE` if different from `qsim-jobs`. Allow the observer to
+reach the Kubernetes API through its egress policy. Do not grant it Secret,
+node, scheduling, or pod mutation access. The public API requires no extra RBAC.
+If this permission is absent, existing SkyPilot metrics remain available while
+the console explicitly reports placement data as unavailable.

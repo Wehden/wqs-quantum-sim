@@ -61,12 +61,15 @@ test('operations shows native totals, missing-data warning and paginates jobs', 
     append(...children){this.children.push(...children);}
     replaceChildren(...children){this.children=children;}
   }
-  for(const id of ['operations','job-metrics','resource-metrics','operations-status','resource-detail','job-rows','job-page','jobs-prev','jobs-next','worker-rows','native-job-rows','native-status','operations-refresh']) elements.set(id,new Element());
+  for(const id of ['hostname-rows','hostname-status','operations','job-metrics','resource-metrics','operations-status','resource-detail','job-rows','job-page','jobs-prev','jobs-next','worker-rows','native-job-rows','native-status','operations-refresh']) elements.set(id,new Element());
   let paths=[], missing=false;
-  const data={observed_at:100,counts:{QUEUED:3,SUCCEEDED:102},total:105,jobs:[{name:'<script>test</script>',id:'test',status:'QUEUED'}],skypilot:{observed_at:100,stale:false,current:{cpus:4,memory_gib:8,up_workers:2},history:{cpu_hours:12,memory_gib_hours:24,worker_hours:6,history_records:2},workers:[],jobs:[],queues_complete:true,queues_observed_at:100}};
+  const data={jobs_by_hostname:{hosts:[{hostname:'node-a',launching:1,running:2,total:3}],unplaced:4,unknown:1,total_active:8,observed_at:100,stale:false},observed_at:100,counts:{QUEUED:3,SUCCEEDED:102},total:105,jobs:[{name:'<script>test</script>',id:'test',status:'QUEUED'}],skypilot:{observed_at:100,stale:false,current:{cpus:4,memory_gib:8,up_workers:2},history:{cpu_hours:12,memory_gib_hours:24,worker_hours:6,history_records:2},workers:[],jobs:[],queues_complete:true,queues_observed_at:100}};
   const context=vm.createContext({csrf:'ready',sessionReady:true,consolePage:()=> 'jobs',$:id=>elements.get(id),node:(tag,text)=>{const e=new Element();e.textContent=text;return e;},call:async path=>{paths.push(path);return {...data,skypilot:missing?{stale:true}:data.skypilot};},window:{addEventListener(){}},setInterval(){},Date});
   vm.runInContext(fs.readFileSync('qsim/admin_static/operations.js','utf8'),context);
   await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(elements.get('hostname-rows').children[0].children[0].textContent,'node-a');
+  assert.equal(elements.get('hostname-rows').children[0].children[3].textContent,'3');
+  assert.match(elements.get('hostname-status').textContent,/not yet assigned: 4/);
   assert.equal(elements.get('resource-metrics').children[0].children[1].textContent,'4');
   assert.equal(elements.get('job-rows').children[0].children[0].textContent,'<script>test</script>');
   assert.equal(elements.get('jobs-prev').disabled,true);

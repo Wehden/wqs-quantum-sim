@@ -210,12 +210,37 @@ def logout(request:Request):
     mutation(request);response=JSONResponse({'status':'signed out'});response.delete_cookie(COOKIE,path=COOKIE_PATH);return response
 
 
+def hostname_counts(active_jobs, placement, now):
+    observed = placement.get('observed_at', 0)
+    available = bool(observed) and now - observed <= 180 and not placement.get('error')
+    clusters = placement.get('clusters', {}) if available else {}
+    hosts = {host: {'hostname': host, 'launching': 0, 'running': 0, 'total': 0}
+             for host in clusters.values() if host}
+    unplaced, unknown = 0, 0
+    for job in active_jobs:
+        cluster = job['cluster']
+        if job['status'] == 'QUEUED' or (job['status'] == 'LAUNCHING' and not cluster):
+            unplaced += 1
+        elif cluster in clusters and clusters[cluster]:
+            host = hosts[clusters[cluster]]
+            host[job['status'].lower()] += 1
+            host['total'] += 1
+        elif available and cluster in clusters and clusters[cluster] is None:
+            unplaced += 1
+        else:
+            unknown += 1
+    return {'hosts': sorted(hosts.values(), key=lambda row: (-row['total'], row['hostname'])),
+            'unplaced': unplaced, 'unknown': unknown, 'total_active': len(active_jobs),
+            'observed_at': observed or None, 'stale': not available, 'error': placement.get('error')}
+
+
 @app.get('/operations')
 def operations(request: Request, offset: int = Query(default=0, ge=0)):
     session(request)
     now = time.time()
     with store.connect() as db:
         counts = dict(db.execute('SELECT status,COUNT(*) FROM jobs GROUP BY status').fetchall())
+        active = [dict(r) for r in db.execute("SELECT j.status,d.cluster FROM jobs j LEFT JOIN job_dispatch d ON d.job_id=j.id WHERE j.status IN ('QUEUED','LAUNCHING','RUNNING')")]
         rows = [dict(r) for r in db.execute("""SELECT j.id,j.name,j.owner,j.status,j.created,j.updated,j.error,d.cluster
             FROM jobs j LEFT JOIN job_dispatch d ON d.job_id=j.id
             ORDER BY (j.status IN ('QUEUED','LAUNCHING','RUNNING')) DESC,j.created DESC,j.id
@@ -226,7 +251,8 @@ def operations(request: Request, offset: int = Query(default=0, ge=0)):
         sky = {}
     sky['stale'] = now - sky.get('observed_at', 0) > 180 or bool(sky.get('last_error'))
     return {'observed_at': now, 'counts': counts, 'total': sum(counts.values()),
-            'jobs': rows, 'offset': offset, 'page_size': 100, 'skypilot': sky}
+            'jobs': rows, 'offset': offset, 'page_size': 100, 'skypilot': sky,
+            'jobs_by_hostname': hostname_counts(active, sky.get('placements', {}), now)}
 
 
 @app.get('/requests')
