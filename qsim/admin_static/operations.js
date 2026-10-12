@@ -26,7 +26,7 @@ async function refreshOperations() {
     $('operations-status').textContent=`Jobs updated ${date(data.observed_at)}. SkyPilot observed ${date(sky.observed_at)}.${sky.stale ? ' SkyPilot data unavailable or stale; values may be outdated.' : ''}${sky.last_error ? ' Last collection failed: '+sky.last_error+'.' : ''}`;
     $('operations-status').className=sky.stale?'error':'status';
     $('resource-detail').textContent=`${sky.current ? sky.current.up_workers+' UP workers. ' : ''}SkyPilot 30-day history: ${sky.history ? sky.history.history_records+' worker records; '+amount(sky.history.worker_hours)+' worker-hours. ' : 'unavailable. '}${sky.history?.unknown_resource_records || sky.current?.unknown_resource_workers ? 'Some resource values are unknown; totals are partial. ' : ''}Allocated resource time includes idle workers. It is not measured CPU or RAM utilization; Kubernetes billing cost is not inferred.`;
-    tableRows($('job-rows'),data.jobs,[r=>r.name,r=>r.id,r=>r.owner,r=>r.status,r=>r.cluster,r=>date(r.updated),r=>r.error]);
+    tableRows($('job-rows'),data.jobs,[r=>r.name,r=>r.id,r=>r.owner,r=>r.status,r=>r.hostname || (r.status==='QUEUED' ? 'Not assigned' : 'Unknown'),r=>date(r.updated),r=>r.error]);
     $('job-page').textContent=`${data.total ? operationsOffset+1 : 0}–${Math.min(operationsOffset+data.jobs.length,data.total)} of ${data.total} saved jobs; active jobs first.`;
     $('jobs-prev').disabled=operationsOffset===0;$('jobs-next').disabled=operationsOffset+data.jobs.length>=data.total;
     tableRows($('worker-rows'),sky.workers || [],[r=>r.name,r=>r.status,r=>amount(r.cpus),r=>amount(r.memory_gib)]);

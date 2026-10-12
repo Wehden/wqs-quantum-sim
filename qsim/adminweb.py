@@ -250,6 +250,12 @@ def operations(request: Request, offset: int = Query(default=0, ge=0)):
     except (OSError, ValueError):
         sky = {}
     sky['stale'] = now - sky.get('observed_at', 0) > 180 or bool(sky.get('last_error'))
+    placement = sky.get('placements', {})
+    fresh = bool(placement.get('observed_at')) and now - placement['observed_at'] <= 180 and not placement.get('error')
+    clusters = placement.get('clusters', {}) if fresh else {}
+    for row in rows:
+        # Current placement cannot establish where a completed job ran.
+        row['hostname'] = clusters.get(row['cluster']) if row['status'] in ('LAUNCHING', 'RUNNING') else None
     return {'observed_at': now, 'counts': counts, 'total': sum(counts.values()),
             'jobs': rows, 'offset': offset, 'page_size': 100, 'skypilot': sky,
             'jobs_by_hostname': hostname_counts(active, sky.get('placements', {}), now)}
