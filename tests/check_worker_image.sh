@@ -15,7 +15,4 @@ for log,marker in [('apt-ssh-setup','apt_ssh_setup_complete'),('runtime-setup','
  assert subprocess.check_output(['/usr/local/bin/tail','-f','-n','+1',str(p)],timeout=3)==out
  assert subprocess.check_output(['/usr/local/bin/tail','-n','1',str(p)])==b'last\n'
 print('All startup followers: wait, completion, failed marker, drain and GNU passthrough passed')
-proc=subprocess.run(['/usr/local/bin/python3','-c','import signal,time;signal.alarm(1);time.sleep(20)'])
-assert proc.returncode == -signal.SIGALRM
-print('Self-enforced wall deadline passed')
 PY

@@ -57,9 +57,6 @@ def recover_intent(sky, row, kind):
     if matches:
         latest = max(matches, key=lambda r: r.created_at)
         save_dispatch(row['id'], **{kind + '_id': str(latest.request_id), 'intent': None})
-    elif time.time() - row['intent_at'] > settings.JOB_DEADLINE:
-        mark_failed(row['id'], 'Dispatch acknowledgement unavailable; contact the service operator')
-        # Retain intent: cleanup must not race a potentially accepted launch.
 
 
 def cleanup_job(sky, row):
@@ -138,7 +135,7 @@ def advance(sky, row):
         changed = db.execute("UPDATE jobs SET status='LAUNCHING', updated=?, started=? WHERE id=? AND status='QUEUED'", (time.time(), time.time(), row['id'])).rowcount
         if not changed:
             return
-        worker = db.execute('SELECT cluster FROM worker_pool WHERE job_id IS NULL AND retired=0 AND image=? AND created>? AND released>? ORDER BY released DESC LIMIT 1', (settings.WORKER_IMAGE,time.time()-840,time.time()-540)).fetchone()
+        worker = db.execute('SELECT cluster FROM worker_pool WHERE job_id IS NULL AND retired=0 AND image=? AND released>? ORDER BY released DESC LIMIT 1', (settings.WORKER_IMAGE,time.time()-540)).fetchone()
         cluster = worker['cluster'] if worker else cluster_name(row['id'])
         method = 'exec' if worker else 'launch'
         if worker:
@@ -160,13 +157,12 @@ def tick():
     sky = sky_client()
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
-        db.execute('DELETE FROM worker_pool WHERE job_id IS NULL AND (created<? OR released<?)', (time.time()-1200,time.time()-660))
+        db.execute('DELETE FROM worker_pool WHERE job_id IS NULL AND released<?', (time.time()-660,))
         for old in db.execute('SELECT id FROM jobs WHERE cleaned=1 AND updated<?', (time.time()-30*86400,)).fetchall():
             shutil.rmtree(settings.DATA / old['id'], ignore_errors=True)
             db.execute('DELETE FROM job_dispatch WHERE job_id=?', (old['id'],))
             db.execute('DELETE FROM jobs WHERE id=?', (old['id'],))
         db.execute("INSERT OR IGNORE INTO job_dispatch(job_id) SELECT id FROM jobs WHERE cleaned=0")
-        db.execute("UPDATE jobs SET status='FAILED',error='Job exceeded the 20 minute dispatch deadline',updated=? WHERE status IN ('LAUNCHING','RUNNING') AND started<? AND id NOT IN (SELECT job_id FROM job_dispatch WHERE retry_pending=1)", (time.time(), time.time()-settings.JOB_DEADLINE))
         rows = db.execute("SELECT jobs.*,job_dispatch.* FROM jobs JOIN job_dispatch ON jobs.id=job_dispatch.job_id WHERE cleaned=0 ORDER BY (status='QUEUED'),created").fetchall()
     for row in rows:
         try:

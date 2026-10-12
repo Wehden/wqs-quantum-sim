@@ -79,3 +79,11 @@ reach the Kubernetes API through its egress policy. Do not grant it Secret,
 node, scheduling, or pod mutation access. The public API requires no extra RBAC.
 If this permission is absent, existing SkyPilot metrics remain available while
 the console explicitly reports placement data as unavailable.
+
+### Active job lifetime
+
+Active simulations have no pod lifetime, controller dispatch deadline, simulator wall-clock alarm, or CPU-time budget. Explicit cancellation still tears down the assigned worker. SkyPilot's ten-minute idle autodown remains enabled and waits for running/pending native jobs to finish. Worker reuse depends on idle time and image compatibility, not worker age.
+
+Roll out the worker image, controller, and SkyPilot pod configuration together when removing the old deadlines. Existing pods and old worker images retain their original limits; drain idle old workers through SkyPilot before accepting new work with the updated image. Do not restart active simulations to apply this change.
+
+Memory (3 GiB per simulation process), output-size and circuit limits remain. Infrastructure failures, OOM kills, and explicit cancellation can still stop a job. Callback HTTP requests retain a 20-second per-attempt timeout with five attempts; delivery failure can prevent recording a result after simulation finishes. SSE connections still rotate after five minutes without cancelling the simulation.
