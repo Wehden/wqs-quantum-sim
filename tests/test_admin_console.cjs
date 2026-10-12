@@ -16,7 +16,7 @@ test('identity drafts survive refresh, editing defers polling, and rollout error
     focus() { active=this; }
     scrollIntoView() {}
   }
-  for (const id of ['requests','review','operations','nav-jobs','nav-approvals','notice','who','refresh']) { const e=new Element('div');e.id=id; }
+  for (const id of ['requests','review','operations','nav-jobs','nav-approvals','service-jobs','native-jobs','nav-service-jobs','nav-native-jobs','notice','who','refresh']) { const e=new Element('div');e.id=id; }
   const id='a'.repeat(32);
   const row={id,status:'PENDING',email:'caller@example.com',name:'Caller',purpose:'Testing',created:1,notification_state:'SENT',notification_attempts:1,delivery_state:'NONE',delivery_attempts:0};
   const context=vm.createContext({
@@ -108,6 +108,13 @@ test('console pages preserve navigation during pending jobs and open approval de
   assert.equal(elements.get('operations').hidden,false);
   assert.equal(elements.get('review').hidden,true);
   assert.equal(paths.includes('./requests'),false);
+  assert.equal(elements.get('service-jobs').hidden,false);
+  assert.equal(elements.get('native-jobs').hidden,true);
+  vm.runInContext("location.hash='#jobs-skypilot';window.dispatchEvent(new Event('hashchange'))",context);await settle();
+  assert.equal(elements.get('operations').hidden,false);
+  assert.equal(elements.get('service-jobs').hidden,true);
+  assert.equal(elements.get('native-jobs').hidden,false);
+  assert.equal(elements.get('nav-native-jobs').attributes['aria-current'],'page');
   vm.runInContext("location.hash='#approvals';window.dispatchEvent(new Event('hashchange'))",context);await settle();
   assert.equal(elements.get('review').hidden,false);
   release();await settle();
@@ -115,6 +122,8 @@ test('console pages preserve navigation during pending jobs and open approval de
   assert.equal(elements.get('nav-approvals').attributes['aria-current'],'page');
   const before=paths.length;await vm.runInContext('refreshOperations()',context);assert.equal(paths.length,before);
   vm.runInContext("location.hash='#jobs';window.dispatchEvent(new Event('hashchange'))",context);await settle();
+  assert.equal(elements.get('service-jobs').hidden,false);
+  assert.equal(elements.get('native-jobs').hidden,true);
   const after=paths.length;await vm.runInContext('refresh(true)',context);assert.equal(paths.length,after);
   vm.runInContext(`location.hash='#request-${id}';window.dispatchEvent(new Event('hashchange'))`,context);await settle();
   assert.equal(elements.get('review').hidden,false);

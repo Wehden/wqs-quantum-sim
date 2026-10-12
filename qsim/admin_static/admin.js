@@ -6,6 +6,11 @@ function showConsolePage() {
   $('operations').hidden = !sessionReady || approvals;
   $('nav-jobs').setAttribute('aria-current', approvals ? 'false' : 'page');
   $('nav-approvals').setAttribute('aria-current', approvals ? 'page' : 'false');
+  const nativeJobs = location.hash === '#jobs-skypilot';
+  $('service-jobs').hidden = nativeJobs;
+  $('native-jobs').hidden = !nativeJobs;
+  $('nav-service-jobs').setAttribute('aria-current', nativeJobs ? 'false' : 'page');
+  $('nav-native-jobs').setAttribute('aria-current', nativeJobs ? 'page' : 'false');
   if (!sessionReady) return;
   if (approvals) refresh().catch(error => $('notice').textContent = error.message);
   window.dispatchEvent(new Event('qsim-page'));
