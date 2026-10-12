@@ -159,7 +159,7 @@ The general submission route accepts `input_format` (`stim` or `qasm2`) and `ope
 - Probability queries: 1–256 bitstrings, each at most 4,096 characters.
 - Clifft limits: at most 4,096 qubits, active width 22, and 1,000,000 sampled output cells.
 - Google qsim: 1–26 declared qubits, two CPU threads, single precision. Both engines use a 2 CPU / 4 GiB worker with a 3 GiB process memory limit.
-- Execution: simulations run concurrently as cluster capacity permits. Placement failures stay queued and retry automatically. Idle compute is reused for subsequent requests, with a fresh simulation process for each job. Cold starts still add latency. The simulation deadline is 300 seconds; each dispatch attempt has a 20-minute deadline. Queue wait can add time.
+- Execution: simulations run concurrently as cluster capacity permits. Placement failures stay queued and retry automatically. Idle compute is reused for subsequent requests, with a fresh simulation process for each job. Cold starts still add latency. Active simulations have no elapsed-time or CPU-time deadline. Explicit cancellation remains available; idle cleanup waits for work to finish. Queue wait can add time.
 - Per identity: no saved-job cap; eight open event streams. No fixed active-job concurrency limit.
 - Service totals: 64 event streams. No fixed saved-job or idempotency-history count cap.
 - Post-selection and experimental GPU execution are not exposed.

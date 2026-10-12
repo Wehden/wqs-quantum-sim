@@ -9,6 +9,5 @@ kubernetes:
   pod_config:
     spec:
       automountServiceAccountToken: false
-      activeDeadlineSeconds: 1200
       nodeSelector:
         kubernetes.io/arch: amd64

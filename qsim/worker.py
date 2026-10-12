@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path
 import resource
-import signal
 import subprocess
 import sys
 import tempfile
@@ -17,10 +16,7 @@ import urllib.request
 
 def simulate(source: Path, output: Path):
     # Bound native compiler/sampler allocations as well as Python allocations.
-    signal.signal(signal.SIGALRM, signal.SIG_DFL)
-    signal.alarm(300)
     resource.setrlimit(resource.RLIMIT_AS, (3 * 1024**3, 3 * 1024**3))
-    resource.setrlimit(resource.RLIMIT_CPU, (300, 301))
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     request = json.loads(source.read_text())
     if request.get("engine", "clifft") == "qsim":
@@ -141,21 +137,16 @@ def remote():
         source.write_text(json.dumps(request))
         # Do not give the native simulator job credentials or controller environment.
         env = {"PATH": os.environ["PATH"], "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
-        try:
-            process = subprocess.run([sys.executable, __file__, "simulate", str(source), str(output)],
-                                     env=env, capture_output=True, timeout=315)
-            if process.returncode == -signal.SIGALRM:
-                payload = {"status": "FAILED", "error": "Simulation exceeded the 300 second limit"}
-            elif process.returncode:
-                print(process.stderr.decode(errors="replace"), file=sys.stderr)
-                message = "Circuit simulation failed; check the circuit and service limits"
-                if request['input_format']=='qasm2':
-                    message = "OpenQASM 2 simulation failed; use unitary qelib1.inc circuits without classical registers, measurement, reset or conditions, and bitstrings matching the qubit count. Check service limits."
-                payload = {"status": "FAILED", "error": message}
-            else:
-                payload = json.loads(output.read_text())
-        except subprocess.TimeoutExpired:
-            payload = {"status": "FAILED", "error": "Simulation exceeded the 300 second limit"}
+        process = subprocess.run([sys.executable, __file__, "simulate", str(source), str(output)],
+                                 env=env, capture_output=True)
+        if process.returncode:
+            print(process.stderr.decode(errors="replace"), file=sys.stderr)
+            message = "Circuit simulation failed; check the circuit and service limits"
+            if request['input_format']=='qasm2':
+                message = "OpenQASM 2 simulation failed; use unitary qelib1.inc circuits without classical registers, measurement, reset or conditions, and bitstrings matching the qubit count. Check service limits."
+            payload = {"status": "FAILED", "error": message}
+        else:
+            payload = json.loads(output.read_text())
         call(payload)
     return 0 if payload["status"] == "SUCCEEDED" else 1
 

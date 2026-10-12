@@ -100,12 +100,12 @@ def test_cancel_settles_launch_before_teardown(client,sky):
     assert client.delete('/api/jobs/'+job,headers=auth('bob')).status_code==404
     assert client.delete('/api/jobs/'+job,headers=auth()).status_code==204
 
-def test_deadline_and_legacy_jobs(client,sky):
+def test_long_running_legacy_job_has_no_deadline(client,sky):
     job=submit(client)
     with store.connect() as db:db.execute("UPDATE jobs SET status='RUNNING',started=? WHERE id=?",(time.time(),job))
     controller.tick();assert not sky.calls
     with store.connect() as db:db.execute('UPDATE jobs SET started=? WHERE id=?',(time.time()-1300,job))
-    controller.tick();assert status(client,job)=='FAILED';assert sky.calls[-1][0]=='down'
+    controller.tick();assert status(client,job)=='RUNNING';assert not sky.calls
 
 def test_saturated_job_does_not_block_other_dispatch(client,sky):
     first=submit(client);controller.tick()
@@ -115,13 +115,13 @@ def test_saturated_job_does_not_block_other_dispatch(client,sky):
     assert status(client,second)=='LAUNCHING'
     assert sky.calls[-1][0]=='launch'
 
-def test_expired_warm_worker_is_not_reused(client,sky):
+def test_old_worker_can_be_reused_after_long_job(client,sky):
     first=submit(client);controller.tick();sky.finish(dispatch(first)['launch_id'])
     with store.connect() as db:
         db.execute("UPDATE jobs SET status='SUCCEEDED' WHERE id=?",(first,))
         db.execute('UPDATE worker_pool SET created=?',(time.time()-850,))
     controller.tick();submit(client);controller.tick()
-    assert [c[0] for c in sky.calls]==['launch','launch']
+    assert [c[0] for c in sky.calls]==['launch','exec']
 
 def test_cancel_during_capacity_retry_never_requeues(client,sky):
     job=submit(client);controller.tick();sky.finish(dispatch(job)['launch_id'],CapacityError())
@@ -142,3 +142,34 @@ def test_absent_partial_cluster_finishes_capacity_cleanup(client,sky):
     controller.tick()
     assert dispatch(job)['retry_pending']==0
     assert status(client,job)=='QUEUED'
+
+
+def test_active_job_survives_two_days_then_completes_and_reuses_worker(client,sky,monkeypatch):
+    job=submit(client);controller.tick();rid=dispatch(job)['launch_id']
+    with store.connect() as db:
+        db.execute("UPDATE jobs SET status='RUNNING' WHERE id=?",(job,))
+    future=time.time()+2*86400
+    monkeypatch.setattr(controller.time,'time',lambda:future)
+    controller.tick()
+    assert status(client,job)=='RUNNING'
+    assert [c[0] for c in sky.calls]==['launch']
+    with store.connect() as db:
+        assert db.execute('SELECT job_id FROM worker_pool').fetchone()['job_id']==job
+        db.execute("UPDATE jobs SET status='SUCCEEDED' WHERE id=?",(job,))
+    sky.finish(rid);controller.tick()
+    with store.connect() as db:
+        assert db.execute('SELECT cleaned FROM jobs WHERE id=?',(job,)).fetchone()['cleaned']==1
+    submit(client);controller.tick()
+    assert [c[0] for c in sky.calls]==['launch','exec']
+
+
+def test_ambiguous_submission_does_not_expire_or_duplicate(client,sky,monkeypatch):
+    def lost(*args,**kwargs):raise TimeoutError()
+    monkeypatch.setattr(sky,'launch',lost)
+    job=submit(client);controller.tick()
+    future=time.time()+2*86400
+    monkeypatch.setattr(controller.time,'time',lambda:future)
+    controller.tick()
+    assert status(client,job)=='LAUNCHING'
+    assert dispatch(job)['intent']=='launch'
+    assert not sky.calls
