@@ -9,13 +9,15 @@ import sys
 import numpy as np
 import pytest
 
+from test_service import client
 PREFIX = 'OPENQASM 2.0; include "qelib1.inc"; '
 
 
-def run_sample(tmp_path, suffix, shots=32, seed=42):
+def run_sample(tmp_path, suffix, shots=32, seed=42, input_format="qasm2"):
+    prefix = PREFIX if input_format == "qasm2" else 'OPENQASM 3.0; include "stdgates.inc"; '
     source, output = tmp_path/'input.json', tmp_path/'output.json'
-    source.write_text(json.dumps(dict(engine='qsim', input_format='qasm2', operation='sample',
-        circuit=PREFIX + suffix, shots=shots, seed=seed)))
+    source.write_text(json.dumps(dict(engine='qsim', input_format=input_format, operation='sample',
+        circuit=prefix + suffix, shots=shots, seed=seed)))
     process = subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
         env={'PATH': os.environ['PATH'], 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'},
         capture_output=True, timeout=30)
@@ -115,3 +117,34 @@ def test_small_seed_preserves_native_integer_sequence(tmp_path):
     with np.load(io.BytesIO(base64.b64decode(result['artifact']))) as artifact:
         memory=artifact['classical_memory']
     assert np.array_equal(memory,np.column_stack([expected.records[f'c_{index}'][:,-1,0] for index in range(3)]))
+
+
+@pytest.mark.parametrize('input_format', ['qasm2','qasm3'])
+@pytest.mark.parametrize('width,shots', [(999998,1), (40000,24)])
+def test_wide_sample_completes_callback_with_full_artifact(client,tmp_path,width,shots,input_format):
+    from test_service import auth, callback
+    circuit=f'qreg q[1]; creg c[{width}]; x q[0]; measure q[0] -> c[0];'
+    prefix=PREFIX
+    if input_format=='qasm3':
+        prefix='OPENQASM 3.0; include "stdgates.inc"; '
+        circuit=f'qubit[1] q; bit[{width}] c; x q[0]; c[0] = measure q[0];'
+    response=client.post('/api/jobs/'+input_format,headers={**auth(),'Idempotency-Key':'wide-sample'},json=dict(
+        engine='qsim',operation='sample',circuit=prefix+circuit,shots=shots,seed=42))
+    assert response.status_code==202,response.text
+    job=response.json()['id']
+    result=run_sample(tmp_path,circuit,shots=shots,input_format=input_format)
+    assert result['status']=='SUCCEEDED',result
+    summary=result['summary']
+    assert len(json.dumps(summary).encode()) <= 2*1024*1024
+    assert summary['preview_truncated'] is True
+    assert summary['counts_truncated'] == (width==999998)
+    assert all(len(row)==width for row in summary['preview'])
+    assert client.post('/internal/jobs/'+job,headers=callback(job),json=result).status_code==200
+    assert client.get('/api/jobs/'+job,headers=auth()).json()['status']=='SUCCEEDED'
+    artifact=client.get('/api/jobs/'+job+'/result',headers=auth())
+    assert artifact.status_code==200
+    with np.load(io.BytesIO(artifact.content)) as data:
+        memory=data['classical_memory']
+        assert memory.shape==(shots,width)
+        assert np.all(memory[:,0]==1)
+        assert np.count_nonzero(memory)==shots

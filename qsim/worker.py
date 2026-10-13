@@ -113,6 +113,30 @@ def simulate_qsim(request, output):
                                  'artifact':base64.b64encode(buffer.getvalue()).decode()}))
 
 
+def qasm_sample_preview(memory, counts):
+    """Keep complete rows/keys within separate JSON budgets; artifacts stay complete."""
+    budget = 512 * 1024
+    selected = {}
+    used = 2
+    for key, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:256]:
+        cost = len(json.dumps(key).encode()) + len(str(count)) + 4
+        if used + cost > budget:
+            break
+        selected[key] = count
+        used += cost
+    preview = []
+    used = 2
+    for row in memory[:20]:
+        value = row.tolist()
+        cost = len(json.dumps(value).encode()) + 2
+        if used + cost > budget:
+            break
+        preview.append(value)
+        used += cost
+    return dict(counts=selected, counts_truncated=len(selected) < len(counts),
+                preview=preview, preview_truncated=len(preview) < len(memory))
+
+
 def simulate_qasm_sample(request, output):
     """Run the verified QASM subset and produce a complete result artifact."""
     from qsim.qasm_adapter import SUPPORTED_COMBINATIONS, final_memory, prepare
@@ -169,11 +193,12 @@ def simulate_qasm_sample(request, output):
                 'input_format': request['input_format'], 'operation': 'sample',
                 'shots': request['shots'], 'seed': request['seed'], 'qubits': len(metadata['qubits']),
                 'registers': metadata['registers'],
-                'counts': dict(sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:256]),
-                'counts_truncated': len(counts) > 256, 'preview': memory[:20].tolist(),
+                **qasm_sample_preview(memory, counts),
                 'compile_seconds': round(compiled - started, 6),
                 'execution_seconds': round(executed - compiled, 6),
                 'elapsed_seconds': round(time.monotonic() - started, 6)}
+        if len(json.dumps(summary).encode()) > 2 * 1024 * 1024:
+            raise ValueError('resource_limit: result metadata exceeds callback limit')
         payload = {'status': 'SUCCEEDED', 'summary': summary,
                    'artifact': base64.b64encode(buffer.getvalue()).decode()}
     except Exception as error:
