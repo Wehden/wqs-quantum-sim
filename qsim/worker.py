@@ -228,8 +228,15 @@ def remote():
                                  env=env, capture_output=True)
         if process.returncode:
             message = "Circuit simulation failed; check the circuit and service limits"
-            if request['input_format']=='qasm2':
+            if request['input_format'] in ('qasm2', 'qasm3') and request.get('operation') == 'sample':
+                version = '2' if request['input_format'] == 'qasm2' else '3'
+                message = f"execution_failed: OpenQASM {version} sampling failed; check the supported sampling circuit syntax and service limits, including sample output size."
+                if request['input_format'] == 'qasm3':
+                    message += " Check declared input bindings."
+            elif request['input_format'] == 'qasm2':
                 message = "OpenQASM 2 simulation failed; use unitary qelib1.inc circuits without classical registers, measurement, reset or conditions, and bitstrings matching the qubit count. Check service limits."
+            elif request['input_format'] == 'qasm3':
+                message = "execution_failed: OpenQASM 3 probability simulation failed; check the supported unitary circuit syntax, input bindings, bitstrings matching the declared qubit count, and service limits."
             payload = {"status": "FAILED", "error": message}
         else:
             payload = json.loads(output.read_text())
