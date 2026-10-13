@@ -12,10 +12,10 @@ import pytest
 PREFIX = 'OPENQASM 2.0; include "qelib1.inc"; '
 
 
-def run_sample(tmp_path, suffix, shots=32):
+def run_sample(tmp_path, suffix, shots=32, seed=42):
     source, output = tmp_path/'input.json', tmp_path/'output.json'
     source.write_text(json.dumps(dict(engine='qsim', input_format='qasm2', operation='sample',
-        circuit=PREFIX + suffix, shots=shots, seed=42)))
+        circuit=PREFIX + suffix, shots=shots, seed=seed)))
     process = subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
         env={'PATH': os.environ['PATH'], 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'},
         capture_output=True, timeout=30)
@@ -55,7 +55,7 @@ def test_reset_midmeasurement_independent_shots(tmp_path):
     ('qreg q[1]; creg c[1]; if(c==0) x q[0]; measure q -> c;','unsupported_feature'),
     ('qreg q[100000000]; h q;','resource_limit'),
     ('qreg q[1]; PRIVATE_CIRCUIT_VALUE q[0];','invalid_circuit'),
-    ('gate f t { x t; } qreg q[1]; creg c[1]; f q[0]; measure q -> c;','unsupported_feature'),
+    ('gate f t { f t; } qreg q[1]; creg c[1]; f q[0]; measure q -> c;','invalid_circuit'),
 ])
 def test_failed_sample_uses_safe_completion_error(tmp_path,circuit,category):
     result = run_sample(tmp_path,circuit)
@@ -89,3 +89,29 @@ def test_incomplete_native_records_cannot_be_success(tmp_path,monkeypatch):
         circuit=PREFIX+'qreg q[1]; creg c[1]; measure q -> c;',shots=4,seed=42),output)
     payload = json.loads(output.read_text())
     assert payload == {'status':'FAILED','error':'execution_failed: simulation did not produce a complete result'}
+
+
+@pytest.mark.parametrize('seed',[2**32,2**63-1])
+def test_wide_seed_is_repeatable_and_preserves_high_bits(tmp_path,seed):
+    source='qreg q[5]; creg c[5]; h q; measure q -> c;'
+    memories=[]
+    for value in (seed,seed,seed & 0xffffffff):
+        result=run_sample(tmp_path,source,shots=64,seed=value)
+        assert result['status']=='SUCCEEDED',result
+        assert result['summary']['seed']==value
+        with np.load(io.BytesIO(base64.b64decode(result['artifact']))) as artifact:
+            memories.append(artifact['classical_memory'])
+    assert np.array_equal(memories[0],memories[1])
+    assert not np.array_equal(memories[0],memories[2])
+
+
+def test_small_seed_preserves_native_integer_sequence(tmp_path):
+    import qsimcirq
+    from cirq.contrib.qasm_import._parser import QasmParser
+    source='qreg q[3]; creg c[3]; h q; measure q -> c;'
+    result=run_sample(tmp_path,source,shots=64,seed=42)
+    parsed=QasmParser().parse(PREFIX+source)
+    expected=qsimcirq.QSimSimulator(seed=42,qsim_options=qsimcirq.QSimOptions(cpu_threads=2)).run(parsed.circuit,repetitions=64)
+    with np.load(io.BytesIO(base64.b64decode(result['artifact']))) as artifact:
+        memory=artifact['classical_memory']
+    assert np.array_equal(memory,np.column_stack([expected.records[f'c_{index}'][:,-1,0] for index in range(3)]))

@@ -1,6 +1,24 @@
-from typing import Literal, Annotated
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+import math
+from typing import Literal, Annotated, ClassVar
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, BeforeValidator
 from .qasm_adapter import SUPPORTED_COMBINATIONS
+
+
+def finite_bindings(value):
+    if not isinstance(value, dict):
+        raise ValueError("bindings must be a mapping of names to finite numbers")
+    normalized = {}
+    for name, number in value.items():
+        if not isinstance(name, str) or type(number) not in (int, float):
+            raise ValueError("bindings require string names and finite numeric values")
+        try:
+            number = float(number)
+        except (OverflowError, ValueError):
+            raise ValueError("binding values must be representable as finite floats") from None
+        if not math.isfinite(number):
+            raise ValueError("binding values must be finite")
+        normalized[name] = 0.0 if number == 0 else number
+    return normalized
 
 
 class Submission(BaseModel):
@@ -10,15 +28,23 @@ class Submission(BaseModel):
     circuit: str = Field(min_length=1, max_length=65536)
     shots: int = Field(default=1000, ge=1, le=10000)
     seed: int = Field(default=42, ge=0, le=2**63-1)
-    input_format: Literal["stim", "qasm2"] = "stim"
+    input_format: Literal["stim", "qasm2", "qasm3"] = "stim"
     operation: Literal["sample", "basis_probabilities"] = "sample"
     bitstrings: list[Annotated[str, Field(min_length=1, max_length=4096, pattern=r"^[01]+$")]] | None = Field(default=None, min_length=1, max_length=256)
     bit_order: Literal["big", "little"] = "big"
+    bindings: Annotated[dict[str, float], BeforeValidator(finite_bindings)] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def valid_operation(self):
-        if self.engine == "qsim" and self.input_format != "qasm2":
-            raise ValueError("qsim supports OpenQASM 2 requests")
+        if self.engine == "qsim" and self.input_format == "stim":
+            raise ValueError("qsim supports OpenQASM requests")
+        if self.input_format != "qasm3" and "bindings" in self.model_fields_set:
+            raise ValueError("bindings are only accepted for OpenQASM 3")
+        if self.input_format == "qasm3":
+            if "operation" not in self.model_fields_set:
+                raise ValueError("OpenQASM 3 requires an explicit operation")
+            if self.operation == "basis_probabilities" and self.model_fields_set & {"shots", "seed"}:
+                raise ValueError("Probability requests do not accept shots or seed")
         if self.operation == "basis_probabilities":
             if not self.bitstrings:
                 raise ValueError("basis_probabilities requires bitstrings")
@@ -26,11 +52,12 @@ class Submission(BaseModel):
                 raise ValueError("bitstrings must have equal lengths")
         elif self.bitstrings is not None:
             raise ValueError("bitstrings is only valid for basis_probabilities")
-        if self.input_format == "qasm2" and self.operation == "sample":
+        if self.input_format in ("qasm2", "qasm3") and self.operation == "sample":
             if self.model_fields_set & {"bitstrings", "bit_order"}:
                 raise ValueError("QASM sampling does not accept bitstrings or bit_order")
+        if self.input_format == "qasm3" or (self.input_format == "qasm2" and self.operation == "sample"):
             if self.operation not in SUPPORTED_COMBINATIONS.get(self.engine, {}).get(self.input_format, ()):
-                raise ValueError("QASM sampling requires a supported engine; select engine=qsim")
+                raise ValueError("This QASM operation requires a supported engine; select engine=qsim")
         return self
 
 
@@ -43,6 +70,7 @@ class StimSubmission(BaseModel):
 
 
 class QasmSubmission(BaseModel):
+    _input_format: ClassVar[str] = "qasm2"
     engine: Literal["clifft", "qsim"] = "clifft"
     model_config = ConfigDict(extra="forbid", strict=True)
     name: str = Field(default="Untitled circuit", min_length=1, max_length=80)
@@ -58,8 +86,14 @@ class QasmSubmission(BaseModel):
         if self.operation == "basis_probabilities" and self.model_fields_set & {"shots", "seed"}:
             raise ValueError("Probability requests do not accept shots or seed")
         Submission(**{**self.model_dump(exclude_unset=True), "operation": self.operation,
-                      "input_format": "qasm2"})
+                      "input_format": self._input_format})
         return self
+
+
+class Qasm3Submission(QasmSubmission):
+    _input_format: ClassVar[str] = "qasm3"
+    operation: Literal["sample", "basis_probabilities"]
+    bindings: Annotated[dict[str, float], BeforeValidator(finite_bindings)] = Field(default_factory=dict)
 
 
 class Completion(BaseModel):

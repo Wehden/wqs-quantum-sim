@@ -113,10 +113,11 @@ def test_custom_nesting_boundary(depth, allowed):
             prepare(payload)
 
 
-def test_parameterized_custom_gate_is_not_yet_enabled():
-    with pytest.raises(ValueError, match='invalid_binding'):
-        prepare(request('gate turn(a) t { rx(a) t; } qreg q[1]; creg c[1]; '
-                        'turn(pi) q[0]; measure q -> c;'))
+def test_parameterized_custom_gate_maps_arguments():
+    circuit, metadata = prepare(request('gate turn(a) t { rx(a) t; } qreg q[1]; creg c[1]; '
+                                        'turn(pi) q[0]; measure q -> c;'))
+    result = qsimcirq.QSimSimulator(seed=42).run(circuit, repetitions=4)
+    assert final_memory(result, metadata, 4).tolist() == [[1]] * 4
 
 
 def test_custom_gate_cannot_hide_measurement():

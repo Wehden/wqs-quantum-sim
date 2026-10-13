@@ -20,7 +20,7 @@ def simulate(source: Path, output: Path):
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     request = json.loads(source.read_text())
     if request.get("engine", "clifft") == "qsim":
-        if request.get('operation') == 'sample':
+        if request.get('operation') == 'sample' or request.get('input_format') == 'qasm3':
             return simulate_qasm_sample(request, output)
         return simulate_qsim(request, output)
     import clifft
@@ -114,7 +114,7 @@ def simulate_qsim(request, output):
 
 
 def simulate_qasm_sample(request, output):
-    """Produce final classical memory with a complete, versioned sample artifact."""
+    """Run the verified QASM subset and produce a complete result artifact."""
     from qsim.qasm_adapter import SUPPORTED_COMBINATIONS, final_memory, prepare
     started = time.monotonic()
     try:
@@ -124,37 +124,63 @@ def simulate_qasm_sample(request, output):
                 request.get('engine'), {}).get(request.get('input_format'), ()):
             raise ValueError('unsupported_feature: engine or input format')
         circuit, metadata = prepare(request)
-        if metadata['custom_gates']:
-            raise ValueError('unsupported_feature: custom gate declarations')
         compiled = time.monotonic()
-        simulator = qsimcirq.QSimSimulator(seed=request['seed'],
+        seed = request.get('seed', 42)
+        # Preserve native small-seed sequences and retain both words of wider API seeds.
+        native_seed = seed if seed < 2**32 else np.random.RandomState([seed & 0xffffffff, seed >> 32])
+        simulator = qsimcirq.QSimSimulator(seed=native_seed,
             qsim_options=qsimcirq.QSimOptions(cpu_threads=2))
-        result = simulator.run(circuit, repetitions=request['shots'])
-        executed = time.monotonic()
-        memory = final_memory(result, metadata, request['shots'])
-        if memory.dtype != np.uint8 or memory.shape != (request['shots'], metadata['classical_bits']):
-            raise ValueError('execution_failed: classical memory shape')
-        counts = collections.Counter(''.join(map(str, row)) for row in memory)
-        buffer = io.BytesIO()
-        np.savez_compressed(buffer, classical_memory=memory)
-        summary = {'result_schema': 'qasm-samples/1',
-            'engine': 'qsim ' + metadata['engine_version'],
-            'importer': 'cirq ' + metadata['importer_version'],
-            'input_format': request['input_format'], 'operation': 'sample',
-            'shots': request['shots'], 'seed': request['seed'], 'qubits': len(metadata['qubits']),
-            'registers': metadata['registers'],
-            'counts': dict(sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:256]),
-            'counts_truncated': len(counts) > 256, 'preview': memory[:20].tolist(),
-            'compile_seconds': round(compiled - started, 6),
-            'execution_seconds': round(executed - compiled, 6),
-            'elapsed_seconds': round(time.monotonic() - started, 6)}
+        if request['operation'] == 'basis_probabilities':
+            import cirq
+            qubits = metadata['qubits']
+            bitstrings = request['bitstrings']
+            if not 1 <= len(bitstrings) <= 256 or any(len(bits) != len(qubits) or set(bits)-{'0','1'} for bits in bitstrings):
+                raise ValueError('invalid_circuit: bitstrings must match declared qubits')
+            order = request.get('bit_order', 'big')
+            if order not in ('big', 'little'):
+                raise ValueError('invalid_circuit: bit order')
+            circuit += cirq.Circuit(cirq.I(q) for q in qubits)
+            indices = [int(bits if order == 'big' else bits[::-1], 2) for bits in bitstrings]
+            amplitudes = simulator.compute_amplitudes(circuit, indices, qubit_order=qubits)
+            probabilities = np.abs(np.asarray(amplitudes, dtype=np.complex128)) ** 2
+            if probabilities.shape != (len(bitstrings),) or not np.all(np.isfinite(probabilities)):
+                raise ValueError('execution_failed: incomplete probability result')
+            buffer = io.BytesIO()
+            np.savez_compressed(buffer, bitstrings=np.asarray(bitstrings), probabilities=probabilities)
+            summary = {'engine': 'qsim ' + metadata['engine_version'],
+                'importer': 'cirq ' + metadata['importer_version'], 'input_format': request['input_format'],
+                'operation': 'basis_probabilities', 'qubits': len(qubits), 'bitstrings': bitstrings,
+                'bit_order': order, 'probabilities': probabilities.tolist(), 'precision': 'single',
+                'compile_seconds': round(compiled-started, 6),
+                'execution_seconds': round(time.monotonic()-compiled, 6),
+                'elapsed_seconds': round(time.monotonic()-started, 6)}
+        else:
+            result = simulator.run(circuit, repetitions=request['shots'])
+            executed = time.monotonic()
+            memory = final_memory(result, metadata, request['shots'])
+            if memory.dtype != np.uint8 or memory.shape != (request['shots'], metadata['classical_bits']):
+                raise ValueError('execution_failed: classical memory shape')
+            counts = collections.Counter(''.join(map(str, row)) for row in memory)
+            buffer = io.BytesIO()
+            np.savez_compressed(buffer, classical_memory=memory)
+            summary = {'result_schema': 'qasm-samples/1',
+                'engine': 'qsim ' + metadata['engine_version'],
+                'importer': 'cirq ' + metadata['importer_version'],
+                'input_format': request['input_format'], 'operation': 'sample',
+                'shots': request['shots'], 'seed': request['seed'], 'qubits': len(metadata['qubits']),
+                'registers': metadata['registers'],
+                'counts': dict(sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:256]),
+                'counts_truncated': len(counts) > 256, 'preview': memory[:20].tolist(),
+                'compile_seconds': round(compiled - started, 6),
+                'execution_seconds': round(executed - compiled, 6),
+                'elapsed_seconds': round(time.monotonic() - started, 6)}
         payload = {'status': 'SUCCEEDED', 'summary': summary,
                    'artifact': base64.b64encode(buffer.getvalue()).decode()}
     except Exception as error:
         category = str(error).partition(':')[0] if isinstance(error, ValueError) else 'execution_failed'
         messages = {
-            'invalid_circuit': 'check the documented QASM sampling subset',
-            'unsupported_feature': 'use supported QASM sampling operations',
+            'invalid_circuit': 'check the documented QASM subset',
+            'unsupported_feature': 'use supported QASM operations',
             'invalid_binding': 'parameters must be resolved finite numbers',
             'resource_limit': 'reduce circuit or sample output size',
             'execution_failed': 'simulation did not produce a complete result',
@@ -164,7 +190,7 @@ def simulate_qasm_sample(request, output):
         detail = {
             'unsupported_feature: custom gate declarations': 'expand custom gates with your circuit library before submission',
             'unsupported_feature: conditions or exponent expressions': 'remove classical conditions; evaluate exponent expressions in the client',
-            'unsupported_feature: engine or input format': 'select engine qsim and OpenQASM 2 sampling',
+            'unsupported_feature: engine or input format': 'select engine qsim and a documented QASM format and operation',
             'invalid_circuit: sampling requires measurement': 'add a measurement into a declared classical register',
         }.get(str(error), messages[category])
         payload = {'status': 'FAILED', 'error': category + ': ' + detail}

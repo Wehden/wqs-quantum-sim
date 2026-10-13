@@ -1,6 +1,6 @@
 # Tasks: broader circuit support
 
-Status: task plan approved by the owner on 2026-10-13, with parallel System2 execution authorized within disjoint write leases. Requirements and design were approved on the same date. TASK-001 and TASK-002 complete; TASK-003 and TASK-004 in progress. Approval preserves the design's evidence gates; it does not establish untested engine capabilities.
+Status: task plan approved by the owner on 2026-10-13, with parallel System2 execution authorized within disjoint write leases. Requirements and design were approved on the same date. TASK-001 through TASK-009 implemented and locally verified; PR review/CI gates remain. TASK-010 awaits owner merges. Approval preserves the design's evidence gates; it does not establish untested engine capabilities.
 
 Prepared using System2 1.1.1 task-planner. Paths are scoped to this existing feature specification directory.
 
@@ -141,19 +141,23 @@ TASK-003 and TASK-004 have separate writes and can proceed independently after c
 - **Dependencies:** TASK-004, TASK-005; TASK-006 only for dynamic features exposed here.
 - **Recommended Mode:** executor.
 - **Risk:** High: expansion and bindings cross parser and identity boundaries.
-- **Files/areas:** `qsim/models.py`, `qsim/api.py`, `qsim/qasm_adapter.py`, `tests/test_qasm_languages.py`, `tests/test_transactions.py`. New test filenames are proposed.
+- **Files/areas:** `qsim/models.py`, `qsim/api.py`, `qsim/qasm_adapter.py`, `qsim/worker.py`, `tests/test_qasm_languages.py`, `tests/test_transactions.py`, `tests/test_qasm_adapter.py`, `tests/test_qasm_sampling.py`, `tests/test_service.py`. New test filenames are proposed.
 - **Steps:** Use importer-native custom-gate expansion within approved bounds. Add at most /api/jobs/qasm3 with explicit operation for the proven subset, and finite numeric input bindings using native resolvers. Reject missing/extra/invalid bindings and unsafe includes. Preserve QASM2 numeric/gate-local syntax without a placeholder dialect. Enable each independent feature only when its own evidence and decisions are complete.
 - **Verification:** Run tests/test_qasm_languages.py and tests/test_transactions.py. Test binding hash equivalence/conflicts, gate operand mapping, recursion/expansion rejection and unsupported QASM3 features; use reference fixtures from TASK-001.
 - **Rollback / Backout:** Disable new combinations and drain dependent jobs; revert new route after retaining access to existing results.
-- **Change budget:** max_files=5, max_new_symbols=8, interface_policy=extend-only. Count production functions/classes/exports; fixture/test functions do not consume the production-symbol budget. Exceeding a budget requires a revised plan before edits.
+- **Change budget:** max_files=9, max_new_symbols=8, interface_policy=extend-only. Count production functions/classes/exports; fixture/test functions do not consume the production-symbol budget. Exceeding a budget requires a revised plan before edits.
 - **write_lease:**
 
 ```text
 ^qsim/models\.py$
 ^qsim/api\.py$
 ^qsim/qasm_adapter\.py$
+^qsim/worker\.py$
 ^tests/test_qasm_languages\.py$
 ^tests/test_transactions\.py$
+^tests/test_qasm_adapter\.py$
+^tests/test_qasm_sampling\.py$
+^tests/test_service\.py$
 ```
 
 ### TASK-008: Verify lifecycle, security and failure contracts
@@ -184,11 +188,11 @@ TASK-003 and TASK-004 have separate writes and can proceed independently after c
 - **Dependencies:** TASK-008.
 - **Recommended Mode:** test-engineer.
 - **Risk:** Med: capability claims and both-engine regressions must match shipped images.
-- **Files/areas:** `qsim/static/index.html`, `qsim/static/agents.md`, `README.md`, `tests/test_qasm_capabilities.py`, `tests/test_qasm_examples.py`, `spec/qasm-support/validation.md`. New test filenames are proposed.
+- **Files/areas:** `qsim/static/index.html`, `qsim/static/agents.md`, `README.md`, `tests/test_qasm_capabilities.py`, `tests/test_qasm_examples.py`, `spec/qasm-support/validation.md`, `tests/check_worker_image.sh`. New test filenames are proposed.
 - **Steps:** Publish only proven support and retained exclusions; provide executable sampling/probability examples and ordering/binding guidance. Reconcile capabilities with image contents and fixtures. Record unchanged-unitary benchmark comparison against agreed threshold. Execute full repository CI and worker image checks.
 - **Verification:** Run bash tools/ci/check.sh and the extended worker-image check. Run tests/test_qasm_examples.py. Require both-engine regressions and recorded Standpunkt-first/GitHub-fallback path. Report CI failure to owner immediately; missing CI is not green.
 - **Rollback / Backout:** Revert incorrect documentation/admission claims; preserve stored artifact compatibility.
-- **Change budget:** max_files=6, max_new_symbols=6, interface_policy=none. Count production functions/classes/exports; fixture/test functions do not consume the production-symbol budget. Exceeding a budget requires a revised plan before edits.
+- **Change budget:** max_files=7, max_new_symbols=6, interface_policy=none. Count production functions/classes/exports; fixture/test functions do not consume the production-symbol budget. Exceeding a budget requires a revised plan before edits.
 - **write_lease:**
 
 ```text
@@ -198,6 +202,7 @@ TASK-003 and TASK-004 have separate writes and can proceed independently after c
 ^tests/test_qasm_capabilities\.py$
 ^tests/test_qasm_examples\.py$
 ^spec/qasm\-support/validation\.md$
+^tests/check_worker_image\.sh$
 ```
 
 ### TASK-010: Prepare rollout handoff
@@ -277,3 +282,13 @@ Document checks for this planning gate are JSON structure/link/traceability chec
 TASK-001 completed: 24 new capability tests and five existing engine tests passed. TASK-002 choices are recorded in [decisions.md](decisions.md); source safety findings are in [capabilities.md](capabilities.md). TASK-003 compatibility and TASK-004 adapter/packaging receive disjoint production write leases. Classical conditions remain deferred because native execution fails; no unverified feature will be admitted.
 
 Execution lease clarification: TASK-005 includes tests/test_qasm_adapter.py (max_files 7) solely to update the existing disabled-admission assertion when sampling is enabled. This adjacent test change is required by the approved admission transition; coordinator owns that file during split execution.
+
+TASK-005 passed combined integration checks. TASK-006 is validation-only in tests/test_qasm_dynamic.py because the shared sampling path already executes reset and measurement; no runtime lease is issued. TASK-007 can proceed with separate API and adapter leases while those tests run; any discovered runtime fix serializes the overlapping work. TASK-007 includes qsim/worker.py (max_files 6) for QASM3 probability dispatch, required by the approved new route. Existing QASM2 probability behavior remains on its compatible path.
+
+TASK-007 adjacent test adjustment: coordinator owns prior custom-gate rejection assertions in tests/test_qasm_adapter.py and tests/test_qasm_sampling.py as support is deliberately enabled. max_files becomes 8; no other lease expansion. TASK-006 finished with six passing isolated-worker tests and no production edits. TASK-008 security tests for the completed sampling increment run in tests/test_qasm_security.py while the language increment is developed.
+
+TASK-007 also updates the prior custom_gates=false capability assertion in tests/test_service.py (coordinator lease, max_files 9). New operation-specific capability metadata must continue to report false for unchanged QASM2 probability custom gates.
+
+TASK-009 includes tests/check_worker_image.sh (coordinator lease, max_files 7) so the existing package-image check permanently covers new QASM2/QASM3 worker entry points and wide seeds, beyond the earlier standalone adapter probe.
+
+Execution checkpoint: TASK-003 through TASK-009 are implemented and locally verified; see [validation.md](validation.md). Full local CI: 220 Python + 3 console tests passed, including the unpushed PR #8 corrective fixture. Published feature suite count is 219 until that correction is pushed. PR #9 foundation CI passed on Standpunkt with no automated findings. TASK-010 remains pending owner merges. No deployment occurred.

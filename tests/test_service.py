@@ -190,7 +190,7 @@ def test_sampling_capability_and_admission_share_metadata(client, monkeypatch):
     assert qsim['input_formats']['qasm2'] == ['basis_probabilities', 'sample']
     assert qsim['sampling']['result_schema'] == 'qasm-samples/1'
     assert qsim['sampling']['mid_circuit_measurement'] and qsim['sampling']['reset']
-    assert not qsim['sampling']['conditions'] and not qsim['sampling']['custom_gates']
+    assert not qsim['sampling']['conditions'] and qsim['sampling']['custom_gates']
     monkeypatch.delitem(SUPPORTED_COMBINATIONS, 'qsim')
     disabled = client.get('/api/capabilities', headers=auth()).json()['engines']['qsim']
     assert disabled['input_formats']['qasm2'] == ['basis_probabilities']

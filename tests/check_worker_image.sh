@@ -31,6 +31,14 @@ requests = [
     {'engine': 'qsim', 'input_format': 'qasm2', 'operation': 'basis_probabilities',
      'circuit': 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; x q[0];',
      'bitstrings': ['0', '1'], 'bit_order': 'big'},
+    {'engine': 'qsim', 'input_format': 'qasm2', 'operation': 'sample', 'shots': 4, 'seed': 2**63-1,
+     'circuit': 'OPENQASM 2.0; include "qelib1.inc"; gate turn(a) t { rx(a) t; } qreg q[1]; creg c[1]; turn(pi) q[0]; measure q -> c;'},
+    {'engine': 'qsim', 'input_format': 'qasm3', 'operation': 'sample', 'shots': 4, 'seed': 42,
+     'bindings': {'theta': 3.141592653589793},
+     'circuit': 'OPENQASM 3.0; include "stdgates.inc"; input angle[64] theta; qubit q; bit c; rx(theta) q; c=measure q;'},
+    {'engine': 'qsim', 'input_format': 'qasm3', 'operation': 'basis_probabilities',
+     'bindings': {'theta': 3.141592653589793}, 'bitstrings': ['0', '1'], 'bit_order': 'big',
+     'circuit': 'OPENQASM 3.0; include "stdgates.inc"; input float[64] theta; qubit q; rx(theta) q;'},
 ]
 with tempfile.TemporaryDirectory() as directory:
     source, output = pathlib.Path(directory)/'input.json', pathlib.Path(directory)/'output.json'
@@ -40,7 +48,7 @@ with tempfile.TemporaryDirectory() as directory:
                        cwd='/opt/qsim', env=env, check=True)
         result = json.loads(output.read_text())
         assert result['status'] == 'SUCCEEDED' and result['artifact']
-        if request['engine'] == 'qsim':
+        if request['operation'] == 'basis_probabilities':
             assert result['summary']['probabilities'][1] > .99999
         else:
             assert result['summary']['counts'] == {'1': 4}

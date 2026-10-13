@@ -12,6 +12,7 @@ import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from . import settings, store
@@ -19,7 +20,7 @@ from .streams import router as stream_router
 from .http_boundary import HttpBoundary
 from .qasm_adapter import SUPPORTED_COMBINATIONS
 from .auth import digest, identity
-from .models import Submission, StimSubmission, QasmSubmission, Completion, KeyRequest
+from .models import Submission, StimSubmission, QasmSubmission, Qasm3Submission, Completion, KeyRequest
 
 
 @asynccontextmanager
@@ -33,6 +34,13 @@ app.include_router(stream_router)
 
 
 app.add_middleware(HttpBoundary)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, error):
+    return JSONResponse(status_code=422, content={"detail": [
+        {key: item[key] for key in ("type", "loc", "msg")} for item in error.errors()
+    ]})
 
 
 @app.get("/healthz")
@@ -111,9 +119,7 @@ def canonical_request(body):
     # Existing reservations include normalized defaults but predate engine selection and bindings.
     if canonical_body["engine"] == "clifft":
         canonical_body.pop("engine")
-    legacy = (canonical_body["input_format"] == "stim" or
-              (canonical_body["input_format"] == "qasm2" and
-               canonical_body["operation"] == "basis_probabilities"))
+    legacy = canonical_body["input_format"] in ("stim", "qasm2")
     if legacy and canonical_body.get("bindings") == {}:
         canonical_body.pop("bindings")
     return json.dumps(canonical_body, sort_keys=True, separators=(",", ":"))
@@ -169,24 +175,41 @@ def submit_qasm(body:QasmSubmission,user=Depends(identity),idempotency_key:str=H
                                  'input_format': 'qasm2', 'operation': body.operation}), user, idempotency_key)
 
 
+@app.post('/api/jobs/qasm3', status_code=202)
+def submit_qasm3(body: Qasm3Submission, user=Depends(identity), idempotency_key: str=Header(min_length=1, max_length=128)):
+    return enqueue(Submission(**{**body.model_dump(exclude_unset=True),
+                                 'input_format': 'qasm3', 'operation': body.operation}), user, idempotency_key)
+
+
 @app.get('/api/capabilities')
 def capabilities(user=Depends(identity)):
     sampling = 'sample' in SUPPORTED_COMBINATIONS.get('qsim', {}).get('qasm2', ())
     qasm_operations = ['basis_probabilities'] + (['sample'] if sampling else [])
+    qasm3_operations = list(SUPPORTED_COMBINATIONS.get('qsim', {}).get('qasm3', ()))
+    formats = {'qasm2': qasm_operations}
+    if qasm3_operations:
+        formats['qasm3'] = qasm3_operations
     return {'engines':{'clifft':{'version':'0.11.0','default':True},
-                       'qsim':{'version':'0.22.1','input_formats':{'qasm2':qasm_operations},'max_qubits':26,'device':'CPU','precision':'single',
+                       'qsim':{'version':'0.22.1','input_formats':formats,'max_qubits':26,'device':'CPU','precision':'single',
                                'importer': {'name': 'cirq', 'version': '1.7.0'},
                                'sampling': {'enabled': sampling, 'result_schema': 'qasm-samples/1' if sampling else None,
                                             'classical_registers': sampling, 'measurement': sampling,
                                             'mid_circuit_measurement': sampling, 'reset': sampling,
-                                            'repeated_writes': sampling, 'conditions': False, 'custom_gates': False,
+                                            'repeated_writes': sampling, 'conditions': False, 'custom_gates': sampling,
                                             'max_shots': 10000, 'max_classical_cells': 1000000,
-                                            'max_count_entries': 256, 'max_preview_shots': 20}}},
-            'input_formats':{'stim':['sample','basis_probabilities'],'qasm2':qasm_operations},
+                                            'max_count_entries': 256, 'max_preview_shots': 20},
+                               'features_by_operation': {
+                                   'qasm2': {'basis_probabilities': {'custom_gates': False, 'bindings': False},
+                                             **({'sample': {'custom_gates': True, 'bindings': False}} if sampling else {})},
+                                   **({'qasm3': {operation: {'custom_gates': True, 'bindings': True, 'conditions': False}
+                                                for operation in qasm3_operations}} if qasm3_operations else {})},
+                               'binding_types': ['float[32]', 'float[64]', 'angle[32]', 'angle[64]'] if qasm3_operations else [],
+                               'custom_gate_limits': {'max_expanded_operations': 65536, 'max_nesting_depth': 32}}},
+            'input_formats':{'stim':['sample','basis_probabilities'], **formats},
             'transactional':'durable jobs with owner-scoped Idempotency-Key',
             'streaming':{'protocol':'SSE','progress':True,'final_result':True,'resume':'Last-Event-ID',
-                         'incremental_samples':False,'reason':'Clifft 0.11 CPU sampling returns completed arrays; no incremental callback is exposed'},
-            'qasm2_subset':'Probability queries retain unitary qelib1.inc circuits. Google qsim sampling supports classical registers, measurement and reset when enabled; conditions and custom gates remain unsupported.',
+                         'incremental_samples':False,'reason':'Workers return complete sample arrays; incremental sample streaming is not enabled'},
+            'qasm2_subset':'Probability queries retain unitary qelib1.inc circuits. Google qsim sampling supports classical registers, measurement, reset and bounded custom gates when enabled; conditions remain unsupported.',
             'client_manages':['call sequences','batches','quantum state']}
 
 
