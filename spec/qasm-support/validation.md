@@ -26,6 +26,12 @@ The owner authorized an additional PR #10 review after round two found that wide
 
 Four regressions run actual QASM2/QASM3 workers, submit their callbacks, verify terminal success and download complete artifacts. They cover one shot across 999,998 classical bits and 24 shots across 40,000 bits. Full local CI passed 228 Python tests and three console tests. The rebuilt worker image checks passed. The committed suite contains 227 Python tests; the separate PR #8 capability correction remains local pending its review decision.
 
+## Operation-specific shot limits
+
+The owner authorized correction of the next PR #10 finding: probability requests carried an API-default shot count into register limits. Preparation now applies the submitted shot multiplier only to sampling; probability preparation retains the unscaled register-allocation bound. Two authenticated API-to-worker regressions verify that a 1,001-bit unused register succeeds for probabilities and exceeds the sampling budget at the default 1,000 shots. Both callbacks reach their expected terminal states; the probability artifact contains the expected result.
+
+Full local CI passed 230 Python tests and three console tests. The rebuilt worker image checks passed. The committed suite contains 229 Python tests while the separate PR #8 fixture correction remains local. Further automated review findings will be escalated to the owner.
+
 ## Legacy timing check
 
 Ten alternating baseline/candidate subprocess runs per engine used the same two-qubit unitary rotation/entangling circuit and frozen environment. Baseline source is origin/main at 0e850ec. The predeclared acceptance threshold is added median time no greater than max(20% of baseline, 0.1 seconds). This checks local subprocess runtime including import overhead, not production SkyPilot dispatch or throughput. A local image build also ran during part of this check; alternating runs limit, but do not eliminate, machine-load noise.

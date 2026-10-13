@@ -105,7 +105,10 @@ def prepare(request):
         with np.errstate(all="raise"):
             if request.get('engine') != 'qsim' or request.get('input_format') not in ('qasm2', 'qasm3'):
                 raise ValueError('unsupported_feature: engine or input format')
-            shots = request.get('shots', 1)
+            operation = request.get('operation', 'basis_probabilities')
+            # Probability queries allocate no per-shot classical memory. Keep the
+            # single-register allocation bound, without multiplying by API defaults.
+            shots = request.get('shots', 1) if operation == 'sample' else 1
             if type(shots) is not int or not 1 <= shots <= 10000:
                 raise ValueError('resource_limit: shots')
             quantum, classical = _preflight(request['circuit'], shots)
@@ -151,7 +154,6 @@ def prepare(request):
                     nonunitary = True
             if (classical + sum(events.values())) * shots > 1_000_000:
                 raise ValueError('resource_limit: classical memory and measurement records')
-            operation = request.get('operation', 'basis_probabilities')
             if operation == 'basis_probabilities' and nonunitary:
                 raise ValueError('unsupported_feature: nonunitary probabilities')
             if operation == 'sample' and not events:

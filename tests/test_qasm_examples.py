@@ -63,3 +63,37 @@ def test_documented_json_roundtrip(client, tmp_path, path, name):
             assert memory.shape == (128, len(expected))
             assert np.all(memory == expected)
             assert completion['summary']['counts'] == {''.join(map(str, expected)): 128}
+
+
+@pytest.mark.parametrize('operation', ['basis_probabilities', 'sample'])
+def test_shot_limits_apply_only_to_sampling(client, tmp_path, operation):
+    circuit = 'OPENQASM 3.0; include "stdgates.inc"; qubit q; bit[1001] c; x q;'
+    body = dict(engine='qsim', operation=operation, circuit=circuit)
+    if operation == 'sample':
+        body['circuit'] += ' c[0] = measure q;'
+    else:
+        body['bitstrings'] = ['0', '1']
+    response = client.post('/api/jobs/qasm3', headers={**auth(), 'Idempotency-Key': 'shot-limits'}, json=body)
+    assert response.status_code == 202, response.text
+    job = response.json()['id']
+    request = client.get('/internal/jobs/' + job, headers=callback(job)).json()
+    assert request['shots'] == 1000
+    source, output = tmp_path/'input.json', tmp_path/'output.json'
+    source.write_text(json.dumps(request))
+    process = subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
+        env={'PATH': os.environ['PATH'], 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'},
+        capture_output=True, timeout=30)
+    assert process.returncode == 0 and not process.stderr
+    completion = json.loads(output.read_text())
+    expected = 'FAILED' if operation == 'sample' else 'SUCCEEDED'
+    assert completion['status'] == expected, completion
+    assert client.post('/internal/jobs/' + job, headers=callback(job), json=completion).status_code == 200
+    assert client.get('/api/jobs/' + job, headers=auth()).json()['status'] == expected
+    if operation == 'sample':
+        assert completion['error'].startswith('resource_limit:')
+    else:
+        assert completion['summary']['probabilities'] == pytest.approx([0, 1], abs=1e-6)
+        result = client.get('/api/jobs/' + job + '/result', headers=auth())
+        assert result.status_code == 200
+        with np.load(io.BytesIO(result.content)) as artifact:
+            assert artifact['probabilities'] == pytest.approx([0, 1], abs=1e-6)
