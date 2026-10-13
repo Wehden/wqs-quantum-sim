@@ -1,0 +1,77 @@
+{
+  "version": "0.1.0",
+  "modules": {
+    "qsim/models.py": {
+      "description": "Existing strict request models; proposed additive QASM operation and binding schema. Feature-scoped exports only.",
+      "public_exports": [
+        {
+          "name": "Submission",
+          "kind": "class",
+          "signature": "Submission(**validated_request_fields)"
+        },
+        {
+          "name": "QasmSubmission",
+          "kind": "class",
+          "signature": "QasmSubmission(circuit: str, engine=\"clifft\", operation=\"basis_probabilities\", **operation_fields)"
+        }
+      ],
+      "internal_only": []
+    },
+    "qsim/api.py": {
+      "description": "Existing HTTP boundary; proposed additive route and capability changes. No untrusted circuit compilation.",
+      "public_exports": [
+        {
+          "name": "app",
+          "kind": "constant",
+          "signature": "FastAPI"
+        }
+      ],
+      "internal_only": [
+        "enqueue"
+      ]
+    },
+    "qsim/qasm_adapter.py": {
+      "description": "Proposed single internal adapter module, not yet implemented. No public Python SDK; exports are worker-facing boundaries.",
+      "public_exports": [
+        {
+          "name": "SUPPORTED_COMBINATIONS",
+          "kind": "constant",
+          "signature": "dict[str, object]  # proposed versioned dependency-free capability metadata; native imports are lazy"
+        },
+        {
+          "name": "prepare",
+          "kind": "function",
+          "signature": "prepare(request: dict) -> tuple[object, dict]  # native circuit/program and register/provenance metadata"
+        },
+        {
+          "name": "final_memory",
+          "kind": "function",
+          "signature": "final_memory(native_result: object, metadata: dict, shots: int) -> object  # uint8 ndarray; reject unsupported mapping"
+        }
+      ],
+      "internal_only": [
+        "bind_parameters",
+        "validate_features",
+        "check_expansion"
+      ]
+    },
+    "qsim/worker.py": {
+      "description": "Existing worker entry points retain resource-limited child execution and complete-result packaging.",
+      "public_exports": [
+        {
+          "name": "simulate",
+          "kind": "function",
+          "signature": "simulate(source: Path, output: Path)"
+        },
+        {
+          "name": "remote",
+          "kind": "function",
+          "signature": "remote() -> int"
+        }
+      ],
+      "internal_only": [
+        "simulate_qsim"
+      ]
+    }
+  }
+}
