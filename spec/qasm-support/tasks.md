@@ -99,11 +99,11 @@ TASK-003 and TASK-004 have separate writes and can proceed independently after c
 - **Dependencies:** TASK-003, TASK-004.
 - **Recommended Mode:** executor.
 - **Risk:** High: measurement ordering and repeated writes affect correctness.
-- **Files/areas:** `qsim/models.py`, `qsim/api.py`, `qsim/worker.py`, `qsim/qasm_adapter.py`, `tests/test_qasm_sampling.py`, `tests/test_service.py`. New test filenames are proposed.
+- **Files/areas:** `qsim/models.py`, `qsim/api.py`, `qsim/worker.py`, `qsim/qasm_adapter.py`, `tests/test_qasm_sampling.py`, `tests/test_service.py`, `tests/test_qasm_adapter.py`. New test filenames are proposed.
 - **Steps:** Add explicit QASM sample operation only for verified combinations. Preserve legacy probability defaults and reject nonunitary probability requests. Emit qasm-samples/1 with declaration-order register metadata, zero-initialized final classical memory, complete NPZ, top 256 counts with lexicographic ties and first 20 shots. Validate artifacts before completion; bound classical output cells.
 - **Verification:** Run tests/test_qasm_sampling.py, tests/test_service.py and tests/test_qsim_engine.py. Verify asymmetric deterministic circuits, unused bits, reordered writes, count truncation and JSON/NPZ reconstruction. Unsupported/default-engine combinations reject without fallback.
 - **Rollback / Backout:** Disable new admission; drain accepted jobs on capable images before reverting; retain result readers.
-- **Change budget:** max_files=6, max_new_symbols=8, interface_policy=extend-only. Count production functions/classes/exports; fixture/test functions do not consume the production-symbol budget. Exceeding a budget requires a revised plan before edits.
+- **Change budget:** max_files=7, max_new_symbols=8, interface_policy=extend-only. Count production functions/classes/exports; fixture/test functions do not consume the production-symbol budget. Exceeding a budget requires a revised plan before edits.
 - **write_lease:**
 
 ```text
@@ -113,6 +113,7 @@ TASK-003 and TASK-004 have separate writes and can proceed independently after c
 ^qsim/qasm_adapter\.py$
 ^tests/test_qasm_sampling\.py$
 ^tests/test_service\.py$
+^tests/test_qasm_adapter\.py$
 ```
 
 ### TASK-006: Enable verified reset and classical control
@@ -274,3 +275,5 @@ Document checks for this planning gate are JSON structure/link/traceability chec
 2026-10-13: owner approved the plan and parallel execution. Current upstream main remains the documented baseline 0e850ec; the specification branch is based on that commit. TASK-001 is split into non-overlapping leases: capability_tests owns tests/test_qasm_capabilities.py; capability_report owns spec/qasm-support/capabilities.md. A third executor performs read-only compatibility/packaging preparation until TASK-002 is resolved. The coordinator owns planning status files. Production write leases are not issued before dependencies are satisfied.
 
 TASK-001 completed: 24 new capability tests and five existing engine tests passed. TASK-002 choices are recorded in [decisions.md](decisions.md); source safety findings are in [capabilities.md](capabilities.md). TASK-003 compatibility and TASK-004 adapter/packaging receive disjoint production write leases. Classical conditions remain deferred because native execution fails; no unverified feature will be admitted.
+
+Execution lease clarification: TASK-005 includes tests/test_qasm_adapter.py (max_files 7) solely to update the existing disabled-admission assertion when sampling is enabled. This adjacent test change is required by the approved admission transition; coordinator owns that file during split execution.

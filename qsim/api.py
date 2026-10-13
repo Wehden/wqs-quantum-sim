@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from . import settings, store
 from .streams import router as stream_router
 from .http_boundary import HttpBoundary
+from .qasm_adapter import SUPPORTED_COMBINATIONS
 from .auth import digest, identity
 from .models import Submission, StimSubmission, QasmSubmission, Completion, KeyRequest
 
@@ -164,18 +165,28 @@ def submit_stim(body:StimSubmission,user=Depends(identity),idempotency_key:str=H
 
 @app.post('/api/jobs/qasm2',status_code=202)
 def submit_qasm(body:QasmSubmission,user=Depends(identity),idempotency_key:str=Header(min_length=1,max_length=128)):
-    return enqueue(Submission(**body.model_dump(),input_format='qasm2',operation='basis_probabilities'),user,idempotency_key)
+    return enqueue(Submission(**{**body.model_dump(exclude_unset=True),
+                                 'input_format': 'qasm2', 'operation': body.operation}), user, idempotency_key)
 
 
 @app.get('/api/capabilities')
 def capabilities(user=Depends(identity)):
+    sampling = 'sample' in SUPPORTED_COMBINATIONS.get('qsim', {}).get('qasm2', ())
+    qasm_operations = ['basis_probabilities'] + (['sample'] if sampling else [])
     return {'engines':{'clifft':{'version':'0.11.0','default':True},
-                       'qsim':{'version':'0.22.1','input_formats':{'qasm2':['basis_probabilities']},'max_qubits':26,'device':'CPU','precision':'single'}},
-            'input_formats':{'stim':['sample','basis_probabilities'],'qasm2':['basis_probabilities']},
+                       'qsim':{'version':'0.22.1','input_formats':{'qasm2':qasm_operations},'max_qubits':26,'device':'CPU','precision':'single',
+                               'importer': {'name': 'cirq', 'version': '1.7.0'},
+                               'sampling': {'enabled': sampling, 'result_schema': 'qasm-samples/1' if sampling else None,
+                                            'classical_registers': sampling, 'measurement': sampling,
+                                            'mid_circuit_measurement': sampling, 'reset': sampling,
+                                            'repeated_writes': sampling, 'conditions': False, 'custom_gates': False,
+                                            'max_shots': 10000, 'max_classical_cells': 1000000,
+                                            'max_count_entries': 256, 'max_preview_shots': 20}}},
+            'input_formats':{'stim':['sample','basis_probabilities'],'qasm2':qasm_operations},
             'transactional':'durable jobs with owner-scoped Idempotency-Key',
             'streaming':{'protocol':'SSE','progress':True,'final_result':True,'resume':'Last-Event-ID',
                          'incremental_samples':False,'reason':'Clifft 0.11 CPU sampling returns completed arrays; no incremental callback is exposed'},
-            'qasm2_subset':'unitary qelib1.inc circuits; no classical registers, measurement, reset, conditions or custom gates',
+            'qasm2_subset':'Probability queries retain unitary qelib1.inc circuits. Google qsim sampling supports classical registers, measurement and reset when enabled; conditions and custom gates remain unsupported.',
             'client_manages':['call sequences','batches','quantum state']}
 
 

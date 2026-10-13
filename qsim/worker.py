@@ -20,6 +20,8 @@ def simulate(source: Path, output: Path):
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     request = json.loads(source.read_text())
     if request.get("engine", "clifft") == "qsim":
+        if request.get('operation') == 'sample':
+            return simulate_qasm_sample(request, output)
         return simulate_qsim(request, output)
     import clifft
     import numpy as np
@@ -109,6 +111,64 @@ def simulate_qsim(request, output):
                'elapsed_seconds':round(time.monotonic()-started,6)}
     output.write_text(json.dumps({'status':'SUCCEEDED','summary':summary,
                                  'artifact':base64.b64encode(buffer.getvalue()).decode()}))
+
+
+def simulate_qasm_sample(request, output):
+    """Produce final classical memory with a complete, versioned sample artifact."""
+    from qsim.qasm_adapter import SUPPORTED_COMBINATIONS, final_memory, prepare
+    started = time.monotonic()
+    try:
+        import numpy as np
+        import qsimcirq
+        if request.get('operation') not in SUPPORTED_COMBINATIONS.get(
+                request.get('engine'), {}).get(request.get('input_format'), ()):
+            raise ValueError('unsupported_feature: engine or input format')
+        circuit, metadata = prepare(request)
+        if metadata['custom_gates']:
+            raise ValueError('unsupported_feature: custom gate declarations')
+        compiled = time.monotonic()
+        simulator = qsimcirq.QSimSimulator(seed=request['seed'],
+            qsim_options=qsimcirq.QSimOptions(cpu_threads=2))
+        result = simulator.run(circuit, repetitions=request['shots'])
+        executed = time.monotonic()
+        memory = final_memory(result, metadata, request['shots'])
+        if memory.dtype != np.uint8 or memory.shape != (request['shots'], metadata['classical_bits']):
+            raise ValueError('execution_failed: classical memory shape')
+        counts = collections.Counter(''.join(map(str, row)) for row in memory)
+        buffer = io.BytesIO()
+        np.savez_compressed(buffer, classical_memory=memory)
+        summary = {'result_schema': 'qasm-samples/1',
+            'engine': 'qsim ' + metadata['engine_version'],
+            'importer': 'cirq ' + metadata['importer_version'],
+            'input_format': request['input_format'], 'operation': 'sample',
+            'shots': request['shots'], 'seed': request['seed'], 'qubits': len(metadata['qubits']),
+            'registers': metadata['registers'],
+            'counts': dict(sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:256]),
+            'counts_truncated': len(counts) > 256, 'preview': memory[:20].tolist(),
+            'compile_seconds': round(compiled - started, 6),
+            'execution_seconds': round(executed - compiled, 6),
+            'elapsed_seconds': round(time.monotonic() - started, 6)}
+        payload = {'status': 'SUCCEEDED', 'summary': summary,
+                   'artifact': base64.b64encode(buffer.getvalue()).decode()}
+    except Exception as error:
+        category = str(error).partition(':')[0] if isinstance(error, ValueError) else 'execution_failed'
+        messages = {
+            'invalid_circuit': 'check the documented QASM sampling subset',
+            'unsupported_feature': 'use supported QASM sampling operations',
+            'invalid_binding': 'parameters must be resolved finite numbers',
+            'resource_limit': 'reduce circuit or sample output size',
+            'execution_failed': 'simulation did not produce a complete result',
+        }
+        if category not in messages:
+            category = 'execution_failed'
+        detail = {
+            'unsupported_feature: custom gate declarations': 'expand custom gates with your circuit library before submission',
+            'unsupported_feature: conditions or exponent expressions': 'remove classical conditions; evaluate exponent expressions in the client',
+            'unsupported_feature: engine or input format': 'select engine qsim and OpenQASM 2 sampling',
+            'invalid_circuit: sampling requires measurement': 'add a measurement into a declared classical register',
+        }.get(str(error), messages[category])
+        payload = {'status': 'FAILED', 'error': category + ': ' + detail}
+    output.write_text(json.dumps(payload))
 
 
 def remote():

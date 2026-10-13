@@ -19,7 +19,7 @@ def request(circuit, **kwargs):
 def test_metadata_import_does_not_load_native_libraries():
     subprocess.run([sys.executable, '-c',
         'import sys; from qsim.qasm_adapter import SUPPORTED_COMBINATIONS; '
-        'assert not SUPPORTED_COMBINATIONS; '
+        'assert SUPPORTED_COMBINATIONS["qsim"]["qasm2"] == ("sample",); '
         'assert not ({"cirq", "numpy", "qsimcirq", "clifft"} & sys.modules.keys())'], check=True)
 
 

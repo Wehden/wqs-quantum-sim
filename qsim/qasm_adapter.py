@@ -1,7 +1,7 @@
 """Pinned native QASM import inside the credential-free simulation child."""
 
-# Admission remains disabled until API and result integration are verified together.
-SUPPORTED_COMBINATIONS = {}
+# New operations admitted only after their worker contract is verified.
+SUPPORTED_COMBINATIONS = {"qsim": {"qasm2": ("sample",)}}
 
 
 def _preflight(source, shots):
@@ -143,6 +143,7 @@ def prepare(request):
             raise ValueError('unsupported_feature: operation')
         return parsed.circuit, dict(registers=registers, qubits=qubits, events=events,
             classical_bits=classical, input_format='qasm2',
+            custom_gates=any(isinstance(op, cirq.CircuitOperation) for op in parsed.circuit.all_operations()),
             engine_version=importlib.metadata.version('qsimcirq'),
             importer_version=importlib.metadata.version('cirq-core'))
     except Exception as error:

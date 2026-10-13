@@ -1,5 +1,6 @@
 from typing import Literal, Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from .qasm_adapter import SUPPORTED_COMBINATIONS
 
 
 class Submission(BaseModel):
@@ -16,8 +17,8 @@ class Submission(BaseModel):
 
     @model_validator(mode="after")
     def valid_operation(self):
-        if self.engine == "qsim" and (self.input_format != "qasm2" or self.operation != "basis_probabilities"):
-            raise ValueError("qsim supports OpenQASM 2 basis-probability queries")
+        if self.engine == "qsim" and self.input_format != "qasm2":
+            raise ValueError("qsim supports OpenQASM 2 requests")
         if self.operation == "basis_probabilities":
             if not self.bitstrings:
                 raise ValueError("basis_probabilities requires bitstrings")
@@ -25,8 +26,11 @@ class Submission(BaseModel):
                 raise ValueError("bitstrings must have equal lengths")
         elif self.bitstrings is not None:
             raise ValueError("bitstrings is only valid for basis_probabilities")
-        if self.input_format == "qasm2" and self.operation != "basis_probabilities":
-            raise ValueError("OpenQASM 2 supports unitary basis-probability queries; use /api/jobs/qasm2 with bitstrings")
+        if self.input_format == "qasm2" and self.operation == "sample":
+            if self.model_fields_set & {"bitstrings", "bit_order"}:
+                raise ValueError("QASM sampling does not accept bitstrings or bit_order")
+            if self.operation not in SUPPORTED_COMBINATIONS.get(self.engine, {}).get(self.input_format, ()):
+                raise ValueError("QASM sampling requires a supported engine; select engine=qsim")
         return self
 
 
@@ -43,15 +47,19 @@ class QasmSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     name: str = Field(default="Untitled circuit", min_length=1, max_length=80)
     circuit: str = Field(min_length=1, max_length=65536)
-    bitstrings: list[Annotated[str, Field(min_length=1, max_length=4096, pattern=r"^[01]+$")]] = Field(min_length=1, max_length=256)
+    operation: Literal["sample", "basis_probabilities"] = "basis_probabilities"
+    shots: int = Field(default=1000, ge=1, le=10000)
+    seed: int = Field(default=42, ge=0, le=2**63-1)
+    bitstrings: list[Annotated[str, Field(min_length=1, max_length=4096, pattern=r"^[01]+$")]] | None = Field(default=None, min_length=1, max_length=256)
     bit_order: Literal["big", "little"] = "big"
 
-    @field_validator('bitstrings')
-    @classmethod
-    def equal_lengths(cls,value):
-        if len({len(bits) for bits in value}) != 1:
-            raise ValueError('bitstrings must have equal lengths')
-        return value
+    @model_validator(mode="after")
+    def valid_operation(self):
+        if self.operation == "basis_probabilities" and self.model_fields_set & {"shots", "seed"}:
+            raise ValueError("Probability requests do not accept shots or seed")
+        Submission(**{**self.model_dump(exclude_unset=True), "operation": self.operation,
+                      "input_format": "qasm2"})
+        return self
 
 
 class Completion(BaseModel):
