@@ -137,10 +137,10 @@ def remote():
         source.write_text(json.dumps(request))
         # Do not give the native simulator job credentials or controller environment.
         env = {"PATH": os.environ["PATH"], "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
-        process = subprocess.run([sys.executable, __file__, "simulate", str(source), str(output)],
+        process = subprocess.run([sys.executable, "-m", "qsim.worker", "simulate", str(source), str(output)],
+                                 cwd=Path(__file__).resolve().parent.parent,
                                  env=env, capture_output=True)
         if process.returncode:
-            print(process.stderr.decode(errors="replace"), file=sys.stderr)
             message = "Circuit simulation failed; check the circuit and service limits"
             if request['input_format']=='qasm2':
                 message = "OpenQASM 2 simulation failed; use unitary qelib1.inc circuits without classical registers, measurement, reset or conditions, and bitstrings matching the qubit count. Check service limits."

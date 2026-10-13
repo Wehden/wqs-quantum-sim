@@ -105,15 +105,23 @@ def submit(body: Submission, user=Depends(identity), idempotency_key: str | None
     return enqueue(body,user,idempotency_key)
 
 
+def canonical_request(body):
+    canonical_body = body.model_dump()
+    # Existing reservations include normalized defaults but predate engine selection and bindings.
+    if canonical_body["engine"] == "clifft":
+        canonical_body.pop("engine")
+    legacy = (canonical_body["input_format"] == "stim" or
+              (canonical_body["input_format"] == "qasm2" and
+               canonical_body["operation"] == "basis_probabilities"))
+    if legacy and canonical_body.get("bindings") == {}:
+        canonical_body.pop("bindings")
+    return json.dumps(canonical_body, sort_keys=True, separators=(",", ":"))
+
+
 def enqueue(body,user,idempotency_key):
     if idempotency_key is not None and not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}",idempotency_key):
         raise HTTPException(422,"Idempotency-Key must be 1–128 ASCII letters, digits, dots, underscores, colons or hyphens")
-    canonical_body=body.model_dump()
-    # Preserve hashes for requests accepted before engines were selectable.
-    if canonical_body["engine"] == "clifft":
-        canonical_body.pop("engine")
-    canonical=json.dumps(canonical_body,sort_keys=True,separators=(",",":"))
-    request_hash=digest(canonical)
+    request_hash=digest(canonical_request(body))
     key_hash=digest(idempotency_key) if idempotency_key is not None else None
     job_id = uuid.uuid4().hex
     token = secrets.token_urlsafe(32)

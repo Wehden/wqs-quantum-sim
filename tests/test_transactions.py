@@ -185,3 +185,69 @@ def test_full_asgi_app_stream_send_cleanup(client,monkeypatch,stalled):
             with pytest.raises(ClientDisconnect):await app(scope,receive,send)
         assert not streams.connections
     asyncio.run(check())
+
+
+@pytest.mark.parametrize('engine,expected', [
+    ('clifft', '4e0a4598ff406882c24d7201dae48ac02b4d60abe4501461eac95e5906fd1b68'),
+    ('qsim', 'b315bb523bd80e9a7a53ff39639da6d90aea492933ba24ba2f495da202a7ea7e'),
+])
+def test_historical_qasm_hash_and_route_replay(client, engine, expected):
+    body = {'circuit': 'OPENQASM 2.0; include "qelib1.inc"; qreg q[2]; x q[0];',
+            'bitstrings': ['10', '01']}
+    if engine != 'clifft':
+        body['engine'] = engine
+    first = client.post('/api/jobs/qasm2', headers=headers(), json=body)
+    assert first.status_code == 202
+    explicit = {**body, 'engine': engine, 'name': 'Untitled circuit', 'bit_order': 'big'}
+    generic = {**explicit, 'input_format': 'qasm2', 'operation': 'basis_probabilities',
+               'shots': 1000, 'seed': 42}
+    for route, payload in [('/api/jobs/qasm2', explicit), ('/api/jobs', generic)]:
+        replay = client.post(route, headers=headers(), json=payload)
+        assert replay.status_code == 202
+        assert replay.json()['id'] == first.json()['id']
+        assert replay.headers['Idempotency-Replayed'] == 'true'
+    with store.connect() as db:
+        assert db.execute('SELECT request_hash FROM job_idempotency').fetchone()[0] == expected
+    for change in ({'engine': 'qsim' if engine == 'clifft' else 'clifft'},
+                   {'shots': 2}, {'seed': 3}, {'bit_order': 'little'},
+                   {'bitstrings': ['01', '10']}):
+        assert client.post('/api/jobs', headers=headers(), json={**generic, **change}).status_code == 409
+
+
+@pytest.mark.parametrize('name,expected', [
+    ('Untitled circuit', '409c2759f8374110d1b50acebfc1034b9b13637eac55344d0779b5380a139b49'),
+    ('é', 'b98fe04521bfaf5c90efc0b010dd762d695b2445658cb1d6cc34e11948ec3ef2'),
+])
+def test_historical_stim_hash_and_route_replay(client, name, expected):
+    body = {'circuit': 'M 0'}
+    if name != 'Untitled circuit':
+        body['name'] = name
+    first = client.post('/api/jobs/stim', headers=headers(), json=body)
+    assert first.status_code == 202
+    explicit = {**body, 'name': name, 'shots': 1000, 'seed': 42,
+                'engine': 'clifft', 'operation': 'sample', 'input_format': 'stim',
+                'bitstrings': None, 'bit_order': 'big'}
+    replay = client.post('/api/jobs', headers=headers(), json=explicit)
+    assert replay.status_code == 202 and replay.json()['id'] == first.json()['id']
+    with store.connect() as db:
+        assert db.execute('SELECT request_hash FROM job_idempotency').fetchone()[0] == expected
+    anonymous_key = {'Authorization': 'Bearer alice-key'}
+    assert client.post('/api/jobs', headers=anonymous_key, json=body).json()['id'] != first.json()['id']
+
+
+def test_legacy_canonical_bytes_survive_empty_binding_default():
+    from types import SimpleNamespace
+    from qsim.api import canonical_request
+    from qsim.models import Submission
+    payload = Submission(circuit='M 0').model_dump()
+    expected = ('{"bit_order":"big","bitstrings":null,"circuit":"M 0","input_format":"stim",'
+                '"name":"Untitled circuit","operation":"sample","seed":42,"shots":1000}')
+    assert canonical_request(Submission(circuit='M 0')) == expected
+    future_default = SimpleNamespace(model_dump=lambda: {**payload, 'bindings': {}})
+    assert canonical_request(future_default) == expected
+    bound = SimpleNamespace(model_dump=lambda: {**payload, 'bindings': {'theta': 1.0}})
+    assert canonical_request(bound) != expected
+    for input_format, operation in [('qasm2', 'sample'), ('qasm3', 'basis_probabilities')]:
+        new_operation = SimpleNamespace(model_dump=lambda: {
+            **payload, 'input_format': input_format, 'operation': operation, 'bindings': {}})
+        assert json.loads(canonical_request(new_operation))['bindings'] == {}
