@@ -32,6 +32,12 @@ The owner authorized correction of the next PR #10 finding: probability requests
 
 Full local CI passed 230 Python tests and three console tests. The rebuilt worker image checks passed. The committed suite contains 229 Python tests while the separate PR #8 fixture correction remains local. Further automated review findings will be escalated to the owner.
 
+## Binding submission bounds
+
+The owner authorized correction of the binding-size finding. Both submission schemas share a bounded binding type: at most 256 entries and names of 1–256 characters. The before-validator checks these bounds before copying or normalizing values; OpenAPI publishes the same limits. Both public guides describe them.
+
+Five regressions cover oversized counts, oversized/empty names, exact boundary acceptance, preserved numeric normalization and generated schemas. Rejected requests leave the jobs table empty and do not echo circuit or binding content. Full local CI passed 235 Python tests and three console tests after correcting a test-only schema lookup. The committed suite contains 234 Python tests; the PR #8 fixture correction remains local. Worker code and image packaging were unchanged by this correction.
+
 ## Legacy timing check
 
 Ten alternating baseline/candidate subprocess runs per engine used the same two-qubit unitary rotation/entangling circuit and frozen environment. Baseline source is origin/main at 0e850ec. The predeclared acceptance threshold is added median time no greater than max(20% of baseline, 0.1 seconds). This checks local subprocess runtime including import overhead, not production SkyPilot dispatch or throughput. A local image build also ran during part of this check; alternating runs limit, but do not eliminate, machine-load noise.

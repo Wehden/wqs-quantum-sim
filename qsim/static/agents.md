@@ -117,7 +117,7 @@ Send this body to `POST /api/jobs/qasm3`. This endpoint requires an explicit ope
 }
 ```
 
-Supported input declarations are `float[32]`, `float[64]`, `angle[32]` and `angle[64]`. Supply exactly the declared names in `bindings`, using finite JSON numbers. Missing or extra names, booleans, strings, null, infinities and NaN are rejected. Values normalize to finite Python floats; declaration widths do not promise width-specific arithmetic, and qsim still runs in single precision. Equivalent integer/float values and signed zero share normalized identity. Changed binding values require a new idempotency key. QASM2 has no `bindings` field; custom gate-local parameters there must resolve from circuit expressions.
+Supported input declarations are `float[32]`, `float[64]`, `angle[32]` and `angle[64]`. Supply exactly the declared names in `bindings`, using finite JSON numbers. Submission accepts at most 256 bindings, with names of 1–256 characters; oversized mappings are rejected before a job is stored. Missing or extra names, booleans, strings, null, infinities and NaN are rejected. Values normalize to finite Python floats; declaration widths do not promise width-specific arithmetic, and qsim still runs in single precision. Equivalent integer/float values and signed zero share normalized identity. Changed binding values require a new idempotency key. QASM2 has no `bindings` field; custom gate-local parameters there must resolve from circuit expressions.
 
 ### QASM3 basis probabilities
 

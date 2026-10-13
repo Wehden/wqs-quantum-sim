@@ -4,9 +4,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .qasm_adapter import SUPPORTED_COMBINATIONS
 
 
+MAX_BINDINGS = 256
+MAX_BINDING_NAME_LENGTH = 256
+
+
 def finite_bindings(value):
     if not isinstance(value, dict):
         raise ValueError("bindings must be a mapping of names to finite numbers")
+    if len(value) > MAX_BINDINGS:
+        raise ValueError("bindings accept at most 256 entries")
+    if any(not isinstance(name, str) or not 1 <= len(name) <= MAX_BINDING_NAME_LENGTH for name in value):
+        raise ValueError("binding names must contain 1–256 characters")
     normalized = {}
     for name, number in value.items():
         if not isinstance(name, str) or type(number) not in (int, float):
@@ -21,6 +29,11 @@ def finite_bindings(value):
     return normalized
 
 
+Bindings = Annotated[
+    dict[Annotated[str, Field(min_length=1, max_length=MAX_BINDING_NAME_LENGTH)], float],
+    Field(max_length=MAX_BINDINGS), BeforeValidator(finite_bindings),
+]
+
 class Submission(BaseModel):
     engine: Literal["clifft", "qsim"] = "clifft"
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -32,7 +45,7 @@ class Submission(BaseModel):
     operation: Literal["sample", "basis_probabilities"] = "sample"
     bitstrings: list[Annotated[str, Field(min_length=1, max_length=4096, pattern=r"^[01]+$")]] | None = Field(default=None, min_length=1, max_length=256)
     bit_order: Literal["big", "little"] = "big"
-    bindings: Annotated[dict[str, float], BeforeValidator(finite_bindings)] = Field(default_factory=dict)
+    bindings: Bindings = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def valid_operation(self):
@@ -93,7 +106,7 @@ class QasmSubmission(BaseModel):
 class Qasm3Submission(QasmSubmission):
     _input_format: ClassVar[str] = "qasm3"
     operation: Literal["sample", "basis_probabilities"]
-    bindings: Annotated[dict[str, float], BeforeValidator(finite_bindings)] = Field(default_factory=dict)
+    bindings: Bindings = Field(default_factory=dict)
 
 
 class Completion(BaseModel):

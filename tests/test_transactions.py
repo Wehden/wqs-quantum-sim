@@ -353,3 +353,37 @@ def test_bound_qasm3_job_result_roundtrip(client, tmp_path, operation):
             assert arrays['classical_memory'].tolist() == [[1]] * 4
         else:
             assert arrays['probabilities'] == pytest.approx([0, 1], abs=1e-6)
+
+
+@pytest.mark.parametrize('bindings', [
+    {f'p{i}': 1 for i in range(257)}, {'private-binding-' + 'x'*256: 1}, {'': 1},
+])
+def test_binding_size_limits_reject_before_storage(client, bindings):
+    body = dict(engine='qsim', operation='sample', circuit='private-circuit-sentinel', bindings=bindings)
+    for route, extra in [('/api/jobs/qasm3', {}), ('/api/jobs', {'input_format': 'qasm3'})]:
+        response = client.post(route, headers=headers(), json={**body, **extra})
+        assert response.status_code == 422, response.text
+        assert 'private-binding-' not in response.text
+        assert 'private-circuit-sentinel' not in response.text
+    with store.connect() as db:
+        assert db.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] == 0
+
+
+@pytest.mark.parametrize('route', ['/api/jobs', '/api/jobs/qasm3'])
+def test_binding_size_boundary_and_schema(client, route):
+    bindings = {f'p{i}': 1 for i in range(255)}
+    bindings['x'*256] = -0.0
+    body = dict(engine='qsim', operation='sample', circuit='not parsed at admission', bindings=bindings)
+    if route == '/api/jobs':
+        body['input_format'] = 'qasm3'
+    response = client.post(route, headers=headers(), json=body)
+    assert response.status_code == 202, response.text
+    with store.connect() as db:
+        saved = json.loads(db.execute('SELECT request FROM jobs WHERE id=?', (response.json()['id'],)).fetchone()[0])
+    assert len(saved['bindings']) == 256
+    assert saved['bindings']['x'*256] == 0.0
+    schema = app.openapi()['components']['schemas']
+    model = 'Submission' if route == '/api/jobs' else 'Qasm3Submission'
+    binding_schema = schema[model]['properties']['bindings']
+    assert binding_schema['maxProperties'] == 256
+    assert binding_schema['propertyNames'] == {'minLength': 1, 'maxLength': 256}
