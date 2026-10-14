@@ -1,8 +1,10 @@
 # Tasks: broader circuit support
 
-Status: task plan approved by the owner on 2026-10-13, with parallel System2 execution authorized within disjoint write leases. Requirements and design were approved on the same date. TASK-001 through TASK-009 implemented and locally verified; PR review/CI gates remain. TASK-010 awaits owner merges. Approval preserves the design's evidence gates; it does not establish untested engine capabilities.
+Status: task plan approved by the owner on 2026-10-13, with parallel System2 execution authorized within disjoint write leases. Requirements and design were approved on the same date. TASK-001 through TASK-009 are merged through PRs #8–#11; see validation.md for exact revisions and CI evidence. TASK-010 remains open for rollout handoff, not pending those merges. Approval preserves the design's evidence gates; it does not establish untested engine capabilities.
 
 Prepared using System2 1.1.1 task-planner. Paths are scoped to this existing feature specification directory.
+
+Approved follow-on design: [classical conditions](classical-conditions/design.md). Proposed implementation tasks TASK-011 through TASK-019 are in [the amendment task plan](classical-conditions/tasks.md); execution requires owner approval of that plan. Earlier parallel-execution approval does not bypass this new gate.
 
 ## Task Graph Overview (short)
 

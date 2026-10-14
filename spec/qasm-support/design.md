@@ -2,6 +2,8 @@
 
 Status: approved by the owner on 2026-10-13 following System2 persona review. The recorded capability experiments and open decisions remain prerequisites for affected implementation. Proposed capabilities are not implemented or deployed by this approval. Task plan approved on 2026-10-13; execution starts with capability evidence.
 
+Approved amendment (2026-10-14): [classical conditions via an explicit Aer engine](classical-conditions/design.md). Its bounded engine/dependency changes supplement the baseline below. [Implementation task planning](classical-conditions/tasks.md) is pending owner review.
+
 ## Overview
 
 Extend the current data-only circuit service through existing library importers and simulator adapters. Keep durable jobs, SkyPilot placement, warm workers, owner isolation and the default Clifft engine. Do not introduce another simulator as a silent fallback. IBM/Qiskit supplies candidate import/binding tooling and local reference behavior; its hardware support does not establish support in Clifft or Google qsim.

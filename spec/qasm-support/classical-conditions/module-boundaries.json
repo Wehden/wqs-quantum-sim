@@ -1,0 +1,90 @@
+{
+  "version": "0.2.0",
+  "boundaries": [
+    {
+      "module": "qsim/api.py",
+      "description": "Proposed amendment boundary. Native imports occur only in credential-free child-called functions; API metadata stays dependency-free.",
+      "allowed_imports_from": [
+        "stdlib",
+        "fastapi",
+        "pydantic",
+        "qsim.models",
+        "qsim.store",
+        "qsim.auth",
+        "qsim.settings",
+        "qsim.streams",
+        "qsim.http_boundary",
+        "qsim.qasm_adapter"
+      ],
+      "forbidden_imports_from": [
+        "qiskit",
+        "qiskit_aer",
+        "qiskit_qasm3_import",
+        "openqasm3",
+        "qsim.aer_adapter",
+        "cirq",
+        "qsimcirq",
+        "clifft"
+      ]
+    },
+    {
+      "module": "qsim/qasm_adapter.py",
+      "description": "Proposed amendment boundary. Native imports occur only in credential-free child-called functions; API metadata stays dependency-free.",
+      "allowed_imports_from": [
+        "stdlib",
+        "numpy",
+        "cirq",
+        "qsimcirq"
+      ],
+      "forbidden_imports_from": [
+        "qiskit",
+        "qiskit_aer",
+        "qsim.aer_adapter",
+        "qsim.api",
+        "qsim.store",
+        "qsim.controller"
+      ]
+    },
+    {
+      "module": "qsim/aer_adapter.py",
+      "description": "Proposed amendment boundary. Native imports occur only in credential-free child-called functions; API metadata stays dependency-free.",
+      "allowed_imports_from": [
+        "stdlib",
+        "numpy",
+        "cirq.contrib.qasm_import._lexer",
+        "qiskit",
+        "qiskit_aer",
+        "qiskit_qasm3_import",
+        "openqasm3"
+      ],
+      "forbidden_imports_from": [
+        "qsim.api",
+        "qsim.store",
+        "qsim.auth",
+        "qsim.controller",
+        "qsim.adminweb",
+        "sky"
+      ]
+    },
+    {
+      "module": "qsim/worker.py",
+      "description": "Proposed amendment boundary. Native imports occur only in credential-free child-called functions; API metadata stays dependency-free.",
+      "allowed_imports_from": [
+        "stdlib",
+        "numpy",
+        "clifft",
+        "cirq",
+        "qsimcirq",
+        "qsim.qasm_adapter",
+        "qsim.aer_adapter"
+      ],
+      "forbidden_imports_from": [
+        "qsim.api",
+        "qsim.store",
+        "qsim.auth",
+        "qsim.controller",
+        "qsim.adminweb"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,292 @@
+{
+  "versions": {
+    "cirq-core": "1.7.0",
+    "qsimcirq": "0.22.1"
+  },
+  "results": [
+    {
+      "case": "scalar",
+      "engine": "cirq",
+      "records": {
+        "c_0": [
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ]
+        ],
+        "o_0": [
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "case": "scalar",
+      "engine": "qsim",
+      "error": "ValueError: Encountered unparseable op: X(q_1).with_classical_controls(Eq(c_0, 1))"
+    },
+    {
+      "case": "unwritten",
+      "engine": "cirq",
+      "error": "ValueError: Measurement keys ['c_0'] missing when testing classical control"
+    },
+    {
+      "case": "unwritten",
+      "engine": "qsim",
+      "error": "ValueError: Encountered unparseable op: X(q_0).with_classical_controls(Eq(c_0, 0))"
+    },
+    {
+      "case": "broadcast",
+      "engine": "cirq",
+      "records": {
+        "o_1": [
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ]
+        ],
+        "o_2": [
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ]
+        ],
+        "c_0": [
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ]
+        ],
+        "o_0": [
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ],
+          [
+            [
+              0
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "case": "broadcast",
+      "engine": "qsim",
+      "error": "ValueError: Encountered unparseable op: X(q_0).with_classical_controls(Eq(c_0, 1))"
+    }
+  ]
+}

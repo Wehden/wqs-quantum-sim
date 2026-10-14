@@ -1,0 +1,103 @@
+{
+  "versions": {
+    "qiskit": "2.5.2",
+    "qiskit-aer": "0.17.2",
+    "qiskit-qasm3-import": "0.6.0",
+    "openqasm3": "1.0.1",
+    "antlr4-python3-runtime": "4.13.2"
+  },
+  "shots": 4096,
+  "seed": 42,
+  "cases": [
+    {
+      "name": "q2_true",
+      "passed": true,
+      "counts": {
+        "3": 4096
+      }
+    },
+    {
+      "name": "q2_false",
+      "passed": true,
+      "counts": {
+        "1": 4096
+      }
+    },
+    {
+      "name": "q2_unwritten_zero",
+      "passed": true,
+      "counts": {
+        "4": 4096
+      }
+    },
+    {
+      "name": "q2_partial_register_little_endian",
+      "passed": true,
+      "counts": {
+        "6": 4096
+      }
+    },
+    {
+      "name": "q2_latest_write",
+      "passed": true,
+      "counts": {
+        "2": 4096
+      }
+    },
+    {
+      "name": "q2_broadcast",
+      "passed": true,
+      "counts": {
+        "6": 4096
+      }
+    },
+    {
+      "name": "q2_custom_gate",
+      "passed": true,
+      "counts": {
+        "2": 4096
+      }
+    },
+    {
+      "name": "q3_if_else",
+      "passed": true,
+      "counts": {
+        "0": 2051,
+        "3": 2045
+      }
+    },
+    {
+      "name": "q3_conditional_measure_last_write",
+      "passed": true,
+      "counts": {
+        "1": 2045,
+        "2": 2051
+      }
+    },
+    {
+      "name": "q3_conditional_reset",
+      "passed": true,
+      "counts": {
+        "1": 2045,
+        "2": 2051
+      }
+    },
+    {
+      "name": "q3_register_equality",
+      "passed": true,
+      "counts": {
+        "6": 4096
+      }
+    },
+    {
+      "name": "q2_teleport_plus",
+      "passed": true,
+      "counts": {
+        "0": 999,
+        "1": 1018,
+        "2": 1052,
+        "3": 1027
+      }
+    }
+  ]
+}

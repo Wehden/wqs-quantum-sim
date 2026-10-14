@@ -1,0 +1,76 @@
+{
+  "version": "0.2.0",
+  "modules": {
+    "qsim/models.py": {
+      "description": "Proposed explicit aer engine on existing sample submissions; legacy defaults preserved.",
+      "public_exports": [
+        {
+          "name": "Submission",
+          "kind": "class",
+          "signature": "Submission(**validated_request_fields)"
+        },
+        {
+          "name": "QasmSubmission",
+          "kind": "class",
+          "signature": "QasmSubmission(**validated_request_fields)"
+        }
+      ],
+      "internal_only": []
+    },
+    "qsim/api.py": {
+      "description": "Existing routes/capabilities extended with explicit Aer sample combinations; no native imports.",
+      "public_exports": [
+        {
+          "name": "app",
+          "kind": "constant",
+          "signature": "FastAPI"
+        }
+      ],
+      "internal_only": [
+        "enqueue"
+      ]
+    },
+    "qsim/qasm_adapter.py": {
+      "description": "Existing qsim adapter remains intact; extend only dependency-free capability metadata for aer.",
+      "public_exports": [
+        {
+          "name": "SUPPORTED_COMBINATIONS",
+          "kind": "constant",
+          "signature": "dict[str, object]"
+        }
+      ],
+      "internal_only": []
+    },
+    "qsim/aer_adapter.py": {
+      "description": "Proposed worker-only integration; no classical interpreter or service authority.",
+      "public_exports": [
+        {
+          "name": "sample",
+          "kind": "function",
+          "signature": "sample(request: dict, *, cpu_threads: int) -> tuple[object, dict]  # uint8 final memory and provenance/register metadata"
+        }
+      ],
+      "internal_only": [
+        "preflight",
+        "validate_native_circuit",
+        "normalize_memory"
+      ]
+    },
+    "qsim/worker.py": {
+      "description": "Existing isolated child invokes explicit engine and shared result packaging.",
+      "public_exports": [
+        {
+          "name": "simulate",
+          "kind": "function",
+          "signature": "simulate(source: Path, output: Path)"
+        },
+        {
+          "name": "remote",
+          "kind": "function",
+          "signature": "remote() -> int"
+        }
+      ],
+      "internal_only": []
+    }
+  }
+}
