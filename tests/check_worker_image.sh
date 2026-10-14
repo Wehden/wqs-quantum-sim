@@ -16,3 +16,49 @@ for log,marker in [('apt-ssh-setup','apt_ssh_setup_complete'),('runtime-setup','
  assert subprocess.check_output(['/usr/local/bin/tail','-n','1',str(p)])==b'last\n'
 print('All startup followers: wait, completion, failed marker, drain and GNU passthrough passed')
 PY
+
+# Verify the same package/module invocation used by controller and isolated child.
+docker run --rm -i --entrypoint /opt/qsim-venv/bin/python "$image" - <<'PY'
+import json, os, pathlib, subprocess, sys, tempfile
+from qsim.qasm_adapter import SUPPORTED_COMBINATIONS
+assert not ({'cirq', 'numpy', 'qsimcirq', 'clifft'} & sys.modules.keys())
+assert pathlib.Path('/opt/qsim/qsim/qasm_adapter.py').is_file()
+assert not pathlib.Path('/opt/qsim/qsim/store.py').exists()
+env = {'PATH': os.environ['PATH'], 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}
+requests = [
+    {'engine': 'clifft', 'input_format': 'stim', 'operation': 'sample',
+     'circuit': 'X 0\nM 0', 'shots': 4, 'seed': 42},
+    {'engine': 'qsim', 'input_format': 'qasm2', 'operation': 'basis_probabilities',
+     'circuit': 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; x q[0];',
+     'bitstrings': ['0', '1'], 'bit_order': 'big'},
+    {'engine': 'qsim', 'input_format': 'qasm2', 'operation': 'sample', 'shots': 4, 'seed': 2**63-1,
+     'circuit': 'OPENQASM 2.0; include "qelib1.inc"; gate turn(a) t { rx(a) t; } qreg q[1]; creg c[1]; turn(pi) q[0]; measure q -> c;'},
+    {'engine': 'qsim', 'input_format': 'qasm3', 'operation': 'sample', 'shots': 4, 'seed': 42,
+     'bindings': {'theta': 3.141592653589793},
+     'circuit': 'OPENQASM 3.0; include "stdgates.inc"; input angle[64] theta; qubit q; bit c; rx(theta) q; c=measure q;'},
+    {'engine': 'qsim', 'input_format': 'qasm3', 'operation': 'basis_probabilities',
+     'bindings': {'theta': 3.141592653589793}, 'bitstrings': ['0', '1'], 'bit_order': 'big',
+     'circuit': 'OPENQASM 3.0; include "stdgates.inc"; input float[64] theta; qubit q; rx(theta) q;'},
+]
+with tempfile.TemporaryDirectory() as directory:
+    source, output = pathlib.Path(directory)/'input.json', pathlib.Path(directory)/'output.json'
+    for request in requests:
+        source.write_text(json.dumps(request))
+        subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
+                       cwd='/opt/qsim', env=env, check=True)
+        result = json.loads(output.read_text())
+        assert result['status'] == 'SUCCEEDED' and result['artifact']
+        if request['operation'] == 'basis_probabilities':
+            assert result['summary']['probabilities'][1] > .99999
+        else:
+            assert result['summary']['counts'] == {'1': 4}
+subprocess.run([sys.executable, '-c', """
+from qsim.qasm_adapter import prepare, final_memory
+import qsimcirq
+circuit, metadata = prepare(dict(engine='qsim',input_format='qasm2',operation='sample',shots=4,
+    circuit='OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; creg c[1]; x q[0]; measure q -> c;'))
+result = qsimcirq.QSimSimulator(seed=42).run(circuit,repetitions=4)
+assert final_memory(result,metadata,4).tolist() == [[1]]*4
+"""], cwd='/opt/qsim', env=env, check=True)
+print('Worker package, isolated module entry point, both engines and adapter passed')
+PY

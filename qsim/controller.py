@@ -21,7 +21,7 @@ def task_config(row):
                       "labels": {"workload": "qsim"}},
         "envs": {"QSIM_JOB_URL": settings.CALLBACK_URL + "/internal/jobs/" + row["id"],
                  "QSIM_JOB_TOKEN": token},
-        "run": "/opt/qsim-venv/bin/python /opt/qsim/worker.py",
+        "run": "cd /opt/qsim && /opt/qsim-venv/bin/python -m qsim.worker",
     }
 
 
