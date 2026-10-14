@@ -4,7 +4,7 @@ Status: task plan approved by the owner on 2026-10-13, with parallel System2 exe
 
 Prepared using System2 1.1.1 task-planner. Paths are scoped to this existing feature specification directory.
 
-Approved follow-on design: [classical conditions](classical-conditions/design.md). Proposed implementation tasks TASK-011 through TASK-019 are in [the amendment task plan](classical-conditions/tasks.md); execution requires owner approval of that plan. Earlier parallel-execution approval does not bypass this new gate.
+Approved follow-on design: [classical conditions](classical-conditions/design.md). Approved implementation tasks TASK-011 through TASK-019 are in [the amendment task plan](classical-conditions/tasks.md); the owner approved that plan on 2026-10-14 and authorized implementation.
 
 ## Task Graph Overview (short)
 

@@ -1,12 +1,12 @@
 # Design amendment: classical conditions
 
-Status: **approved by the owner on 2026-10-14**. Implementation task planning authorized; task-plan approval remains pending. Date: 2026-10-14. Parent: [approved QASM design](../design.md), D1/D3/D4/D6/D9/D10; [REQ-006](../requirements.md). Source baseline: `2ed33601e9fdd5ab8ba04ef98c831486dbf9205c`. This amendment does not enable a capability or authorize deployment.
+Status: **approved by the owner on 2026-10-14**. Task plan approved and implementation authorized on the same date. Date: 2026-10-14. Parent: [approved QASM design](../design.md), D1/D3/D4/D6/D9/D10; [REQ-006](../requirements.md). Source baseline: `2ed33601e9fdd5ab8ba04ef98c831486dbf9205c`. This amendment does not enable a capability or authorize deployment.
 
 ## Overview
 
 Recommend adding **explicit `engine="aer"` sampling** through the existing QASM2/QASM3 job routes. Use Qiskit's maintained importers and native Aer classical execution. Keep Clifft as the default and retain the existing qsim and Clifft paths, identities and capability restrictions.
 
-This changes the parent design's two-engine scope and selects a new runtime dependency family. The owner approved this scope on 2026-10-14. Implementation remains gated on task-plan approval. No Qiskit code is installed in the project environment, and no application, CI or deployment code changed during this investigation.
+This changes the parent design's two-engine scope and selects a new runtime dependency family. The owner approved this scope on 2026-10-14. TASK-011 has added the pinned Qiskit family to the worker environment and verified combined capabilities. API admission and deployment remain closed. The original investigation changed no application code.
 
 The [requirements clarification](requirements-delta.md) maps the proposal to the existing requirements. The [evidence record](../research/classical-conditions/evidence.md) contains versions, circuits and limitations. Twelve local Aer probes passed. Existing Cirq/qsim probes establish why enabling conditions in the current adapter is insufficient.
 
@@ -87,7 +87,7 @@ Record engine/importer versions and separate import/transpile/execution duration
 
 ## Rollout Plan (staged rollout, feature flags, backout)
 
-The System2 design review gate passed on 2026-10-14. The next gate is owner review of [the implementation task plan](tasks.md), before implementation or deployment.
+The System2 design review gate passed on 2026-10-14. The owner also approved [the implementation task plan](tasks.md) on 2026-10-14. Implementation is in progress; verification and owner-merged PRs remain required before a separately authorized deployment.
 
 1. After design approval, amend the task plan with bounded leases: importer/safety probes, adapter/results, API/docs, and integration/image verification. Do not treat the previous completed TASK-006 as reopened implementation authority.
 2. Implementation PRs preserve existing tests and add Aer checks. Standpunkt remains the preferred test runner with hosted fallback; the packaged-image job remains separately hosted and required. Automatic review only, at most two rounds before escalation. Owner merges.
