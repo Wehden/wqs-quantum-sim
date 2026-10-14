@@ -93,9 +93,19 @@ jobs:
           name: test-results-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/*.xml
           retention-days: 14
+  worker-image:
+    name: GitHub-hosted / packaged worker image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and verify isolated worker package
+        run: bash tools/ci/check-worker.sh
   result:
     name: CI result and path
-    needs: [route, local, hosted]
+    needs: [route, local, hosted, worker-image]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -105,6 +115,7 @@ jobs:
           ROUTE_RESULT: ${{ needs.route.result }}
           LOCAL_TESTS: ${{ needs.local.outputs.tests }}
           LOCAL_ARTIFACT: ${{ needs.local.outputs.artifact }}
+          IMAGE_RESULT: ${{ needs.worker-image.result }}
           HOSTED_RESULT: ${{ needs.hosted.result }}
         run: |
           python3 - <<'PY'
@@ -119,8 +130,10 @@ jobs:
           else:
               detail = 'Standpunkt: skipped by routing. GitHub-hosted test suite: ' + os.environ['HOSTED_RESULT'] + '.'
               passed = os.environ['HOSTED_RESULT'] == 'success'
+          detail += ' Worker image (GitHub-hosted): ' + os.environ['IMAGE_RESULT'] + '.'
+          passed = passed and os.environ['IMAGE_RESULT'] == 'success'
           print(detail)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
-              out.write('## Actual CI path\n\n' + detail + '\n\nBoth test lanes cover Clifft, Google qsim, and API/console behavior. Routing and this result report run on GitHub-hosted infrastructure.\n')
+              out.write('## Actual CI path\n\n' + detail + '\n\nBoth test lanes cover Clifft, Google qsim, and API/console behavior. Worker image checks run separately on GitHub-hosted infrastructure because the isolated Standpunkt runner has no Docker daemon. Routing and this result report run on GitHub-hosted infrastructure.\n')
           raise SystemExit(0 if passed and os.environ['ROUTE_RESULT'] == 'success' else 1)
           PY
