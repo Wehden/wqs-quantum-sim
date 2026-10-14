@@ -1,0 +1,66 @@
+{
+  "version": "0.1.0",
+  "boundaries": [
+    {
+      "module": "qsim/api.py",
+      "description": "Feature-scoped runtime boundary; API may validate envelopes but must not import native simulators or execute circuit compilation. Adapter access is limited to side-effect-free capability metadata; native calls/imports remain forbidden.",
+      "allowed_imports_from": [
+        "qsim.models",
+        "qsim.store",
+        "qsim.auth",
+        "qsim.settings",
+        "qsim.streams",
+        "qsim.http_boundary",
+        "fastapi",
+        "pydantic",
+        "stdlib",
+        "qsim.qasm_adapter"
+      ],
+      "forbidden_imports_from": [
+        "clifft",
+        "cirq",
+        "qsimcirq",
+        "qiskit"
+      ]
+    },
+    {
+      "module": "qsim/qasm_adapter.py",
+      "description": "Proposed integration module: API may import dependency-free capability metadata; native integration functions run only in the isolated worker. Candidate library imports require selection and dependency approval.",
+      "allowed_imports_from": [
+        "stdlib",
+        "numpy",
+        "clifft",
+        "cirq",
+        "qsimcirq",
+        "qiskit"
+      ],
+      "forbidden_imports_from": [
+        "qsim.api",
+        "qsim.store",
+        "qsim.auth",
+        "qsim.controller",
+        "qsim.adminweb",
+        "sky"
+      ]
+    },
+    {
+      "module": "qsim/worker.py",
+      "description": "Existing worker may call proposed adapter; must not depend on API/store/controller authority.",
+      "allowed_imports_from": [
+        "stdlib",
+        "numpy",
+        "clifft",
+        "cirq",
+        "qsimcirq",
+        "qsim.qasm_adapter"
+      ],
+      "forbidden_imports_from": [
+        "qsim.api",
+        "qsim.store",
+        "qsim.auth",
+        "qsim.controller",
+        "qsim.adminweb"
+      ]
+    }
+  ]
+}
