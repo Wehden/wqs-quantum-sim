@@ -48,7 +48,7 @@ jobs:
       - name: Install pinned environment tool
         if: runner.environment == 'github-hosted'
         run: python -m pip install uv==0.11.6
-      - name: Test both simulators and API contracts
+      - name: Test simulators, API contracts and worker image
         id: tests
         run: bash tools/ci/check.sh
       - name: Retain test results
@@ -82,7 +82,7 @@ jobs:
       - name: Install pinned environment tool
         if: runner.environment == 'github-hosted'
         run: python -m pip install uv==0.11.6
-      - name: Test both simulators and API contracts
+      - name: Test simulators, API contracts and worker image
         id: tests
         run: bash tools/ci/check.sh
       - name: Retain test results
@@ -121,6 +121,6 @@ jobs:
               passed = os.environ['HOSTED_RESULT'] == 'success'
           print(detail)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
-              out.write('## Actual CI path\n\n' + detail + '\n\nBoth test lanes cover Clifft, Google qsim, and API/console behavior. Routing and this result report run on GitHub-hosted infrastructure.\n')
+              out.write('## Actual CI path\n\n' + detail + '\n\nBoth test lanes cover Clifft, Google qsim, API/console behavior, and the built worker image. Routing and this result report run on GitHub-hosted infrastructure.\n')
           raise SystemExit(0 if passed and os.environ['ROUTE_RESULT'] == 'success' else 1)
           PY

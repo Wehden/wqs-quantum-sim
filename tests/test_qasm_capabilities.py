@@ -49,7 +49,7 @@ def test_qsim_mid_measurement_collapses_and_preserves_correlation():
     assert set(result.records['c_0'].ravel()) == {0, 1}
 
 
-def test_qsim_entangled_reset_preserves_partner_and_starts_fresh_shots():
+def test_qsim_reset_after_measurement_preserves_measured_partner():
     parsed = QasmParser().parse(QASM2 +
         'qreg q[2]; creg c[2]; creg before[1]; h q[0]; cx q[0],q[1]; '
         'measure q[1] -> before[0]; reset q[0]; measure q -> c;')
@@ -57,6 +57,18 @@ def test_qsim_entangled_reset_preserves_partner_and_starts_fresh_shots():
     assert np.array_equal(result.records['c_0'], np.zeros((SHOTS, 1, 1)))
     assert np.array_equal(result.records['c_1'], result.records['before_0'])
     assert set(result.records['c_1'].ravel()) == {0, 1}
+
+
+def test_qsim_reset_entangled_qubit_before_any_measurement():
+    shots = 4096
+    # Predeclared OR-006 criterion: partner probability 0.5 within 0.05.
+    parsed = QasmParser().parse(QASM2 +
+        'qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; '
+        'reset q[0]; measure q -> c;')
+    result = qsimcirq.QSimSimulator(seed=SEED).run(parsed.circuit, repetitions=shots)
+    assert np.array_equal(result.records['c_0'], np.zeros((shots, 1, 1)))
+    assert result.records['c_1'].shape == (shots, 1, 1)
+    assert np.mean(result.records['c_1']) == pytest.approx(0.5, abs=0.05)
 
 
 def test_qsim_repeated_write_records_are_events_not_final_memory():
