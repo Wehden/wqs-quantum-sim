@@ -132,3 +132,91 @@ def test_more_than_100_saved_jobs_per_identity(client):
     assert client.post('/api/jobs/stim', headers={**auth(), 'Idempotency-Key': 'beyond-500'}, json=body).status_code == 202
     assert len(client.get('/api/jobs', headers=auth()).json()) == 501
     assert client.post('/api/jobs/stim', headers=headers, json=body).json()['id'] == newest
+
+
+def test_qasm_sampling_submission_replay_and_isolation(client):
+    body = {'engine': 'qsim', 'operation': 'sample', 'circuit': 'not parsed by the API',
+            'shots': 12, 'seed': 7}
+    headers = {**auth(), 'Idempotency-Key': 'qasm-sample'}
+    first = client.post('/api/jobs/qasm2', headers=headers, json=body)
+    assert first.status_code == 202, first.text
+    job = first.json()['id']
+    assert first.json()['status'] == 'QUEUED'
+    replay = client.post('/api/jobs', headers=headers, json={**body, 'input_format': 'qasm2'})
+    assert replay.status_code == 202 and replay.json()['id'] == job
+    assert replay.headers['Idempotency-Replayed'] == 'true'
+    with store.connect() as db:
+        request = json.loads(db.execute('SELECT request FROM jobs WHERE id=?', (job,)).fetchone()[0])
+    assert request['shots'] == 12 and request['seed'] == 7
+    assert client.get('/api/jobs/' + job, headers=auth()).json()['status'] == 'QUEUED'
+    assert client.get('/api/jobs/' + job, headers=auth('bob')).status_code == 404
+    assert client.get('/api/jobs/' + job + '/result', headers=auth('bob')).status_code == 404
+    assert client.post('/api/jobs/qasm2', headers=headers, json={**body, 'seed': 8}).status_code == 409
+    assert client.post('/api/jobs/qasm2', headers=auth(), json=body).status_code == 422
+
+
+@pytest.mark.parametrize('fields', [
+    {'engine': 'clifft'}, {'bitstrings': None}, {'bitstrings': ['0']},
+    {'bit_order': 'big'}, {'shots': True}, {'shots': 10001}, {'seed': -1},
+    {'bindings': {}}, {'operation': 'unknown'},
+])
+def test_qasm_sampling_rejects_invalid_envelope(client, fields):
+    body = {'engine': 'qsim', 'operation': 'sample', 'circuit': 'M 0', **fields}
+    for route, extra in [('/api/jobs/qasm2', {}), ('/api/jobs', {'input_format': 'qasm2'})]:
+        response = client.post(route, headers={**auth(), 'Idempotency-Key': 'invalid'}, json={**body, **extra})
+        assert response.status_code == 422, response.text
+    assert client.get('/api/jobs', headers=auth()).json() == []
+
+
+def test_qasm_probability_field_rules_remain_compatible(client):
+    body = {'circuit': 'OPENQASM 2.0; qreg q[1];', 'bitstrings': ['0']}
+    headers = {**auth(), 'Idempotency-Key': 'probability'}
+    for fields in ({'shots': 1000}, {'seed': 42}):
+        assert client.post('/api/jobs/qasm2', headers=headers, json={**body, **fields}).status_code == 422
+    dedicated = client.post('/api/jobs/qasm2', headers=headers, json=body)
+    assert dedicated.status_code == 202
+    generic = {**body, 'input_format': 'qasm2', 'operation': 'basis_probabilities', 'shots': 1000, 'seed': 42}
+    assert client.post('/api/jobs', headers=headers, json=generic).json()['id'] == dedicated.json()['id']
+    assert client.post('/api/jobs', headers=auth(), json={**generic, 'shots': 2, 'seed': 3}).status_code == 202
+    sample_default = client.post('/api/jobs/qasm2', headers=headers,
+                                 json={'circuit': 'M 0', 'operation': 'sample'})
+    assert sample_default.status_code == 422
+
+
+def test_sampling_capability_and_admission_share_metadata(client, monkeypatch):
+    from qsim.qasm_adapter import SUPPORTED_COMBINATIONS
+    response = client.get('/api/capabilities', headers=auth()).json()
+    qsim = response['engines']['qsim']
+    assert qsim['input_formats']['qasm2'] == ['basis_probabilities', 'sample']
+    assert qsim['sampling']['result_schema'] == 'qasm-samples/1'
+    assert qsim['sampling']['mid_circuit_measurement'] and qsim['sampling']['reset']
+    assert not qsim['sampling']['conditions'] and qsim['sampling']['custom_gates']
+    monkeypatch.delitem(SUPPORTED_COMBINATIONS, 'qsim')
+    disabled = client.get('/api/capabilities', headers=auth()).json()['engines']['qsim']
+    assert disabled['input_formats']['qasm2'] == ['basis_probabilities']
+    assert not disabled['sampling']['enabled']
+    body = {'engine': 'qsim', 'operation': 'sample', 'circuit': 'not parsed'}
+    assert client.post('/api/jobs/qasm2', headers={**auth(), 'Idempotency-Key': 'disabled'}, json=body).status_code == 422
+
+
+def test_qasm_sample_api_worker_result_roundtrip(client, tmp_path):
+    request = {'engine': 'qsim', 'operation': 'sample', 'shots': 4,
+               'circuit': 'OPENQASM 2.0; include "qelib1.inc"; qreg q[2]; creg c[3]; x q[0]; measure q[0] -> c[1];'}
+    response = client.post('/api/jobs/qasm2', headers={**auth(), 'Idempotency-Key': 'roundtrip'}, json=request)
+    assert response.status_code == 202
+    job = response.json()['id']
+    source, output = tmp_path / 'sample-request.json', tmp_path / 'sample-output.json'
+    source.write_text(json.dumps(client.get('/internal/jobs/' + job, headers=callback(job)).json()))
+    subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
+                   env={**os.environ, 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}, check=True)
+    completion = json.loads(output.read_text())
+    assert completion['summary']['result_schema'] == 'qasm-samples/1'
+    assert completion['summary']['counts'] == {'010': 4}
+    for _ in range(2):
+        assert client.post('/internal/jobs/' + job, headers=callback(job), json=completion).status_code == 200
+    assert client.get('/api/jobs/' + job, headers=auth()).json()['status'] == 'SUCCEEDED'
+    assert client.get('/api/jobs/' + job + '/result', headers=auth('bob')).status_code == 404
+    downloaded = client.get('/api/jobs/' + job + '/result', headers=auth())
+    with np.load(io.BytesIO(downloaded.content), allow_pickle=False) as arrays:
+        assert arrays['classical_memory'].dtype == np.uint8
+        assert arrays['classical_memory'].tolist() == [[0, 1, 0]] * 4

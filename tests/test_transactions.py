@@ -247,7 +247,143 @@ def test_legacy_canonical_bytes_survive_empty_binding_default():
     assert canonical_request(future_default) == expected
     bound = SimpleNamespace(model_dump=lambda: {**payload, 'bindings': {'theta': 1.0}})
     assert canonical_request(bound) != expected
-    for input_format, operation in [('qasm2', 'sample'), ('qasm3', 'basis_probabilities')]:
+    for input_format, operation in [('qasm3', 'sample'), ('qasm3', 'basis_probabilities')]:
         new_operation = SimpleNamespace(model_dump=lambda: {
             **payload, 'input_format': input_format, 'operation': operation, 'bindings': {}})
         assert json.loads(canonical_request(new_operation))['bindings'] == {}
+
+
+def test_qasm3_bindings_numeric_identity_and_owner_scope(client):
+    body = {'engine': 'qsim', 'operation': 'sample', 'circuit': 'parsed only inside worker',
+            'bindings': {'theta': 1, 'phi': -0.0}}
+    first = client.post('/api/jobs/qasm3', headers=headers(), json=body)
+    assert first.status_code == 202, first.text
+    equivalent = {**body, 'bindings': {'phi': 0, 'theta': 1.0}}
+    replay = client.post('/api/jobs/qasm3', headers=headers(), json=equivalent)
+    assert replay.status_code == 202 and replay.json()['id'] == first.json()['id']
+    generic = client.post('/api/jobs', headers=headers(), json={**equivalent, 'input_format': 'qasm3'})
+    assert generic.status_code == 202 and generic.json()['id'] == first.json()['id']
+    assert client.post('/api/jobs/qasm3', headers=headers(), json={**body, 'bindings': {'theta': 2, 'phi': 0}}).status_code == 409
+    second = client.post('/api/jobs/qasm3', headers=headers(user='bob'), json=body)
+    assert second.status_code == 202 and second.json()['id'] != first.json()['id']
+    assert client.get('/api/jobs/' + first.json()['id'], headers=headers(user='bob')).status_code == 404
+    with store.connect() as db:
+        saved = json.loads(db.execute('SELECT request FROM jobs WHERE id=?', (first.json()['id'],)).fetchone()[0])
+    assert saved['bindings'] == {'theta': 1.0, 'phi': 0.0}
+    assert '"phi":0.0' in json.dumps(saved, separators=(',', ':'))
+
+
+@pytest.mark.parametrize('value', [True, '1', None, [1], {}, float('nan'), float('inf'), -float('inf'), 10**400])
+def test_qasm3_invalid_binding_values_reject_before_queue(client, value):
+    body = {'engine': 'qsim', 'operation': 'sample', 'circuit': 'private-circuit-sentinel', 'bindings': {'private-binding-sentinel': value}}
+    for route, extra in [('/api/jobs/qasm3', {}), ('/api/jobs', {'input_format': 'qasm3'})]:
+        # Raw JSON reaches the server for nonfinite values that httpx's encoder rejects.
+        response = client.post(route, headers={**headers(), 'Content-Type': 'application/json'},
+                               content=json.dumps({**body, **extra}))
+        assert response.status_code == 422, response.text
+        assert 'private-circuit-sentinel' not in response.text
+        assert 'private-binding-sentinel' not in response.text
+        assert all(set(error) == {'type', 'loc', 'msg'} for error in response.json()['detail'])
+    assert client.get('/api/jobs', headers=headers()).json() == []
+
+
+@pytest.mark.parametrize('change', [
+    {'operation': None}, {'engine': 'clifft'}, {'bit_order': 'big'}, {'bitstrings': None},
+    {'bindings': None}, {'bindings': []}, {'unexpected': True},
+])
+def test_qasm3_invalid_envelope(client, change):
+    body = {'engine': 'qsim', 'operation': 'sample', 'circuit': 'not parsed', **change}
+    assert client.post('/api/jobs/qasm3', headers=headers(), json=body).status_code == 422
+
+
+def test_qasm3_requires_explicit_operation_and_preserves_default_engine(client):
+    for body in ({'engine': 'qsim', 'circuit': 'x'}, {'operation': 'sample', 'circuit': 'x'}):
+        assert client.post('/api/jobs/qasm3', headers=headers(), json=body).status_code == 422
+        assert client.post('/api/jobs', headers=headers(), json={**body, 'input_format': 'qasm3'}).status_code == 422
+    assert client.post('/api/jobs/qasm3', headers={'Authorization': 'Bearer alice-key'},
+                       json={'engine': 'qsim', 'operation': 'sample', 'circuit': 'x'}).status_code == 422
+
+
+def test_qasm2_sample_identity_survives_binding_schema(client):
+    body = {'engine': 'qsim', 'operation': 'sample',
+            'circuit': 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; creg c[1]; measure q -> c;'}
+    response = client.post('/api/jobs/qasm2', headers=headers(), json=body)
+    assert response.status_code == 202
+    with store.connect() as db:
+        assert db.execute('SELECT request_hash FROM job_idempotency').fetchone()[0] == '780987147dd468bb2c12770b604b1125e8f1376750538e3ad29177dde32bd18c'
+
+
+def test_qasm3_capabilities_match_operation_scope(client):
+    capability = client.get('/api/capabilities', headers=headers()).json()
+    qsim = capability['engines']['qsim']
+    assert qsim['input_formats']['qasm3'] == ['sample', 'basis_probabilities']
+    features = qsim['features_by_operation']
+    assert features['qasm2']['basis_probabilities'] == {'custom_gates': False, 'bindings': False}
+    assert features['qasm2']['sample'] == {'custom_gates': True, 'bindings': False}
+    assert features['qasm3']['sample']['bindings']
+    assert not features['qasm3']['sample']['conditions']
+    assert qsim['binding_types'] == ['float[32]', 'float[64]', 'angle[32]', 'angle[64]']
+
+
+@pytest.mark.parametrize('operation', ['sample', 'basis_probabilities'])
+def test_bound_qasm3_job_result_roundtrip(client, tmp_path, operation):
+    import math
+    circuit = 'OPENQASM 3.0; include "stdgates.inc"; input float[64] theta; qubit q; rx(theta) q;'
+    body = {'engine': 'qsim', 'operation': operation, 'bindings': {'theta': math.pi}, 'circuit': circuit}
+    if operation == 'sample':
+        body.update(circuit=circuit + ' bit c; c=measure q;', shots=4)
+    else:
+        body['bitstrings'] = ['0', '1']
+    response = client.post('/api/jobs/qasm3', headers=headers(), json=body)
+    assert response.status_code == 202, response.text
+    job = response.json()['id']
+    token = (settings.DATA / job / 'callback-token').read_text()
+    callback_headers = {'Authorization': 'Bearer ' + token}
+    source, output = tmp_path / 'request.json', tmp_path / 'completion.json'
+    source.write_text(json.dumps(client.get('/internal/jobs/' + job, headers=callback_headers).json()))
+    subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
+                   env={**os.environ, 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}, check=True)
+    completion = json.loads(output.read_text())
+    assert completion['status'] == 'SUCCEEDED', completion
+    assert client.post('/internal/jobs/' + job, headers=callback_headers, json=completion).status_code == 200
+    downloaded = client.get('/api/jobs/' + job + '/result', headers=headers())
+    assert downloaded.status_code == 200
+    with np.load(io.BytesIO(downloaded.content), allow_pickle=False) as arrays:
+        if operation == 'sample':
+            assert arrays['classical_memory'].tolist() == [[1]] * 4
+        else:
+            assert arrays['probabilities'] == pytest.approx([0, 1], abs=1e-6)
+
+
+@pytest.mark.parametrize('bindings', [
+    {f'p{i}': 1 for i in range(257)}, {'private-binding-' + 'x'*256: 1}, {'': 1},
+])
+def test_binding_size_limits_reject_before_storage(client, bindings):
+    body = dict(engine='qsim', operation='sample', circuit='private-circuit-sentinel', bindings=bindings)
+    for route, extra in [('/api/jobs/qasm3', {}), ('/api/jobs', {'input_format': 'qasm3'})]:
+        response = client.post(route, headers=headers(), json={**body, **extra})
+        assert response.status_code == 422, response.text
+        assert 'private-binding-' not in response.text
+        assert 'private-circuit-sentinel' not in response.text
+    with store.connect() as db:
+        assert db.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] == 0
+
+
+@pytest.mark.parametrize('route', ['/api/jobs', '/api/jobs/qasm3'])
+def test_binding_size_boundary_and_schema(client, route):
+    bindings = {f'p{i}': 1 for i in range(255)}
+    bindings['x'*256] = -0.0
+    body = dict(engine='qsim', operation='sample', circuit='not parsed at admission', bindings=bindings)
+    if route == '/api/jobs':
+        body['input_format'] = 'qasm3'
+    response = client.post(route, headers=headers(), json=body)
+    assert response.status_code == 202, response.text
+    with store.connect() as db:
+        saved = json.loads(db.execute('SELECT request FROM jobs WHERE id=?', (response.json()['id'],)).fetchone()[0])
+    assert len(saved['bindings']) == 256
+    assert saved['bindings']['x'*256] == 0.0
+    schema = app.openapi()['components']['schemas']
+    model = 'Submission' if route == '/api/jobs' else 'Qasm3Submission'
+    binding_schema = schema[model]['properties']['bindings']
+    assert binding_schema['maxProperties'] == 256
+    assert binding_schema['propertyNames'] == {'minLength': 1, 'maxLength': 256}

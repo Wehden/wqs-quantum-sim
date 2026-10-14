@@ -3,6 +3,7 @@ import io
 import json
 from pathlib import Path
 from types import SimpleNamespace
+import pytest
 from qsim import worker
 
 
@@ -36,3 +37,36 @@ def test_native_simulation_keeps_memory_limit_without_time_limit(monkeypatch,tmp
     worker.simulate(source,tmp_path/'out.json')
     assert resource.RLIMIT_CPU not in [kind for kind,value in limits]
     assert resource.RLIMIT_AS in [kind for kind,value in limits]
+
+
+@pytest.mark.parametrize('input_format,operation,expected', [
+    ('qasm2','sample','OpenQASM 2 sampling failed'),
+    ('qasm3','sample','OpenQASM 3 sampling failed'),
+    ('qasm2','basis_probabilities','use unitary qelib1.inc circuits without classical registers'),
+    ('qasm3','basis_probabilities','OpenQASM 3 probability simulation failed'),
+])
+def test_native_child_failure_guidance_matches_operation(monkeypatch,capsys,input_format,operation,expected):
+    callbacks=[]
+    monkeypatch.setenv('QSIM_JOB_URL','http://example.invalid/internal/jobs/test')
+    monkeypatch.setenv('QSIM_JOB_TOKEN','test-only')
+    def response(request,**kwargs):
+        if request.data:
+            callbacks.append(json.loads(request.data))
+            return io.BytesIO(b'{}')
+        return io.BytesIO(json.dumps(dict(input_format=input_format,operation=operation)).encode())
+    monkeypatch.setattr(worker.urllib.request,'urlopen',response)
+    monkeypatch.setattr(worker.subprocess,'run',lambda *args,**kwargs:
+        SimpleNamespace(returncode=-9,stderr=b'PRIVATE_NATIVE_CIRCUIT'))
+    assert worker.remote()==1
+    error=callbacks[-1]['error']
+    assert callbacks[-1]['status']=='FAILED'
+    assert expected in error
+    assert 'service limits' in error.lower()
+    if operation=='sample':
+        assert 'bitstrings' not in error
+        assert 'without classical registers' not in error
+        assert 'sampling' in error
+    if input_format=='qasm3':
+        assert 'bindings' in error
+    assert 'PRIVATE_NATIVE_CIRCUIT' not in error
+    assert 'PRIVATE_NATIVE_CIRCUIT' not in capsys.readouterr().err

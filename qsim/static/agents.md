@@ -3,7 +3,7 @@
 Base URL: https://simulation.example.invalid
 Developer guide: https://simulation.example.invalid/
 This guide: https://simulation.example.invalid/agents.md
-API contract: 0.3. Updated: 2026-10-11.
+Guide updated: 2026-10-13. Check `GET /api/capabilities` on your installation before selecting a new operation.
 
 ## Scope and credentials
 
@@ -21,14 +21,16 @@ If no key is available, direct the user to https://simulation.example.invalid/#k
 
 ## Choose the input and operation
 
-| Input | Endpoint | Operation | Required JSON fields |
+| Engine | Input / endpoint | Operation | Required JSON fields |
 | --- | --- | --- | --- |
-| Stim with supported Clifft extensions | `POST /api/jobs/stim` | Fixed-shot measurement sampling | `circuit` |
-| OpenQASM 2 | `POST /api/jobs/qasm2` | Exact probabilities of requested computational-basis strings | `circuit`, `bitstrings` |
+| Clifft (default) | Stim, `POST /api/jobs/stim` | Sampling | `circuit` |
+| Clifft or Google qsim | QASM2, `POST /api/jobs/qasm2` | Basis probabilities (default) | `circuit`, `bitstrings` |
+| Google qsim | QASM2, `POST /api/jobs/qasm2` | Sampling | `engine:"qsim"`, `operation:"sample"`, `circuit` |
+| Google qsim | QASM3, `POST /api/jobs/qasm3` | Sampling or basis probabilities | `engine:"qsim"`, explicit `operation`, `circuit`; `bitstrings` for probabilities |
 
-Both endpoints require `Content-Type: application/json` and `Idempotency-Key`.
+All three format endpoints require `Content-Type: application/json` and `Idempotency-Key`. Clifft remains the default engine; explicitly select qsim for QASM sampling or QASM3. Unsupported engine combinations fail rather than switch engines.
 
-Stim supports measurement instructions in the circuit. OpenQASM 2 supports Clifft's unitary `qelib1.inc` subset. It does not accept classical registers, measurements, resets, conditions, or custom gate definitions. Do not send measurement-bearing QASM to the probability endpoint or silently remove its measurement instructions. Use an appropriate Stim circuit when measurement sampling is required.
+The existing QASM2 probability operation remains unitary-only for both engines: no classical registers, measurement, reset, conditions or custom gate definitions. Google qsim QASM2 sampling and QASM3 use a broader tested Cirq subset described below. Never remove measurements to turn a sampling request into a probability query.
 
 ### Stim request
 
@@ -70,17 +72,86 @@ Idempotency-Key: <PERSISTED_REQUEST_UUID>
 
 The expected probabilities are `[0.5, 0, 0, 0.5]`. The summary and NPZ archive contain `bitstrings` and `probabilities` in the requested order. These are probabilities of the selected strings, not a renormalized distribution over the selection.
 
-Each bitstring must contain only `0` and `1` and match the circuit's qubit count. All strings must have equal length. `bit_order="big"` maps the first character to qubit 0; `"little"` maps the last character to qubit 0. The default is `big`. This endpoint does not accept `shots` or `seed`.
+Each bitstring must contain only `0` and `1` and match the circuit's qubit count. All strings must have equal length. `bit_order="big"` maps the first character to qubit 0; `"little"` maps the last character to qubit 0. The default is `big`. The probability operation does not accept `shots` or `seed`.
 
 ## Google qsim engine
 
 On `POST /api/jobs/qasm2`, set `"engine":"qsim"` to select Google qsim 0.22.1 via Cirq. Omitted `engine` or `"engine":"clifft"` selects Clifft. Changing the engine requires a new idempotency key. The general `/api/jobs` endpoint also accepts this engine with `input_format="qasm2"` and `operation="basis_probabilities"`.
 
-Use the same circuit, bitstrings, bit order, and result handling as the QASM example above. qsim supports 1–26 declared qubits (including idle qubits), in declaration order with numeric indices. Its unitary QASM importer is Cirq’s; gate support may differ from Clifft. Classical registers, measurements, reset, conditions, custom gates, Stim input, and executable Python are not accepted. This initial integration exposes basis probabilities only.
+The existing QASM2 probability path accepts the same circuit, bitstrings and bit order shown above. It does not accept classical registers or custom gates. qsim supports 1–26 declared qubits, including idle qubits, in declaration order with numeric indices. It uses single-precision state-vector simulation: selected probabilities come from amplitudes, with floating-point error but no shot noise. `summary.engine` identifies the version; probability results report `precision="single"`.
 
-qsim is a full state-vector CPU simulator with single-precision arithmetic. Probabilities are computed from amplitudes without sampling, but differ from Clifft at floating-point precision; compare with a suitable numerical tolerance, not bit-for-bit equality. `summary.engine` identifies the engine/version and qsim summaries include `precision="single"`. Both engines use the same durable queue, SSE progress/final summary, and NPZ result download. There is no incremental amplitude or measurement stream.
+### QASM2 sampling
 
-Project and license: https://github.com/quantumlib/qsim (Apache 2.0).
+Send this body to `POST /api/jobs/qasm2`. Explicitly select `sample`; omitted operation still means basis probabilities.
+
+<!-- example: qasm2-sample -->
+```json
+{
+  "engine": "qsim",
+  "operation": "sample",
+  "name": "Classical bit placement",
+  "circuit": "OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; creg c[3]; x q[0]; measure q[0] -> c[1];",
+  "shots": 128,
+  "seed": 42
+}
+```
+
+Expected counts: `{"010":128}`. Supported sampling includes terminal and mid-circuit measurement, reset, repeated classical writes, and bounded custom gates. Each shot starts fresh. Classical conditions remain unsupported, including a branch that would not execute.
+
+### QASM3 sampling and parameter binding
+
+Send this body to `POST /api/jobs/qasm3`. This endpoint requires an explicit operation. The example binds a custom gate rotation and samples `10` on every shot.
+
+<!-- example: qasm3-sample -->
+```json
+{
+  "engine": "qsim",
+  "operation": "sample",
+  "name": "Bound custom gate",
+  "circuit": "OPENQASM 3.0; include \"stdgates.inc\"; input angle[64] theta; gate turn(a) t { rx(a) t; } qubit[2] q; bit[2] c; turn(theta) q[0]; c = measure q;",
+  "bindings": {
+    "theta": 3.141592653589793
+  },
+  "shots": 128,
+  "seed": 42
+}
+```
+
+Supported input declarations are `float[32]`, `float[64]`, `angle[32]` and `angle[64]`. Supply exactly the declared names in `bindings`, using finite JSON numbers. Submission accepts at most 256 bindings, with names of 1–256 characters; oversized mappings are rejected before a job is stored. Missing or extra names, booleans, strings, null, infinities and NaN are rejected. Values normalize to finite Python floats; declaration widths do not promise width-specific arithmetic, and qsim still runs in single precision. Equivalent integer/float values and signed zero share normalized identity. Changed binding values require a new idempotency key. QASM2 has no `bindings` field; custom gate-local parameters there must resolve from circuit expressions.
+
+### QASM3 basis probabilities
+
+Send this unitary request to `POST /api/jobs/qasm3`. Expected probabilities are approximately `[0.75,0.25]`, with absolute tolerance `1e-6` for this example.
+
+<!-- example: qasm3-probabilities -->
+```json
+{
+  "engine": "qsim",
+  "operation": "basis_probabilities",
+  "name": "Bound rotation probabilities",
+  "circuit": "OPENQASM 3.0; include \"stdgates.inc\"; input float[64] theta; qubit[1] q; ry(theta) q[0];",
+  "bindings": {
+    "theta": 1.0471975511965976
+  },
+  "bitstrings": [
+    "0",
+    "1"
+  ],
+  "bit_order": "big"
+}
+```
+
+QASM3 probability queries accept supported custom gates and unused classical declarations. Measurement, reset and conditions are rejected; samples are never substituted for probabilities. Do not include `shots` or `seed` in probability requests, or `bitstrings`/`bit_order` in QASM sample requests.
+
+### QASM result and syntax contracts
+
+Sampling returns `result_schema="qasm-samples/1"`. The NPZ contains `classical_memory`, a `uint8` array shaped `[shots,total_classical_bits]`. `summary.registers` lists `{name,size,offset}` in declaration order; each register uses ascending bit indices. Count keys follow that same left-to-right column order. Unwritten bits remain zero and the last measurement written to a bit supplies its final value. These are final classical values, not measurement-event history.
+
+The complete artifact retains all shots. JSON retains at most 256 counts, sorted by descending count with lexicographic ties, and at most the first 20 shots in `preview`. Each collection has a 512 KiB JSON budget; only complete count keys and shot rows are included. Inspect `counts_truncated` and `preview_truncated`, including when a collection is empty for a very wide register. Counts can be reconstructed from the artifact. A sampling circuit must contain a measurement.
+
+The broader qsim paths use Cirq 1.7.0. Includes are limited to packaged `qelib1.inc` and `stdgates.inc`; file/network includes, executable Python, conditions and unsupported control flow are rejected. On these new paths, exponent expressions using `^` are rejected. Custom gates are bounded by 65,536 expanded operations and nesting depth 32. Numeric literals must be finite with absolute value at most `1e100`; derived gate values must also remain valid and finite. Unresolved parameters are rejected.
+
+Query capabilities for installation-specific availability. Progress/final-result SSE and NPZ downloads use the same durable job lifecycle for every engine. Incremental samples remain unavailable. Project and license: https://github.com/quantumlib/qsim (Apache 2.0).
 
 ## Durable submission and safe retries
 
@@ -126,7 +197,7 @@ Persist the cursor only after processing an event. Deduplicate by `(job_id, even
 
 Streams send idle heartbeat comments and close at completion or after at most five minutes. A slow or broken connection may close without a final control event. Reconnect with the saved cursor. A completed stream resumed after its final event closes without replaying that event. Job deletion removes its event history. Older jobs migrated into event tracking may have only an initial current-state snapshot.
 
-**Incremental live measurement samples are unavailable.** Clifft 0.11's CPU sampler returns complete arrays and exposes no incremental callback. This API streams progress and the final result summary; it does not reseed smaller sample batches to imitate streaming. Query `GET /api/capabilities` for current support.
+**Incremental live measurement samples are unavailable for both engines.** This API streams progress and the final result summary; it does not reseed smaller sample batches to imitate streaming. Query `GET /api/capabilities` for current support.
 
 ## Retrieve and retain results
 
@@ -141,7 +212,8 @@ A result URL is relative to the wqsim base URL and is not a signed anonymous dow
 | GET | `/api/me` | Authenticated identity and engine. |
 | GET | `/api/capabilities` | Supported formats, operations, and streaming capabilities. |
 | POST | `/api/jobs/stim` | Durable Stim sampling submission; idempotency key required. |
-| POST | `/api/jobs/qasm2` | Durable unitary QASM probability query; idempotency key required. |
+| POST | `/api/jobs/qasm2` | Basis probabilities by default; explicit qsim sampling also supported. Idempotency key required. |
+| POST | `/api/jobs/qasm3` | qsim subset with explicit operation; idempotency key required. |
 | POST | `/api/jobs` | General submission. Optional idempotency key for compatibility; without it, each call creates new work. |
 | GET | `/api/jobs` | All saved jobs for this identity. |
 | GET | `/api/jobs/{id}` | Job status, error, and completed summary. |
@@ -150,7 +222,7 @@ A result URL is relative to the wqsim base URL and is not a signed anonymous dow
 | POST | `/api/jobs/{id}/cancel` | Record cancellation; returns 202. |
 | DELETE | `/api/jobs/{id}` | Delete a terminal, cleaned job; returns 204. |
 
-The general submission route accepts `input_format` (`stim` or `qasm2`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`; QASM requires `basis_probabilities`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
+The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires `engine="qsim"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
 
 ## Limits and errors
 
@@ -158,6 +230,7 @@ The general submission route accepts `input_format` (`stim` or `qasm2`) and `ope
 - Sampling: 1–10,000 shots; integer seed from 0 through 9,223,372,036,854,775,807.
 - Probability queries: 1–256 bitstrings, each at most 4,096 characters.
 - Clifft limits: at most 4,096 qubits, active width 22, and 1,000,000 sampled output cells.
+- New QASM sampling: `shots × (total classical bits + measurement events)` must not exceed 1,000,000; repeated writes count as separate native events even though only the final value is returned.
 - Google qsim: 1–26 declared qubits, two CPU threads, single precision. Both engines use a 2 CPU / 4 GiB worker with a 3 GiB process memory limit.
 - Execution: simulations run concurrently as cluster capacity permits. Placement failures stay queued and retry automatically. Idle compute is reused for subsequent requests, with a fresh simulation process for each job. Cold starts still add latency. Active simulations have no elapsed-time or CPU-time deadline. Explicit cancellation remains available; idle cleanup waits for work to finish. Queue wait can add time.
 - Per identity: no saved-job cap; eight open event streams. No fixed active-job concurrency limit.
@@ -177,4 +250,4 @@ The general submission route accepts `input_format` (`stim` or `qasm2`) and `ope
 | 429 | Respect capacity limits and back off. |
 | 503 | Retry transient service unavailability with bounded backoff. |
 
-Job-level failures are reported in the job record and event stream, not necessarily as a failing HTTP status on the original submission.
+Envelope errors reject submission with HTTP 422. Circuit parsing, binding and native execution occur after acceptance; failures become FAILED jobs with safe prefixes such as `invalid_circuit`, `invalid_binding`, `unsupported_feature`, `resource_limit` or `execution_failed`. Do not treat HTTP 202 as successful simulation.

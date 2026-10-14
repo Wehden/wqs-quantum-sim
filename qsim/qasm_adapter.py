@@ -1,7 +1,7 @@
 """Pinned native QASM import inside the credential-free simulation child."""
 
-# Admission remains disabled until API and result integration are verified together.
-SUPPORTED_COMBINATIONS = {}
+# New operations admitted only after their worker contract is verified.
+SUPPORTED_COMBINATIONS = {"qsim": {"qasm2": ("sample",), "qasm3": ("sample", "basis_probabilities")}}
 
 
 def _preflight(source, shots):
@@ -50,7 +50,7 @@ def _preflight(source, shots):
     return quantum, classical
 
 
-def _check_expansion(circuit, cache=None, depth=0):
+def _check_expansion(circuit, cache=None, depth=0, validate=False):
     import cirq
     import numpy as np
     from qsimcirq.qsim_circuit import _has_cirq_gate_kind
@@ -68,7 +68,7 @@ def _check_expansion(circuit, cache=None, depth=0):
         if isinstance(op, cirq.CircuitOperation):
             if op.repetitions != 1:
                 raise ValueError('unsupported_feature: gate repetitions')
-            child_count, child_height = _check_expansion(op.circuit, cache, depth + 1)
+            child_count, child_height = _check_expansion(op.circuit, cache, depth + 1, validate)
             count += child_count
             height = max(height, child_height + 1)
         else:
@@ -76,15 +76,16 @@ def _check_expansion(circuit, cache=None, depth=0):
                 raise ValueError('unsupported_feature: classical conditions')
             if len(op.qubits) > 5:
                 raise ValueError('unsupported_feature: gate width')
-            if cirq.is_parameterized(op):
+            if validate and cirq.is_parameterized(op):
                 raise ValueError('invalid_binding: unresolved parameter')
             # Builtin decompositions are bounded independently of custom graphs.
             if isinstance(op.gate, (cirq.MeasurementGate, cirq.ResetChannel)):
                 count += 1
             else:
-                matrix = cirq.unitary(op, default=None)
-                if matrix is None or not np.all(np.isfinite(matrix)):
-                    raise ValueError('invalid_circuit: nonfinite or unsupported gate')
+                if validate:
+                    matrix = cirq.unitary(op, default=None)
+                    if matrix is None or not np.all(np.isfinite(matrix)):
+                        raise ValueError('invalid_circuit: nonfinite or unsupported gate')
                 count += len(cirq.decompose(op, keep=_has_cirq_gate_kind))
         if count > 65536:
             raise ValueError('resource_limit: expanded operations')
@@ -95,56 +96,75 @@ def _check_expansion(circuit, cache=None, depth=0):
 def prepare(request):
     """Return the native circuit and explicit register metadata, without execution."""
     import importlib.metadata
+    import math
+    import numpy as np
     import cirq
     from cirq.contrib.qasm_import._parser import QasmParser
 
     try:
-        if request.get('engine') != 'qsim' or request.get('input_format') != 'qasm2':
-            raise ValueError('unsupported_feature: engine or input format')
-        shots = request.get('shots', 1)
-        if type(shots) is not int or not 1 <= shots <= 10000:
-            raise ValueError('resource_limit: shots')
-        quantum, classical = _preflight(request['circuit'], shots)
-        parsed = QasmParser().parse(request['circuit'])
-        if parsed.input_params or request.get('bindings'):
-            raise ValueError('unsupported_feature: parameter bindings')
-        if not request['circuit'].lstrip().startswith('OPENQASM 2.0;'):
-            # The lexer validates grammar; format must also match the envelope.
+        with np.errstate(all="raise"):
+            if request.get('engine') != 'qsim' or request.get('input_format') not in ('qasm2', 'qasm3'):
+                raise ValueError('unsupported_feature: engine or input format')
+            operation = request.get('operation', 'basis_probabilities')
+            # Probability queries allocate no per-shot classical memory. Keep the
+            # single-register allocation bound, without multiplying by API defaults.
+            shots = request.get('shots', 1) if operation == 'sample' else 1
+            if type(shots) is not int or not 1 <= shots <= 10000:
+                raise ValueError('resource_limit: shots')
+            quantum, classical = _preflight(request['circuit'], shots)
+            parsed = QasmParser().parse(request['circuit'])
             from cirq.contrib.qasm_import._lexer import QasmLexer
             lexer = QasmLexer()
             lexer.input(request['circuit'])
             first = lexer.token()
-            if first is None or first.type != 'FORMAT_SPEC' or first.value != '2.0':
+            expected = '2.0' if request['input_format'] == 'qasm2' else '3.0'
+            if first is None or first.type != 'FORMAT_SPEC' or first.value != expected:
                 raise ValueError('invalid_circuit: format mismatch')
-        _check_expansion(parsed.circuit)
-        qubits = [cirq.NamedQubit(f'{name}_{i}') for name, size in parsed.qregs.items() for i in range(size)]
-        registers, offset = [], 0
-        for name, size in parsed.cregs.items():
-            registers.append(dict(name=name, size=size, offset=offset))
-            offset += size
-        if len(qubits) != quantum or offset != classical:
-            raise ValueError('invalid_circuit: register metadata')
-        events = {}
-        nonunitary = False
-        for op in parsed.circuit.all_operations():
-            if cirq.is_measurement(op):
-                key = cirq.measurement_key_name(op)
-                events[key] = events.get(key, 0) + 1
-            if not cirq.has_unitary(op):
-                nonunitary = True
-        if (classical + sum(events.values())) * shots > 1_000_000:
-            raise ValueError('resource_limit: classical memory and measurement records')
-        operation = request.get('operation', 'basis_probabilities')
-        if operation == 'basis_probabilities' and nonunitary:
-            raise ValueError('unsupported_feature: nonunitary probabilities')
-        if operation == 'sample' and not events:
-            raise ValueError('invalid_circuit: sampling requires measurement')
-        if operation not in ('sample', 'basis_probabilities'):
-            raise ValueError('unsupported_feature: operation')
-        return parsed.circuit, dict(registers=registers, qubits=qubits, events=events,
-            classical_bits=classical, input_format='qasm2',
-            engine_version=importlib.metadata.version('qsimcirq'),
-            importer_version=importlib.metadata.version('cirq-core'))
+            bindings = request.get('bindings', {})
+            if request['input_format'] == 'qasm2' and (parsed.input_params or bindings):
+                raise ValueError('unsupported_feature: parameter bindings')
+            if any(kind not in ('float[32]', 'float[64]', 'angle[32]', 'angle[64]')
+                   for kind in parsed.input_params.values()):
+                raise ValueError('unsupported_feature: input type')
+            if not isinstance(bindings, dict) or set(bindings) != set(parsed.input_params):
+                raise ValueError('invalid_binding: declared parameter names')
+            if any(type(value) not in (int, float) or not math.isfinite(value)
+                   for value in bindings.values()):
+                raise ValueError('invalid_binding: finite numeric values required')
+            _check_expansion(parsed.circuit)
+            # Native expansion applies each call's own qubit and parameter maps.
+            # The compact graph budget must pass before any resolving or unrolling.
+            circuit = cirq.unroll_circuit_op(parsed.circuit, deep=True, tags_to_check=None)
+            circuit = cirq.resolve_parameters(circuit, {key: float(value) for key, value in bindings.items()})
+            _check_expansion(circuit, validate=True)
+            qubits = [cirq.NamedQubit(f'{name}_{i}') for name, size in parsed.qregs.items() for i in range(size)]
+            registers, offset = [], 0
+            for name, size in parsed.cregs.items():
+                registers.append(dict(name=name, size=size, offset=offset))
+                offset += size
+            if len(qubits) != quantum or offset != classical:
+                raise ValueError('invalid_circuit: register metadata')
+            events = {}
+            nonunitary = False
+            for op in circuit.all_operations():
+                if cirq.is_measurement(op):
+                    key = cirq.measurement_key_name(op)
+                    events[key] = events.get(key, 0) + 1
+                if not cirq.has_unitary(op):
+                    nonunitary = True
+            if (classical + sum(events.values())) * shots > 1_000_000:
+                raise ValueError('resource_limit: classical memory and measurement records')
+            if operation == 'basis_probabilities' and nonunitary:
+                raise ValueError('unsupported_feature: nonunitary probabilities')
+            if operation == 'sample' and not events:
+                raise ValueError('invalid_circuit: sampling requires measurement')
+            if operation not in ('sample', 'basis_probabilities'):
+                raise ValueError('unsupported_feature: operation')
+            return circuit, dict(registers=registers, qubits=qubits, events=events,
+                classical_bits=classical, input_format=request['input_format'],
+                custom_gates=any(isinstance(op, cirq.CircuitOperation) for op in parsed.circuit.all_operations()),
+                engine_version=importlib.metadata.version('qsimcirq'),
+                importer_version=importlib.metadata.version('cirq-core'))
     except Exception as error:
         message = str(error)
         if isinstance(error, ValueError) and message.startswith((
