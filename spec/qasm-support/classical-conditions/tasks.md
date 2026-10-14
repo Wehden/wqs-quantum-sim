@@ -1,6 +1,6 @@
 # Implementation tasks: classical conditions
 
-Status: **approved by the owner on 2026-10-14; implementation authorized**. Design and requirements amendment approved on the same date. Execution starts with TASK-011.
+Status: **approved by the owner on 2026-10-14; implementation authorized**. Design and requirements amendment approved on the same date. TASK-011 dependency/capability evidence passed: 249 Python and three console tests, plus baseline worker-image checks. Follow-on tasks are pending.
 
 Prepared against the System2 1.1.1 task-planner contract. Parent scope: [design](design.md), [requirements delta](requirements-delta.md), and [existing tasks](../tasks.md). Research evidence remains separate from implementation acceptance.
 
@@ -205,7 +205,7 @@ The initial chain is deliberately sequential: safety and native execution share 
 
 ## Execution Notes (tooling, environment, checkpoints)
 
-This is a local specification gate. No implementation PR, production action or runtime verification is performed by writing this plan. Preserve the existing validation reconciliation and release/CD draft. The next action is owner task-plan review.
+The owner approved this plan on 2026-10-14. TASK-011 is implemented in the foundation PR; its local verification passed. Preserve the existing release/CD draft. Production actions remain outside these implementation leases.
 
 Before execution, inspect current repository instructions and main revision, preserve local spec work, and allocate one task lease per writer. Leases are conservative allowlists, not instructions to touch every file. Exceeding a file/symbol budget or discovering a new public contract requires an amended plan before edits. TASK-012/013 share one file and cannot run concurrently. TASK-016/017 can. Do not reuse older execution authorization for this amendment.
 

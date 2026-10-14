@@ -16,4 +16,4 @@ Material deviations from the approved design return to owner review. Routine det
 
 ## Classical-conditions amendment (2026-10-14)
 
-The owner approved [the explicit Aer design](classical-conditions/design.md) and its requirements clarification. This supersedes OR-001's no-additional-simulator decision only for the bounded new Aer sampling path. Clifft/qsim classical controls remain unsupported. Existing OR-002 through OR-007 contracts remain in force for their current paths. TASK-011 through TASK-019 are proposed in [the amendment plan](classical-conditions/tasks.md); implementation awaits task-plan approval.
+The owner approved [the explicit Aer design](classical-conditions/design.md) and its requirements clarification. This supersedes OR-001's no-additional-simulator decision only for the bounded new Aer sampling path. Clifft/qsim classical controls remain unsupported. Existing OR-002 through OR-007 contracts remain in force for their current paths. TASK-011 through TASK-019 are approved in [the amendment plan](classical-conditions/tasks.md); implementation was authorized on 2026-10-14.
