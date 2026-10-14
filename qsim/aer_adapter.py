@@ -270,3 +270,55 @@ def _prepare(request):
     if (circuit.num_clbits + events) * request['shots'] > 1_000_000:
         raise ValueError('resource_limit: native sample cells')
     return circuit, metadata
+
+
+def sample(request, *, cpu_threads):
+    """Return complete final classical memory and provenance for one Aer job."""
+    import contextlib
+    import io
+    import time
+    from importlib.metadata import version
+    import numpy as np
+    from qiskit import transpile
+    from qiskit_aer import AerSimulator
+    if type(cpu_threads) is not int or cpu_threads != 1:
+        raise ValueError('resource_limit: fixed Aer thread budget')
+    started = time.monotonic()
+    circuit, metadata = _prepare(request)
+    backend = AerSimulator(method='statevector', device='CPU', precision='double',
+                           max_parallel_threads=cpu_threads, max_parallel_experiments=1,
+                           max_parallel_shots=1, max_memory_mb=2048)
+    with contextlib.redirect_stderr(io.StringIO()), np.errstate(all='raise'):
+        compiled = transpile(circuit, backend, optimization_level=0, seed_transpiler=42)
+        if compiled.clbits != circuit.clbits or compiled.num_qubits != circuit.num_qubits:
+            raise ValueError('execution_failed: transpiler register mapping')
+        _, events = _validate_native(compiled)
+        if (compiled.num_clbits + events) * request['shots'] > 1_000_000:
+            raise ValueError('resource_limit: transpiled sample cells')
+        prepared = time.monotonic()
+        result = backend.run(compiled, shots=request['shots'], seed_simulator=request['seed'],
+                             memory=True).result()
+    executed = time.monotonic()
+    if not result.success:
+        raise ValueError('execution_failed: Aer result')
+    raw = result.data(0).get('memory')
+    width = metadata['classical_bits']
+    if not isinstance(raw, list) or len(raw) != request['shots']:
+        raise ValueError('execution_failed: missing shot memory')
+    memory = np.zeros((request['shots'], width), dtype=np.uint8)
+    # Only native result data reaches this conversion; public source never does.
+    for row, value in enumerate(raw):
+        if not isinstance(value, str) or not value.startswith('0x') or len(value) > 2 + (width + 3)//4:
+            raise ValueError('execution_failed: memory encoding')
+        integer = int(value, 16)
+        if integer < 0 or integer.bit_length() > width:
+            raise ValueError('execution_failed: memory width')
+        packed = integer.to_bytes((width + 7)//8, 'little')
+        memory[row] = np.unpackbits(np.frombuffer(packed, dtype=np.uint8), bitorder='little')[:width]
+    metadata.pop('scalar')
+    metadata.update(engine_version=version('qiskit-aer'), importer_version=version('qiskit'),
+                    qasm3_importer_version=version('qiskit-qasm3-import'),
+                    method='statevector', device='CPU', precision='double', cpu_threads=cpu_threads,
+                    compile_seconds=round(prepared-started, 6),
+                    execution_seconds=round(executed-prepared, 6))
+    return memory, metadata
