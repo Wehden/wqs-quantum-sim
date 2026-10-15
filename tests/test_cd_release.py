@@ -1,4 +1,6 @@
 import hashlib
+import io
+import tarfile
 import json
 from pathlib import Path
 import pytest
@@ -28,11 +30,20 @@ def evidence():
 
 def bundle(tmp_path):
     for target in release.TARGETS:
-        data = (target + ' image').encode()
-        (tmp_path/(target+'.tar')).write_bytes(data)
+        image = 'wqs-release-ci:' + target + '-' + SHA
+        cfg = {'os': 'linux', 'architecture': 'amd64', 'rootfs': {'type': 'layers', 'diff_ids': ['sha256:'+'c'*64]},
+               'config': {'Labels': {'org.opencontainers.image.revision': SHA}, 'Cmd': ['test']}}
+        payload = json.dumps(cfg).encode()
+        with tarfile.open(tmp_path/(target+'.tar'), 'w') as archive:
+            for name, data in [('config.json', payload), ('manifest.json', json.dumps([
+                    {'Config': 'config.json', 'RepoTags': [image], 'Layers': []}]).encode())]:
+                info = tarfile.TarInfo(name); info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+        digest = hashlib.sha256((tmp_path/(target+'.tar')).read_bytes()).hexdigest()
         (tmp_path/(target+'.json')).write_text(json.dumps({'schema': 1, 'source_sha': SHA, 'target': target,
             'platform': 'linux/amd64', 'image_id': 'sha256:'+'b'*64, 'archive': target+'.tar',
-            'archive_sha256': hashlib.sha256(data).hexdigest()}))
+            'image_ref': image, 'config_digest': 'sha256:'+hashlib.sha256(payload).hexdigest(),
+            'archive_sha256': digest}))
     return tmp_path
 
 
@@ -170,10 +181,10 @@ def test_image_identity_mismatch_never_pushes(tmp_path, monkeypatch):
     def command(args, *a, **kw):
         calls.append(args)
         if args[:3] == ['docker', 'image', 'inspect']:
-            return json.dumps([{'Id': 'wrong', 'Os': 'linux', 'Architecture': 'amd64'}])
+            return json.dumps([{'Id': 'wrong', 'Os': 'windows', 'Architecture': 'amd64'}])
         return ''
     monkeypatch.setattr(release, 'run', command)
-    with pytest.raises(ValueError, match='identity'):
+    with pytest.raises(ValueError, match='content'):
         release.Deployer(config(tmp_path)).publish(tmp_path, records, SHA)
     assert not any('push' in c for c in calls)
 
@@ -189,3 +200,47 @@ def test_controller_patch_updates_worker_without_replacing_other_config(tmp_path
                          'env': [{'name': 'QSIM_WORKER_IMAGE', 'value': 'worker-digest', 'valueFrom': None}]}
     assert 'replicas' not in patch['spec']
     assert calls[1][:2] == ('rollout', 'status')
+
+
+def test_loaded_content_uses_portable_config_and_layer_identity(tmp_path):
+    root = bundle(tmp_path)
+    record = release.validate_bundle(root, SHA)['api']
+    _, expected = release.archive_config(root/'api.tar', record['image_ref'])
+    actual = {'Id': 'different-backend-id', 'Os': 'linux', 'Architecture': 'amd64',
+              'RootFS': {'Type': 'layers', 'Layers': expected['rootfs']['diff_ids']},
+              'Config': {**expected['config'], 'LegacyEmpty': ''}}
+    release.verify_loaded_content(actual, expected, SHA)
+    actual['RootFS']['Layers'] = ['sha256:'+'d'*64]
+    with pytest.raises(ValueError, match='content'):
+        release.verify_loaded_content(actual, expected, SHA)
+
+
+@pytest.mark.parametrize('strategy', [{}, {'type': 'RollingUpdate'}, {'type': 'Recreate'}])
+def test_controller_strategy_is_checked_in_preflight(tmp_path, monkeypatch, strategy):
+    deploy = release.Deployer(config(tmp_path))
+    def kube(*args, **kwargs):
+        role = args[2]
+        return json.dumps({'spec': {'replicas': 1, 'strategy': strategy,
+            'template': {'spec': {'containers': [{'name': role, 'image': 'old', 'env': []}]}}}})
+    monkeypatch.setattr(deploy, 'kube', kube)
+    if strategy.get('type') == 'Recreate':
+        assert set(deploy.capture()) == set(release.ROLES)
+    else:
+        with pytest.raises(ValueError, match='Recreate'):
+            deploy.capture()
+
+
+def test_record_creates_fixed_tag_and_safe_notes_with_installed_gh_flags(tmp_path, monkeypatch):
+    cfg = config(tmp_path); Path(cfg['state_dir']).mkdir()
+    receipt = {'sha': SHA, 'status': 'verified', 'acceptance': evidence(), 'ci_run': '123',
+               'images': {'api': 'private-inventory-must-not-leak'}}
+    (Path(cfg['state_dir'])/(SHA+'.json')).write_text(json.dumps(receipt))
+    calls = []
+    def command(args, *a, **kw):
+        calls.append(args)
+        return '[]' if 'matching-refs' in args[-1] else ''
+    monkeypatch.setattr(release, 'run', command)
+    release.publish_version(cfg, SHA, 'v0.1.0')
+    assert any('sha='+SHA in args and 'ref=refs/tags/v0.1.0' in args for args in calls)
+    assert not any('--slurp' in args for args in calls)
+    assert 'private-inventory' not in str(calls)

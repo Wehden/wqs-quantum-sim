@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+import tarfile
 import urllib.request
 
 REPOSITORY = 'Wehden/wqs-quantum-sim'
@@ -59,18 +60,53 @@ def write_record(path, data):
         os.close(fd)
 
 
+def archive_config(archive, image):
+    # Adapted from HousePanel's archive verifier: never extract paths to disk.
+    with tarfile.open(archive, 'r:*') as bundle:
+        def read_member(name):
+            member = bundle.getmember(name)
+            if not member.isfile() or member.size > 1024 * 1024:
+                raise ValueError('Invalid image configuration member')
+            return bundle.extractfile(member).read()
+        manifests = json.loads(read_member('manifest.json'))
+        if len(manifests) != 1 or manifests[0]['RepoTags'] != [image]:
+            raise ValueError('Expected exactly one tagged release image')
+        payload = read_member(manifests[0]['Config'])
+    return 'sha256:' + hashlib.sha256(payload).hexdigest(), json.loads(payload)
+
+
+def verify_loaded_content(actual, expected, sha):
+    # Docker backends expose different image IDs and may add empty legacy fields.
+    def normalized(value):
+        if isinstance(value, dict):
+            return {k: normalized(v) for k, v in value.items() if v not in (None, '', False, [], {})}
+        return value
+    if (actual['Os'] != expected['os'] or actual['Architecture'] != expected['architecture']
+            or actual.get('Variant', '') != expected.get('variant', '')
+            or actual['RootFS'] != {'Type': expected['rootfs']['type'], 'Layers': expected['rootfs']['diff_ids']}
+            or normalized(actual['Config']) != normalized(expected['config'])
+            or actual['Config'].get('Labels', {}).get('org.opencontainers.image.revision') != sha):
+        raise ValueError('Loaded image content mismatch')
+
+
 def validate_bundle(root, sha):
     result = {}
     for target in TARGETS:
         record = json.loads((root / (target + '.json')).read_text())
         if (record['schema'] != 1 or record['source_sha'] != sha or record['target'] != target
                 or record['archive'] != target + '.tar' or record['platform'] != 'linux/amd64'
-                or not re.fullmatch('sha256:[a-f0-9]{64}', record['image_id'])):
+                or record['image_ref'] != 'wqs-release-ci:' + target + '-' + sha
+                or not re.fullmatch('sha256:[a-f0-9]{64}', record['config_digest'])):
             raise ValueError('Invalid release manifest')
         with (root / record['archive']).open('rb') as stream:
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         if digest != record['archive_sha256']:
             raise ValueError('Archive checksum mismatch')
+        config_digest, config = archive_config(root / record['archive'], record['image_ref'])
+        if config_digest != record['config_digest'] or config['os'] + '/' + config['architecture'] != record['platform']:
+            raise ValueError('Image config identity mismatch')
+        if config.get('config', {}).get('Labels', {}).get('org.opencontainers.image.revision') != sha:
+            raise ValueError('Image source mismatch')
         result[target] = record
     return result
 
@@ -134,13 +170,12 @@ class Deployer:
         images = {}
         for target, record in records.items():
             run(['docker', 'load', '-i', str(root / record['archive'])], 600)
-            info = json.loads(run(['docker', 'image', 'inspect', record['image_id']]))[0]
-            if (info['Id'] != record['image_id'] or info['Os'] + '/' + info['Architecture'] != record['platform']
-                    or info['Config'].get('Labels', {}).get('org.opencontainers.image.revision') != sha):
-                raise ValueError('Loaded image identity mismatch')
+            info = json.loads(run(['docker', 'image', 'inspect', record['image_ref']]))[0]
+            _, expected = archive_config(root / record['archive'], record['image_ref'])
+            verify_loaded_content(info, expected, sha)
             repo = self.config['registry'].rstrip('/') + '/' + target
             tag = repo + ':' + sha
-            run(['docker', 'tag', record['image_id'], tag])
+            run(['docker', 'tag', record['image_ref'], tag])
             run(['docker', 'push', tag], 600)
             info = json.loads(run(['docker', 'image', 'inspect', tag]))[0]
             digests = [d for d in info.get('RepoDigests', []) if re.fullmatch(re.escape(repo) + '@sha256:[a-f0-9]{64}', d)]
@@ -153,6 +188,8 @@ class Deployer:
         result = {}
         for role, mapping in self.config['roles'].items():
             live = json.loads(self.kube('get', 'deployment', mapping['deployment'], '-o', 'json'))
+            if role == 'controller' and live['spec'].get('strategy', {}).get('type', 'RollingUpdate') != 'Recreate':
+                raise ValueError('Controller requires Recreate to transfer its exclusive lock')
             if live['spec'].get('replicas', 1) != 1:
                 raise ValueError('Release requires single-replica application roles')
             container = next(c for c in live['spec']['template']['spec']['containers'] if c['name'] == mapping['container'])
@@ -196,7 +233,7 @@ class Deployer:
             if state['protocol'] != 1 or state['release']:
                 raise ValueError('Bootstrap missing or admission already held')
             receipt = {'schema': 1, 'sha': sha, 'ci_run': str(run_id), 'status': 'preparing',
-                       'started': time.time(), 'previous': self.capture()}
+                       'started': time.time(), 'previous': self.capture(), 'artifacts': records}
             write_record(receipt_path, receipt)
             try:
                 receipt['images'] = self.publish(root, records, sha)
@@ -271,8 +308,8 @@ def publish_version(config, sha, version):
     notes = ('Verified deployment of ' + sha + '.\n\nCI: https://github.com/' + REPOSITORY +
              '/actions/runs/' + record['ci_run'] + '\nAll three engines passed live acceptance.\n')
     # Creating a release is explicit. Existing releases are never edited or retagged.
-    releases = json.loads(run(['gh', 'api', '--paginate', '--slurp', 'repos/' + REPOSITORY + '/releases']))
-    if any(r['tag_name'] == version for page in releases for r in page):
+    tags = run(['gh', 'api', '--paginate', 'repos/' + REPOSITORY + '/releases', '--jq', '.[].tag_name']).splitlines()
+    if version in tags:
         return
     run(['gh', 'api', '--method', 'POST', 'repos/' + REPOSITORY + '/releases',
          '-f', 'tag_name=' + version, '-f', 'name=' + version, '-f', 'body=' + notes])

@@ -25,7 +25,9 @@ this PR is merged. First:
    versions lack `qsim.release_control` and fail CD preflight without changing
    admission or images. Keep the autonomous workflow disabled until the existing
    service has protocol 1, persistent shared storage and exactly one replica of
-   each service role. Preserve encryption material, callback secrets and job data.
+   each service role. The controller must use `Recreate`; the default rolling
+   strategy can start a surge pod that cannot acquire the controller lock and is
+   rejected before any image or admission mutation. Preserve encryption material, callback secrets and job data.
 4. Install the private config and backup/verification hooks described below.
    Test backup restoration independently. Rehearse interrupted deployment and
    recovery with synthetic jobs. Confirm registry retention preserves successful
@@ -48,11 +50,13 @@ The workflow serializes production deployments and does not cancel a rollout
 when a newer merge arrives. A local file lock also rejects concurrent operators.
 
 Each archive has a schema-1 JSON manifest containing `source_sha`, `target`,
-`archive`, `archive_sha256`, `image_id` and `platform`. Require all three targets,
+`archive`, `archive_sha256`, `image_ref`, `config_digest`, `image_id` and `platform`. Require all three targets,
 Linux/amd64, matching source labels and verified archive hashes before loading.
-After loading, validate image identity, push without rebuilding, and resolve the
+After loading, compare runtime configuration and uncompressed layer digests with
+the verified archive, push without rebuilding, and resolve the
 registry digest. An image ID, archive checksum and registry digest are different
-identities and are recorded separately. CI archives expire after 14 days; the
+identities and are recorded separately. Docker backend IDs can differ; the
+archive config digest and loaded content checks establish portable identity. CI archives expire after 14 days; the
 private registry must retain qualified deployment/rollback images independently.
 
 ## Private configuration contract
