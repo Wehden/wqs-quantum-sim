@@ -3,11 +3,11 @@
 Base URL: https://simulation.example.invalid
 Developer guide: https://simulation.example.invalid/
 This guide: https://simulation.example.invalid/agents.md
-Guide updated: 2026-10-13. Check `GET /api/capabilities` on your installation before selecting a new operation.
+Guide updated: 2026-10-14. Check `GET /api/capabilities` on your installation before selecting a new operation.
 
 ## Scope and credentials
 
-wqsim runs independent Clifft 0.11.0 and Google qsim 0.22.1 CPU simulation jobs. The caller manages call sequences, batches, dependencies, and quantum state between requests. Submitting a job does not create a persistent quantum session.
+wqsim runs independent Clifft 0.11.0, Google qsim 0.22.1 and Qiskit Aer 0.17.2 CPU simulation jobs. The caller manages call sequences, batches, dependencies, and quantum state between requests. Submitting a job does not create a persistent quantum session.
 
 Use an API key supplied by the user or their secret store:
 
@@ -28,7 +28,9 @@ If no key is available, direct the user to https://simulation.example.invalid/#k
 | Google qsim | QASM2, `POST /api/jobs/qasm2` | Sampling | `engine:"qsim"`, `operation:"sample"`, `circuit` |
 | Google qsim | QASM3, `POST /api/jobs/qasm3` | Sampling or basis probabilities | `engine:"qsim"`, explicit `operation`, `circuit`; `bitstrings` for probabilities |
 
-All three format endpoints require `Content-Type: application/json` and `Idempotency-Key`. Clifft remains the default engine; explicitly select qsim for QASM sampling or QASM3. Unsupported engine combinations fail rather than switch engines.
+| Qiskit Aer | QASM2 or QASM3, corresponding format endpoint | Conditional sampling | `engine:"aer"`, `operation:"sample"`, `circuit` |
+
+All three format endpoints require `Content-Type: application/json` and `Idempotency-Key`. Clifft remains the default engine; explicitly select qsim or Aer for supported QASM operations. Unsupported engine combinations fail rather than switch engines.
 
 The existing QASM2 probability operation remains unitary-only for both engines: no classical registers, measurement, reset, conditions or custom gate definitions. Google qsim QASM2 sampling and QASM3 use a broader tested Cirq subset described below. Never remove measurements to turn a sampling request into a probability query.
 
@@ -197,7 +199,7 @@ Persist the cursor only after processing an event. Deduplicate by `(job_id, even
 
 Streams send idle heartbeat comments and close at completion or after at most five minutes. A slow or broken connection may close without a final control event. Reconnect with the saved cursor. A completed stream resumed after its final event closes without replaying that event. Job deletion removes its event history. Older jobs migrated into event tracking may have only an initial current-state snapshot.
 
-**Incremental live measurement samples are unavailable for both engines.** This API streams progress and the final result summary; it does not reseed smaller sample batches to imitate streaming. Query `GET /api/capabilities` for current support.
+**Incremental live measurement samples are unavailable for all engines.** This API streams progress and the final result summary; it does not reseed smaller sample batches to imitate streaming. Query `GET /api/capabilities` for current support.
 
 ## Retrieve and retain results
 
@@ -222,7 +224,7 @@ A result URL is relative to the wqsim base URL and is not a signed anonymous dow
 | POST | `/api/jobs/{id}/cancel` | Record cancellation; returns 202. |
 | DELETE | `/api/jobs/{id}` | Delete a terminal, cleaned job; returns 204. |
 
-The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires `engine="qsim"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
+The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires explicit `engine="qsim"` or `engine="aer"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
 
 ## Limits and errors
 
@@ -251,3 +253,47 @@ The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`)
 | 503 | Retry transient service unavailability with bounded backoff. |
 
 Envelope errors reject submission with HTTP 422. Circuit parsing, binding and native execution occur after acceptance; failures become FAILED jobs with safe prefixes such as `invalid_circuit`, `invalid_binding`, `unsupported_feature`, `resource_limit` or `execution_failed`. Do not treat HTTP 202 as successful simulation.
+
+## Classical conditions with Qiskit Aer
+
+Select `"engine": "aer"` and `"operation": "sample"` on `/api/jobs/qasm2` or `/api/jobs/qasm3`. Check `/api/capabilities` first. Aer 0.17.2 runs CPU statevector simulation in double precision, imported by Qiskit 2.5.2 and QASM3 importer 0.6.0. This is an explicit engine choice; requests never switch simulators automatically.
+
+QASM2 accepts whole-register equality to an in-range integer followed by one standard gate statement, including register broadcast. QASM3 accepts a scalar bit compared with `true`/`false`, or a whole bit array compared with an in-range integer, followed by flat `if`/`else` blocks. Those blocks may contain standard gates, measurements and reset. Use `if(c==true)` for a scalar QASM3 bit; the selected importer does not accept `if(c==1)` for that type.
+
+Classical bits start at zero. Conditions see the latest write; skipped measurements preserve the destination's previous value. Register integer significance follows OpenQASM: bit zero is the least significant bit. The result uses the existing `qasm-samples/1` contract, with declaration-order registers and ascending bit indices, full final memory in NPZ, and bounded JSON counts/preview. Each shot starts fresh. Both examples below return `{"1":128}`.
+
+Send this example to `POST /api/jobs/qasm2`:
+
+<!-- example: aer-qasm2 -->
+```json
+{
+  "engine": "aer",
+  "operation": "sample",
+  "name": "Conditional correction",
+  "circuit": "OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; creg c[1]; if(c==0) x q; measure q->c;",
+  "shots": 128,
+  "seed": 42
+}
+```
+
+Send this example to `POST /api/jobs/qasm3`:
+
+<!-- example: aer-qasm3 -->
+```json
+{
+  "engine": "aer",
+  "operation": "sample",
+  "name": "Conditional branches",
+  "circuit": "OPENQASM 3.0; include \"stdgates.inc\"; qubit q; bit c; if(c==false) { x q; } else { reset q; } c=measure q;",
+  "shots": 128,
+  "seed": 42
+}
+```
+
+Aer currently rejects probability queries, Stim input, custom gate declarations, nonempty parameter bindings, nested conditions, loops, classical arithmetic/assignment, aliases/slices, timing/pulse instructions and external includes. Existing qsim custom-gate/binding capabilities remain available with `engine="qsim"`.
+
+Aer standard gate names: `id`, `x`, `y`, `z`, `h`, `s`, `sdg`, `t`, `tdg`, `sx`, `sxdg`, `rx`, `ry`, `rz`, `p`, `u1`, `u2`, `u3`, `u`, `U`, `cx`, `CX`, `cy`, `cz`, `ch`, `swap`, `cp`, `crx`, `cry`, `crz`, `rxx`, `ryy`, `rzz`, `ccx`, `cswap`, where supplied by the selected format's standard include. Arguments must be finite numeric literals or supported constant expressions using `pi`, `tau`, `e` and `+`, `-`, `*`, `/`; no exponent or function expressions. Native import may reject constants/gate spellings absent from that format's standard library. Declarations must precede operations and use literal sizes.
+
+Aer shares the 26-declared-qubit ceiling and 3 GiB process limit. It uses one native CPU thread within the existing worker profile. The operation budget counts both branches, and the sampling-cell budget includes all possible measurement events, even when skipped. No active-job deadline or fixed concurrency cap is added. This API returns complete samples, not incremental sample streaming.
+
+Upstream: [Qiskit Aer](https://github.com/Qiskit/qiskit-aer) and [QASM3 importer](https://qiskit.github.io/qiskit-qasm3-import/).
