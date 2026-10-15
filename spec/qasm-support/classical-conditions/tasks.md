@@ -1,6 +1,6 @@
 # Implementation tasks: classical conditions
 
-Status: **implementation completed on reviewed branches; main integration pending** (2026-10-14). TASK-011 through TASK-017 are implemented. TASK-018 local and PR CI passed; the owner accepted the final documentation nits. PR #12 merged to main, #13 to the foundation branch, and #14 to the adapter branch. The latter two therefore still require integration into main. TASK-019 remains incomplete until main integration and verified deployable image identities are recorded.
+Status: **TASK-011 through TASK-018 complete and integrated into main** (2026-10-14). The owner merged #18 with a merge commit; all contributing PR histories are ancestors of main `157d9bb46ff25b0ff5796ba8b85eca4e30488ed5`. Exact-main push CI passed. The owner accepted the final documentation nits. TASK-019 remains incomplete pending qualified deployable images and rollout acceptance; CD implementation is tracked separately.
 
 Prepared against the System2 1.1.1 task-planner contract. Parent scope: [design](design.md), [requirements delta](requirements-delta.md), and [existing tasks](../tasks.md). Research evidence remains separate from implementation acceptance.
 

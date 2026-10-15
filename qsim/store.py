@@ -8,6 +8,8 @@ def init():
     settings.DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
+        db.execute("CREATE TABLE IF NOT EXISTS release_control (singleton INTEGER PRIMARY KEY CHECK(singleton=1), release TEXT NOT NULL, smoke_owner TEXT NOT NULL)")
+        db.execute("INSERT OR IGNORE INTO release_control VALUES (1,'','')")
         db.execute('''CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL,
             status TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL,

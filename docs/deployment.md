@@ -1,11 +1,11 @@
 # Deployment
 
 This repository supplies application images and example SkyPilot configuration.
-It does not contain a live cluster inventory or an unattended deployment installer.
+It does not contain a live cluster inventory. See [Releases and CD](releases.md) for the opt-in deployment workflow and required private bootstrap.
 
 Build `api`, `controller`, and `worker` targets in `deploy/Dockerfile` and push them
 to your own registry. Pin the deployed images by digest. The controller image
-includes the SkyPilot client. The worker includes both simulation engines.
+includes the SkyPilot client. The worker includes all three simulation engines.
 
 Run one API and one controller with a shared persistent data directory. SQLite
 and the controller's file lock require storage with compatible locking semantics.

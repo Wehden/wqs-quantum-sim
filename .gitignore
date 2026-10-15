@@ -240,3 +240,5 @@ kubeconfig*
 __pycache__/
 .pytest_cache/
 test-results/
+release/
+release-receipt.json

@@ -10,6 +10,8 @@ def choose(event, kind, repository, ref, enabled):
     ) or (kind == 'workflow_dispatch' and ref == 'refs/heads/main')
     if not trusted:
         return 'hosted', 'This event is not eligible for the private runner.'
+    if kind == 'workflow_dispatch' and event.get('inputs', {}).get('hosted_tests') in (True, 'true'):
+        return 'hosted', 'Explicit hosted dependency-validation run; Standpunkt skipped.'
     if enabled == 'false':
         return 'hosted', 'Standpunkt CI is disabled by repository configuration.'
     return 'local', 'Standpunkt is the default; GitHub-hosted CI retries if the local attempt fails.'
