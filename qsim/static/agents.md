@@ -27,7 +27,6 @@ If no key is available, direct the user to https://simulation.example.invalid/#k
 | Clifft or Google qsim | QASM2, `POST /api/jobs/qasm2` | Basis probabilities (default) | `circuit`, `bitstrings` |
 | Google qsim | QASM2, `POST /api/jobs/qasm2` | Sampling | `engine:"qsim"`, `operation:"sample"`, `circuit` |
 | Google qsim | QASM3, `POST /api/jobs/qasm3` | Sampling or basis probabilities | `engine:"qsim"`, explicit `operation`, `circuit`; `bitstrings` for probabilities |
-
 | Qiskit Aer | QASM2 or QASM3, corresponding format endpoint | Conditional sampling | `engine:"aer"`, `operation:"sample"`, `circuit` |
 
 All three format endpoints require `Content-Type: application/json` and `Idempotency-Key`. Clifft remains the default engine; explicitly select qsim or Aer for supported QASM operations. Unsupported engine combinations fail rather than switch engines.
