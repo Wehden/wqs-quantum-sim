@@ -189,7 +189,7 @@ def capabilities(user=Depends(identity)):
     formats = {'qasm2': qasm_operations}
     if qasm3_operations:
         formats['qasm3'] = qasm3_operations
-    return {'engines':{'clifft':{'version':'0.11.0','default':True},
+    result = {'engines':{'clifft':{'version':'0.11.0','default':True},
                        'qsim':{'version':'0.22.1','input_formats':formats,'max_qubits':26,'device':'CPU','precision':'single',
                                'importer': {'name': 'cirq', 'version': '1.7.0'},
                                'sampling': {'enabled': sampling, 'result_schema': 'qasm-samples/1' if sampling else None,
@@ -211,6 +211,29 @@ def capabilities(user=Depends(identity)):
                          'incremental_samples':False,'reason':'Workers return complete sample arrays; incremental sample streaming is not enabled'},
             'qasm2_subset':'Probability queries retain unitary qelib1.inc circuits. Google qsim sampling supports classical registers, measurement, reset and bounded custom gates when enabled; conditions remain unsupported.',
             'client_manages':['call sequences','batches','quantum state']}
+    if SUPPORTED_COMBINATIONS.get('aer'):
+        result['engines']['aer'] = {
+            'version': '0.17.2', 'default': False,
+            'input_formats': {fmt: list(ops) for fmt, ops in SUPPORTED_COMBINATIONS['aer'].items()},
+            'max_qubits': 26, 'device': 'CPU', 'method': 'statevector', 'precision': 'double',
+            'importer': {'name': 'qiskit', 'version': '2.5.2', 'qasm3_importer_version': '0.6.0'},
+            'sampling': {'enabled': True, 'result_schema': 'qasm-samples/1',
+                         'classical_registers': True, 'measurement': True,
+                         'mid_circuit_measurement': True, 'reset': True,
+                         'repeated_writes': True, 'conditions': True, 'custom_gates': False,
+                         'max_shots': 10000, 'max_classical_cells': 1000000,
+                         'max_count_entries': 256, 'max_preview_shots': 20},
+            'features_by_operation': {
+                'qasm2': {'sample': {'conditions': True, 'custom_gates': False, 'bindings': False}},
+                'qasm3': {'sample': {'conditions': True, 'custom_gates': False, 'bindings': False}}},
+            'condition_subset': {
+                'qasm2': 'whole-register equality to an in-range integer; one standard gate statement',
+                'qasm3': 'scalar bit == boolean or whole-register == in-range integer; flat if/else blocks',
+                'conditional_measurement_reset': ['qasm3'],
+                'nested_conditions': False, 'loops': False},
+            'limits': {'max_expanded_operations': 65536, 'max_source_nesting': 32}}
+    return result
+
 
 
 @app.get("/api/jobs/{job_id}")
