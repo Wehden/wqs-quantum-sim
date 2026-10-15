@@ -19,6 +19,8 @@ def simulate(source: Path, output: Path):
     resource.setrlimit(resource.RLIMIT_AS, (3 * 1024**3, 3 * 1024**3))
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     request = json.loads(source.read_text())
+    if request.get("engine") == "aer":
+        return simulate_aer(request, output)
     if request.get("engine", "clifft") == "qsim":
         if request.get('operation') == 'sample' or request.get('input_format') == 'qasm3':
             return simulate_qasm_sample(request, output)
@@ -219,6 +221,45 @@ def simulate_qasm_sample(request, output):
             'invalid_circuit: sampling requires measurement': 'add a measurement into a declared classical register',
         }.get(str(error), messages[category])
         payload = {'status': 'FAILED', 'error': category + ': ' + detail}
+    output.write_text(json.dumps(payload))
+
+
+def simulate_aer(request, output):
+    """Fixed Aer dispatch through the same complete-result contract."""
+    started = time.monotonic()
+    try:
+        import numpy as np
+        from qsim.aer_adapter import sample
+        memory, metadata = sample(request, cpu_threads=1)
+        if memory.dtype != np.uint8 or memory.shape != (request['shots'], metadata['classical_bits']):
+            raise ValueError('execution_failed: classical memory shape')
+        counts = collections.Counter(''.join(map(str, row)) for row in memory)
+        buffer = io.BytesIO()
+        np.savez_compressed(buffer, classical_memory=memory)
+        summary = {
+            'result_schema': 'qasm-samples/1', 'engine': 'aer ' + metadata['engine_version'],
+            'importer': 'qiskit ' + metadata['importer_version'],
+            'qasm3_importer': metadata['qasm3_importer_version'],
+            'input_format': request['input_format'], 'operation': 'sample',
+            'shots': request['shots'], 'seed': request['seed'], 'qubits': metadata['quantum_bits'],
+            'registers': metadata['registers'], **qasm_sample_preview(memory, counts),
+            **{key: metadata[key] for key in ('method', 'device', 'precision', 'cpu_threads',
+                                             'compile_seconds', 'execution_seconds')},
+            'elapsed_seconds': round(time.monotonic()-started, 6),
+        }
+        if len(json.dumps(summary).encode()) > 2 * 1024 * 1024:
+            raise ValueError('resource_limit: callback summary')
+        payload = {'status': 'SUCCEEDED', 'summary': summary,
+                   'artifact': base64.b64encode(buffer.getvalue()).decode()}
+    except Exception as error:
+        category = str(error).partition(':')[0] if isinstance(error, ValueError) else 'execution_failed'
+        messages = {'invalid_circuit': 'check the documented Aer QASM subset',
+                    'unsupported_feature': 'select a documented Aer sampling construct',
+                    'resource_limit': 'reduce circuit or sample output size',
+                    'execution_failed': 'simulation did not produce a complete result'}
+        if category not in messages:
+            category = 'execution_failed'
+        payload = {'status': 'FAILED', 'error': category + ': ' + messages[category]}
     output.write_text(json.dumps(payload))
 
 

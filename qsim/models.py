@@ -35,7 +35,7 @@ Bindings = Annotated[
 ]
 
 class Submission(BaseModel):
-    engine: Literal["clifft", "qsim"] = "clifft"
+    engine: Literal["clifft", "qsim", "aer"] = "clifft"
     model_config = ConfigDict(extra="forbid", strict=True)
     name: str = Field(default="Untitled circuit", min_length=1, max_length=80)
     circuit: str = Field(min_length=1, max_length=65536)
@@ -49,6 +49,11 @@ class Submission(BaseModel):
 
     @model_validator(mode="after")
     def valid_operation(self):
+        if self.engine == "aer":
+            if self.input_format not in ("qasm2", "qasm3") or self.operation != "sample":
+                raise ValueError("Aer supports only OpenQASM sampling")
+            if self.bindings:
+                raise ValueError("Aer does not accept parameter bindings")
         if self.engine == "qsim" and self.input_format == "stim":
             raise ValueError("qsim supports OpenQASM requests")
         if self.input_format != "qasm3" and "bindings" in self.model_fields_set:
@@ -70,7 +75,7 @@ class Submission(BaseModel):
                 raise ValueError("QASM sampling does not accept bitstrings or bit_order")
         if self.input_format == "qasm3" or (self.input_format == "qasm2" and self.operation == "sample"):
             if self.operation not in SUPPORTED_COMBINATIONS.get(self.engine, {}).get(self.input_format, ()):
-                raise ValueError("This QASM operation requires a supported engine; select engine=qsim")
+                raise ValueError("This QASM operation requires a supported engine; select a documented engine and operation")
         return self
 
 
@@ -84,7 +89,7 @@ class StimSubmission(BaseModel):
 
 class QasmSubmission(BaseModel):
     _input_format: ClassVar[str] = "qasm2"
-    engine: Literal["clifft", "qsim"] = "clifft"
+    engine: Literal["clifft", "qsim", "aer"] = "clifft"
     model_config = ConfigDict(extra="forbid", strict=True)
     name: str = Field(default="Untitled circuit", min_length=1, max_length=80)
     circuit: str = Field(min_length=1, max_length=65536)

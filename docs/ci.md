@@ -7,7 +7,7 @@ The workflow names both lanes, marks the unused lane skipped, and writes the
 selection and reason to its run summary.
 
 Both lanes execute `bash tools/ci/check.sh`: frozen dependency installation,
-dependency consistency, both simulator engines, Python API/controller tests,
+dependency consistency, all three simulator engines (Clifft, Google qsim and Aer), Python API/controller tests,
 and JavaScript console tests. JUnit results are retained for 14 days. Tests use
 synthetic identities, temporary storage, and mocked dispatch; no live SkyPilot,
 SMTP, or cluster credentials are needed.
@@ -43,8 +43,21 @@ An operator can disable local CI and start a fresh run in that situation.
 ## Packaged worker check
 
 A separate required GitHub-hosted job runs `bash tools/ci/check-worker.sh` to build
-the worker target and verify package isolation, both engines and the supported
+the worker target and verify package isolation, all three engines and the supported
 QASM modes. This job needs Docker; the Standpunkt runner deliberately has no host
 Docker socket. Test-suite routing remains Standpunkt-first. The final result
 reports the image-job outcome and fails if it fails, even when the tests pass.
 No image is published; the per-run image tag is removed on exit.
+
+## Main-branch integration gate
+
+Target implementation PRs at `main`. If a stacked base is explicitly needed,
+retarget each dependent PR to `main` after its parent merges and rerun CI before
+merging. A PR marked merged into a feature branch is not integrated into main.
+
+Before reporting a feature complete or starting its release handoff, fetch main
+and verify that every contributing PR's merge commit is an ancestor of
+`origin/main` with `git merge-base --is-ancestor`. Verify successful push CI for
+the exact integrated main SHA separately from the individual PR checks. If a
+merge used squash or rebase, reconcile the resulting main commit and diff
+explicitly instead of claiming ancestry that does not exist.
