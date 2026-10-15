@@ -182,8 +182,8 @@ curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
 <tr><td>GET</td><td><code>/api/me</code></td><td>Authenticated identity and engine information.</td></tr>
 <tr><td>GET</td><td><code>/api/capabilities</code></td><td>Formats, operations, and streaming support.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs/stim</code></td><td>Idempotent Stim sampling submission; requires Idempotency-Key.</td></tr>
-<tr><td>POST</td><td><code>/api/jobs/qasm2</code></td><td>QASM2 probabilities by default or explicit qsim sampling; requires Idempotency-Key.</td></tr>
-<tr><td>POST</td><td><code>/api/jobs/qasm3</code></td><td>qsim subset; explicit operation and Idempotency-Key required.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/qasm2</code></td><td>QASM2 probabilities by default or explicit qsim/Aer sampling; requires Idempotency-Key.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/qasm3</code></td><td>qsim probabilities/sampling or Aer conditional sampling; explicit operation and Idempotency-Key required.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs</code></td><td>General submission; Idempotency-Key optional for compatibility. Without it each call creates new work.</td></tr>
 <tr><td>GET</td><td><code>/api/jobs/{id}/events</code></td><td>Resumable SSE progress and final result summary.</td></tr>
 <tr><td>GET</td><td><code>/api/jobs</code></td><td>List your saved jobs.</td></tr>
@@ -191,9 +191,10 @@ curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
 <tr><td>GET</td><td><code>/api/jobs/{id}/result</code></td><td>Download the successful job’s .npz artifact.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs/{id}/cancel</code></td><td>Cancel a queued or active job; returns 202.</td></tr>
 <tr><td>DELETE</td><td><code>/api/jobs/{id}</code></td><td>Remove a terminal job after compute cleanup; returns 204.</td></tr>
-</tbody></table></div><h3>General submission body</h3><p>The general route also accepts <code>operation</code>: <code>sample</code> (default) or <code>basis_probabilities</code>. Probability queries require <code>bitstrings</code> and support <code>bit_order</code>. QASM sampling requires <code>engine="qsim"</code>; QASM3 always requires an explicit operation. Shots and seed apply only to sampling.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>
+</tbody></table></div><h3>General submission body</h3><p>The general route also accepts <code>operation</code>: <code>sample</code> (default) or <code>basis_probabilities</code>. Probability queries require <code>bitstrings</code> and support <code>bit_order</code>. QASM sampling requires explicit <code>engine="qsim"</code> or <code>engine="aer"</code>; QASM3 always requires an explicit operation. Shots and seed apply only to sampling.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>
 <tr><td><code>circuit</code></td><td>Required text, 1–65,536 characters.</td><td>Required</td></tr>
 <tr><td><code>name</code></td><td>1–80 characters.</td><td>Untitled circuit</td></tr>
+<tr><td><code>engine</code></td><td><code>clifft</code>, <code>qsim</code>, or <code>aer</code>. Aer accepts QASM2/QASM3 sampling only; check capabilities for each engine.</td><td>clifft</td></tr>
 <tr><td><code>input_format</code></td><td><code>stim</code>, supported <code>qasm2</code> or <code>qasm3</code>.</td><td>stim</td></tr>
 <tr><td><code>shots</code></td><td>Integer, 1–10,000.</td><td>1000</td></tr>
 <tr><td><code>seed</code></td><td>Integer, 0–9,223,372,036,854,775,807.</td><td>42</td></tr>
