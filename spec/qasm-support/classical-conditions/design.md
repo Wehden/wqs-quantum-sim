@@ -107,7 +107,7 @@ The System2 design review gate passed on 2026-10-14. The owner also approved [th
 ## Open Design Questions
 
 - **Resolved owner decision (2026-10-14):** explicit Aer and the bounded first subset are approved. The remaining discovery items below gate implementation milestones.
-- **Discovery Needed, worker/image task:** verify all candidate pins coexist with the existing frozen worker set on Python 3.12, inventory transitive licenses, check image size and the 3 GiB isolation envelope. No compatibility claim is made from the separate research environment.
+- **Resolved by TASK-011:** the combined Python 3.12 worker environment preserves existing engine pins, passes dependency/capability checks, and has a recorded transitive license inventory and measured foundation image footprint. See [implementation-decisions.md](implementation-decisions.md). **Remaining TASK-014 gate:** actual Aer execution and boundary workloads must pass the 3 GiB child isolation envelope; image disk size does not establish runtime memory use.
 - **Discovery Needed, controller/worker task:** identify how allocated CPU and compatible worker-image identity reach the child. Reuse current fields where sufficient; any new configuration contract requires a documented task-plan amendment.
 - **Discovery Needed, validation task:** prove source-level preallocation guards, native instruction allowlisting and classical bit mapping for both formats. A failure blocks admission, not a reason to substitute another backend.
 
