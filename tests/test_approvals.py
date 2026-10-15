@@ -206,6 +206,11 @@ def test_hostname_counts_cover_all_jobs_and_withhold_stale_placement(clients):
     path=settings.DATA/'skypilot-observation.json';path.write_text(json.dumps(snapshot))
     data=admin.get('/operations?offset=100').json();groups=data['jobs_by_hostname']
     assert len(data['jobs'])==5
+    all_rows=admin.get('/operations').json()['jobs']+data['jobs']
+    by_id={r['id']:r for r in all_rows}
+    assert by_id['0']['hostname']=='node-a'
+    assert by_id['101']['hostname']=='node-b'
+    assert all(by_id[str(i)]['hostname'] is None for i in [102,103,104])
     assert groups['hosts']==[
         {'hostname':'node-a','running':101,'launching':0,'total':101},
         {'hostname':'node-b','running':0,'launching':1,'total':1},
@@ -213,8 +218,12 @@ def test_hostname_counts_cover_all_jobs_and_withhold_stale_placement(clients):
     assert groups['total_active']==104 and groups['unplaced']==1 and groups['unknown']==1
     assert 'private circuit' not in json.dumps(data) and 'private token' not in json.dumps(data)
     snapshot['placements']['observed_at']=now-181;path.write_text(json.dumps(snapshot))
-    groups=admin.get('/operations').json()['jobs_by_hostname']
+    stale_data=admin.get('/operations').json()
+    assert all(r['hostname'] is None for r in stale_data['jobs'])
+    groups=stale_data['jobs_by_hostname']
     assert groups['stale'] is True and groups['hosts']==[] and groups['unknown']==103
     snapshot['placements'].update(observed_at=now,error='ApiException');path.write_text(json.dumps(snapshot))
-    assert admin.get('/operations').json()['jobs_by_hostname']['hosts']==[]
+    error_data=admin.get('/operations').json()
+    assert error_data['jobs_by_hostname']['hosts']==[]
+    assert all(r['hostname'] is None for r in error_data['jobs'])
     assert public.get('/operations').status_code==404
