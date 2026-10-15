@@ -1554,7 +1554,7 @@ requires-dist = [
     { name = "qiskit-aer", marker = "extra == 'worker'", specifier = "==0.17.2" },
     { name = "qiskit-qasm3-import", marker = "extra == 'worker'", specifier = "==0.6.0" },
     { name = "qsimcirq", marker = "extra == 'worker'", specifier = "==0.22.1" },
-    { name = "skypilot", extras = ["kubernetes"], marker = "extra == 'controller'", specifier = "==0.13.0" },
+    { name = "skypilot", extras = ["kubernetes"], marker = "extra == 'controller'", specifier = "==0.14.0" },
     { name = "uvicorn", specifier = "==0.35.0" },
 ]
 provides-extras = ["worker", "controller"]
@@ -1764,7 +1764,7 @@ wheels = [
 
 [[package]]
 name = "skypilot"
-version = "0.13.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -1818,9 +1818,9 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/b1/0ad50c2e89a3b18dafca3e8b5910e11aa9608dae8977394902fe59ba1e0d/skypilot-0.13.0.tar.gz", hash = "sha256:0bd0c59a649d59fa21f1093534318e6c2f50b30e10fb3f54f4d702acf2615fb7", size = 3313547, upload-time = "2026-07-22T17:29:35.125Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/db/ef8bb6591eab7855ad6a69d3db800c44d06dd8b4879744010f051afe2678/skypilot-0.14.0.tar.gz", hash = "sha256:e85b1c63debfcfb0e753c7847c74a9514d6891a3d59976ed1e933c1784369f99", size = 3689325, upload-time = "2026-10-05T19:25:03.265Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/d9/a503213b79d362e7a5da595dd7fa38186a6d1adb3642466f1399045bafe2/skypilot-0.13.0-py3-none-any.whl", hash = "sha256:30411fb3622140e61d386494dfaaeefaee737f76565a3838d72a31157571d96c", size = 3653109, upload-time = "2026-07-22T17:29:32.508Z" },
+    { url = "https://files.pythonhosted.org/packages/20/94/35e6b63b95e52305a9911daf10793e217f5e166a84d10fdeeb8f60b0504b/skypilot-0.14.0-py3-none-any.whl", hash = "sha256:669be4e308eb97ffc980d962abea223d861460f1d3cad87419a3be10c1ac2f13", size = 4043040, upload-time = "2026-10-05T19:25:00.106Z" },
 ]
 
 [package.optional-dependencies]
