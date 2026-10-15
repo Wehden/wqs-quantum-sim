@@ -214,8 +214,8 @@ A result URL is relative to the wqsim base URL and is not a signed anonymous dow
 | GET | `/api/me` | Authenticated identity and engine. |
 | GET | `/api/capabilities` | Supported formats, operations, and streaming capabilities. |
 | POST | `/api/jobs/stim` | Durable Stim sampling submission; idempotency key required. |
-| POST | `/api/jobs/qasm2` | Basis probabilities by default; explicit qsim sampling also supported. Idempotency key required. |
-| POST | `/api/jobs/qasm3` | qsim subset with explicit operation; idempotency key required. |
+| POST | `/api/jobs/qasm2` | Basis probabilities by default; explicit qsim or Aer sampling also supported. Idempotency key required. |
+| POST | `/api/jobs/qasm3` | qsim probabilities/sampling or Aer conditional sampling; explicit operation and idempotency key required. |
 | POST | `/api/jobs` | General submission. Optional idempotency key for compatibility; without it, each call creates new work. |
 | GET | `/api/jobs` | All saved jobs for this identity. |
 | GET | `/api/jobs/{id}` | Job status, error, and completed summary. |
@@ -224,7 +224,7 @@ A result URL is relative to the wqsim base URL and is not a signed anonymous dow
 | POST | `/api/jobs/{id}/cancel` | Record cancellation; returns 202. |
 | DELETE | `/api/jobs/{id}` | Delete a terminal, cleaned job; returns 204. |
 
-The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires explicit `engine="qsim"` or `engine="aer"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
+The `engine` field accepts `clifft` (default), `qsim`, or `aer`; Aer supports QASM2/QASM3 sampling only. The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires explicit `engine="qsim"` or `engine="aer"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
 
 ## Limits and errors
 
@@ -233,7 +233,7 @@ The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`)
 - Probability queries: 1–256 bitstrings, each at most 4,096 characters.
 - Clifft limits: at most 4,096 qubits, active width 22, and 1,000,000 sampled output cells.
 - New QASM sampling: `shots × (total classical bits + measurement events)` must not exceed 1,000,000; repeated writes count as separate native events even though only the final value is returned.
-- Google qsim: 1–26 declared qubits, two CPU threads, single precision. Both engines use a 2 CPU / 4 GiB worker with a 3 GiB process memory limit.
+- Google qsim: 1–26 declared qubits, two CPU threads, single precision. All engines use a 2 CPU / 4 GiB worker with a 3 GiB process memory limit.
 - Execution: simulations run concurrently as cluster capacity permits. Placement failures stay queued and retry automatically. Idle compute is reused for subsequent requests, with a fresh simulation process for each job. Cold starts still add latency. Active simulations have no elapsed-time or CPU-time deadline. Explicit cancellation remains available; idle cleanup waits for work to finish. Queue wait can add time.
 - Per identity: no saved-job cap; eight open event streams. No fixed active-job concurrency limit.
 - Service totals: 64 event streams. No fixed saved-job or idempotency-history count cap.
