@@ -24,3 +24,9 @@ No new credentials/provider SDK or hardware account is required. Distribution li
 Current controller code requests two CPUs and four GB; worker reuse compares the configured image. Select one native Aer thread, matching the existing restricted child's OMP/BLAS environment and fitting that allocation. Pass `cpu_threads=1` as a fixed internal worker argument, not a public field. No new configuration variable, resource request or controller policy is required. Regression tests will protect compatible-image selection.
 
 TASK-014 must verify the actual Aer child under the existing 3 GiB address-space limit before admission. Dependency compatibility and a baseline image build alone do not prove memory-boundary execution, hostile-input safety or release readiness.
+
+## Foundation image footprint
+
+Measured on 2026-10-14 from an archive of foundation revision `d8cacfe24335cca97da3d1142912961b1013921e`, using `deploy/Dockerfile` target `worker`. Docker reports image ID `sha256:9428e20baabec01f396c78572eb3a235aba69144cd19fe564b49f53e4abdcac3` and size **2,205,914,902 bytes (about 2.05 GiB)**. This is Docker's local image-size metric, not registry compressed transfer size, runtime memory use or a published deployment digest. The image contains the combined pinned dependencies; Aer service admission is absent from this foundation revision.
+
+TASK-011's dependency/license inventory and image-footprint evidence are complete. Real Aer execution and memory-boundary acceptance remain TASK-014 gates.
