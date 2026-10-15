@@ -7,7 +7,7 @@ The workflow names both lanes, marks the unused lane skipped, and writes the
 selection and reason to its run summary.
 
 Both lanes execute `bash tools/ci/check.sh`: frozen dependency installation,
-dependency consistency, both simulator engines, Python API/controller tests,
+dependency consistency, all three simulator engines (Clifft, Google qsim and Aer), Python API/controller tests,
 and JavaScript console tests. JUnit results are retained for 14 days. Tests use
 synthetic identities, temporary storage, and mocked dispatch; no live SkyPilot,
 SMTP, or cluster credentials are needed.
@@ -43,7 +43,7 @@ An operator can disable local CI and start a fresh run in that situation.
 ## Packaged worker check
 
 A separate required GitHub-hosted job runs `bash tools/ci/check-worker.sh` to build
-the worker target and verify package isolation, both engines and the supported
+the worker target and verify package isolation, all three engines and the supported
 QASM modes. This job needs Docker; the Standpunkt runner deliberately has no host
 Docker socket. Test-suite routing remains Standpunkt-first. The final result
 reports the image-job outcome and fails if it fails, even when the tests pass.

@@ -21,8 +21,9 @@ PY
 docker run --rm -i --entrypoint /opt/qsim-venv/bin/python "$image" - <<'PY'
 import json, os, pathlib, subprocess, sys, tempfile
 from qsim.qasm_adapter import SUPPORTED_COMBINATIONS
-assert not ({'cirq', 'numpy', 'qsimcirq', 'clifft'} & sys.modules.keys())
+assert not ({'cirq', 'numpy', 'qsimcirq', 'clifft', 'qiskit', 'qiskit_aer'} & sys.modules.keys())
 assert pathlib.Path('/opt/qsim/qsim/qasm_adapter.py').is_file()
+assert pathlib.Path('/opt/qsim/qsim/aer_adapter.py').is_file()
 assert not pathlib.Path('/opt/qsim/qsim/store.py').exists()
 env = {'PATH': os.environ['PATH'], 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}
 requests = [
@@ -39,6 +40,10 @@ requests = [
     {'engine': 'qsim', 'input_format': 'qasm3', 'operation': 'basis_probabilities',
      'bindings': {'theta': 3.141592653589793}, 'bitstrings': ['0', '1'], 'bit_order': 'big',
      'circuit': 'OPENQASM 3.0; include "stdgates.inc"; input float[64] theta; qubit q; rx(theta) q;'},
+    {'engine': 'aer', 'input_format': 'qasm2', 'operation': 'sample', 'shots': 4, 'seed': 2**63-1,
+     'circuit': 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; creg c[1]; if(c==0) x q; measure q->c;'},
+    {'engine': 'aer', 'input_format': 'qasm3', 'operation': 'sample', 'shots': 4, 'seed': 42,
+     'circuit': 'OPENQASM 3.0; include "stdgates.inc"; qubit q; bit c; if(c==false) { x q; } else { reset q; } c=measure q;'},
 ]
 with tempfile.TemporaryDirectory() as directory:
     source, output = pathlib.Path(directory)/'input.json', pathlib.Path(directory)/'output.json'
@@ -60,5 +65,5 @@ circuit, metadata = prepare(dict(engine='qsim',input_format='qasm2',operation='s
 result = qsimcirq.QSimSimulator(seed=42).run(circuit,repetitions=4)
 assert final_memory(result,metadata,4).tolist() == [[1]]*4
 """], cwd='/opt/qsim', env=env, check=True)
-print('Worker package, isolated module entry point, both engines and adapter passed')
+print('Worker package, isolated module entry point, all three engines and adapters passed')
 PY

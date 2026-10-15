@@ -120,7 +120,7 @@ The initial chain is deliberately sequential: safety and native execution share 
 - **Dependencies:** TASK-015.
 - **Recommended Mode:** test-engineer.
 - **Risk:** Med: passing source tests can hide missing native image dependencies.
-- **Files/areas:** `.github/workflows/ci.yml`, `tools/ci/check.sh`, `tools/ci/check-worker.sh`, `tests/check_worker_image.sh`, `tests/test_ci_route.py`. New Aer test/report paths are proposed.
+- **Files/areas:** `.github/workflows/ci.yml`, `tools/ci/check.sh`, `tools/ci/check-worker.sh`, `tests/check_worker_image.sh`, `tests/test_ci_route.py`, `docs/ci.md`. New Aer test/report paths are proposed.
 - **Steps:** Ensure the existing full suite includes all Aer tests and reports all three engines. Extend real image checks with conditional Aer circuits and isolated imports while preserving Clifft/qsim cases. Preserve Standpunkt-first tests, hosted test fallback and the separately required hosted image check. Update runner-path descriptions and gate tests if labels/outputs change; do not add availability tokens or replace routing. Avoid workflow changes where existing discovery already covers the new tests.
 - **Verification:** Run bash tools/ci/check.sh and bash tools/ci/check-worker.sh where Docker is available; run focused tests/test_ci_route.py after any workflow changes. Require actual three-engine execution and failure/cancelled/skipped image-gate cases. Record actual runner and skipped fallback paths in the PR. CI failure is reported to owner.
 - **Rollback / Backout:** Revert only CI changes that are incorrect; do not call an untested Aer image release-ready.
@@ -133,6 +133,7 @@ The initial chain is deliberately sequential: safety and native execution share 
 ^tools/ci/check\-worker\.sh$
 ^tests/check_worker_image\.sh$
 ^tests/test_ci_route\.py$
+^docs/ci\.md$
 ```
 
 ### TASK-017: Document and exercise the new engine contract
@@ -233,3 +234,5 @@ Checkpoints: dependency decisions after TASK-011; safety/execution after TASK-01
 | REQ-018–021 safety and resource/lifecycle constraints | TASK-011, TASK-012, TASK-014, TASK-018 |
 | REQ-022 provenance | TASK-013, TASK-014, TASK-017 |
 | REQ-023/024 verification and release | TASK-016, TASK-017, TASK-018, TASK-019 |
+
+Lease clarification (2026-10-14): TASK-016 includes `docs/ci.md` so its engine-coverage description stays consistent with the workflow. The five-file change budget is unchanged; no routing change is authorized.
