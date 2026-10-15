@@ -1,6 +1,6 @@
 # Implementation tasks: classical conditions
 
-Status: **approved by the owner on 2026-10-14; implementation authorized**. Design and requirements amendment approved on the same date. TASK-011 dependency/capability evidence passed: 249 Python and three console tests, plus baseline worker-image checks. Follow-on tasks are pending.
+Status: **approved by the owner on 2026-10-14; implementation authorized**. Design and requirements amendment approved on the same date. TASK-011 dependency/capability evidence passed: 249 Python and three console tests, plus baseline worker-image checks. TASK-012 through TASK-017 are implemented in dependent branches; TASK-018 local verification passed; PR CI and automatic review are pending. TASK-019 awaits owner merges and published image identity.
 
 Prepared against the System2 1.1.1 task-planner contract. Parent scope: [design](design.md), [requirements delta](requirements-delta.md), and [existing tasks](../tasks.md). Research evidence remains separate from implementation acceptance.
 
@@ -196,10 +196,10 @@ The initial chain is deliberately sequential: safety and native execution share 
 - [x] Owner approved the design and requirements amendment.
 - [x] Owner approved this task plan before implementation.
 - [x] Combined frozen dependencies and licenses verified; current engine pins preserved. Foundation image footprint recorded in implementation-decisions.md.
-- [ ] Input safety, condition semantics, classical mapping and seed behavior pass positive/negative checks.
-- [ ] Actual isolated worker respects existing memory/output/thread budgets and compatible-image reuse.
-- [ ] Legacy defaults, identities and result contracts remain unchanged.
-- [ ] Authenticated API-to-worker examples and protected complete artifacts pass for Aer.
+- [x] Input safety, condition semantics, classical mapping and seed behavior pass positive/negative checks.
+- [x] Actual isolated worker respects existing memory/output/thread budgets and compatible-image reuse.
+- [x] Legacy defaults, identities and result contracts remain unchanged.
+- [x] Authenticated API-to-worker examples and protected complete artifacts pass for Aer.
 - [ ] All three engines and actual packaged image pass required CI; runner path reported.
 - [ ] Automatic review resolved within the authorized review policy; owner merges PRs.
 - [ ] Complete rollout handoff recorded, with deployed acceptance clearly outstanding until authorized and verified.
