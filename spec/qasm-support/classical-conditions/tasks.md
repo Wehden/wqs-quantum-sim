@@ -194,7 +194,7 @@ The initial chain is deliberately sequential: safety and native execution share 
 
 - [x] Owner approved the design and requirements amendment.
 - [x] Owner approved this task plan before implementation.
-- [ ] Combined frozen dependencies and licenses verified; current engine pins preserved.
+- [x] Combined frozen dependencies and licenses verified; current engine pins preserved. Foundation image footprint recorded in implementation-decisions.md.
 - [ ] Input safety, condition semantics, classical mapping and seed behavior pass positive/negative checks.
 - [ ] Actual isolated worker respects existing memory/output/thread budgets and compatible-image reuse.
 - [ ] Legacy defaults, identities and result contracts remain unchanged.
