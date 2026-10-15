@@ -293,4 +293,6 @@ TASK-007 also updates the prior custom_gates=false capability assertion in tests
 
 TASK-009 includes tests/check_worker_image.sh (coordinator lease, max_files 7) so the existing package-image check permanently covers new QASM2/QASM3 worker entry points and wide seeds, beyond the earlier standalone adapter probe.
 
-Execution checkpoint: TASK-003 through TASK-009 are implemented and locally verified; see [validation.md](validation.md). Full local CI: 220 Python + 3 console tests passed, including the unpushed PR #8 corrective fixture. Published feature suite count is 219 until that correction is pushed. PR #9 foundation CI passed on Standpunkt with no automated findings. TASK-010 remains pending owner merges. No deployment occurred.
+Historical checkpoint (2026-10-13, before PRs #8–#11 merged): TASK-003 through TASK-009 had passed 220 local Python and three console tests, including a then-unpushed correction to the PR #8 capability fixture; the committed suite at that checkpoint contained 219 Python tests.
+
+Current reconciliation (2026-10-14): PRs #8–#11 are merged. PR #11 includes that fixture correction. Main revision `2ed33601e9fdd5ab8ba04ef98c831486dbf9205c` passed CI run 38493150281 on Standpunkt with the hosted test fallback skipped and the separate hosted image check passed. See [validation.md](validation.md) for merge revisions and evidence. TASK-010 is open for rollout handoff and is no longer waiting for those merges. This source/CI evidence does not establish deployed acceptance.
