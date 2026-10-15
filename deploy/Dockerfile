@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-server 
 WORKDIR /opt/qsim
 COPY pyproject.toml uv.lock ./
 RUN UV_PROJECT_ENVIRONMENT=/opt/qsim-venv uv sync --frozen --no-dev --extra worker
-COPY qsim/__init__.py qsim/worker.py qsim/qasm_adapter.py /opt/qsim/qsim/
+COPY qsim/__init__.py qsim/worker.py qsim/qasm_adapter.py qsim/aer_adapter.py /opt/qsim/qsim/
 COPY --chmod=755 deploy/worker/tail /usr/local/bin/tail
 ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 CMD ["sleep", "infinity"]

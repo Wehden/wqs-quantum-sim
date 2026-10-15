@@ -1,7 +1,10 @@
 """Pinned native QASM import inside the credential-free simulation child."""
 
 # New operations admitted only after their worker contract is verified.
-SUPPORTED_COMBINATIONS = {"qsim": {"qasm2": ("sample",), "qasm3": ("sample", "basis_probabilities")}}
+SUPPORTED_COMBINATIONS = {
+    "qsim": {"qasm2": ("sample",), "qasm3": ("sample", "basis_probabilities")},
+    "aer": {"qasm2": ("sample",), "qasm3": ("sample",)},
+}
 
 
 def _preflight(source, shots):
