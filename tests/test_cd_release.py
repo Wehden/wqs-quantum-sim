@@ -244,3 +244,67 @@ def test_record_creates_fixed_tag_and_safe_notes_with_installed_gh_flags(tmp_pat
     assert any('sha='+SHA in args and 'ref=refs/tags/v0.1.0' in args for args in calls)
     assert not any('--slurp' in args for args in calls)
     assert 'private-inventory' not in str(calls)
+
+
+@pytest.mark.parametrize('failure', [None, 'load', 'content', 'tag', 'push', 'digest'])
+def test_publication_cleans_only_attempted_release_tags(tmp_path, monkeypatch, failure):
+    records = release.validate_bundle(bundle(tmp_path), SHA)
+    source = records['api']['image_ref']
+    destination = config(tmp_path)['registry'] + '/api:' + SHA
+    _, expected = release.archive_config(tmp_path/'api.tar', source)
+    actual = {'Os': expected['os'], 'Architecture': expected['architecture'],
+              'RootFS': {'Type': 'layers', 'Layers': expected['rootfs']['diff_ids']},
+              'Config': expected['config']}
+    calls = []
+    def command(args, *a, **kw):
+        calls.append(args)
+        stage = args[1]
+        if stage in ('load', 'tag', 'push') and failure == stage:
+            raise RuntimeError('original ' + stage + ' failure')
+        if args[:3] == ['docker', 'image', 'inspect']:
+            if args[-1] == source:
+                return json.dumps([{**actual, 'Os': 'windows'} if failure == 'content' else actual])
+            return json.dumps([{'RepoDigests': [] if failure == 'digest' else [
+                config(tmp_path)['registry']+'/api@sha256:'+'b'*64]}])
+        return ''
+    monkeypatch.setattr(release, 'run', command)
+    deploy = release.Deployer(config(tmp_path))
+    if failure:
+        with pytest.raises((RuntimeError, ValueError)):
+            deploy.publish(tmp_path, {'api': records['api']}, SHA)
+    else:
+        assert deploy.publish(tmp_path, {'api': records['api']}, SHA)['api'].endswith('@sha256:'+'b'*64)
+    removed = [args[-1] for args in calls if args[:3] == ['docker', 'image', 'rm']]
+    assert removed == ([source] if failure in ('load', 'content') else [destination, source])
+    assert not any('prune' in args or '--force' in args for args in calls)
+    if failure is None:
+        assert calls.index(['docker', 'image', 'inspect', destination]) < calls.index(['docker', 'image', 'rm', destination])
+
+
+@pytest.mark.parametrize('publish_fails', [True, False])
+def test_cleanup_attempts_both_tags_and_preserves_original_error(tmp_path, monkeypatch, capsys, publish_fails):
+    import subprocess
+    records = release.validate_bundle(bundle(tmp_path), SHA)
+    source = records['api']['image_ref']
+    destination = config(tmp_path)['registry'] + '/api:' + SHA
+    _, expected = release.archive_config(tmp_path/'api.tar', source)
+    removed = []
+    def command(args, *a, **kw):
+        if args[:3] == ['docker', 'image', 'rm']:
+            removed.append(args[-1])
+            if args[-1] == destination:
+                raise subprocess.CalledProcessError(1, args)
+        if args[:2] == ['docker', 'push'] and publish_fails:
+            raise ValueError('original push error')
+        if args[:3] == ['docker', 'image', 'inspect']:
+            if args[-1] == source:
+                return json.dumps([{'Os': 'linux', 'Architecture': 'amd64', 'Config': expected['config'],
+                    'RootFS': {'Type': 'layers', 'Layers': expected['rootfs']['diff_ids']}}])
+            return json.dumps([{'RepoDigests': [config(tmp_path)['registry']+'/api@sha256:'+'b'*64]}])
+        return ''
+    monkeypatch.setattr(release, 'run', command)
+    with pytest.raises(ValueError if publish_fails else RuntimeError,
+                       match='original push error' if publish_fails else 'cleanup incomplete'):
+        release.Deployer(config(tmp_path)).publish(tmp_path, {'api': records['api']}, SHA)
+    assert removed == [destination, source]
+    assert 'cleanup failed' in capsys.readouterr().err

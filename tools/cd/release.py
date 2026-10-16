@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 import tarfile
 import urllib.request
@@ -169,19 +170,38 @@ class Deployer:
     def publish(self, root, records, sha):
         images = {}
         for target, record in records.items():
-            run(['docker', 'load', '-i', str(root / record['archive'])], 600)
-            info = json.loads(run(['docker', 'image', 'inspect', record['image_ref']]))[0]
-            _, expected = archive_config(root / record['archive'], record['image_ref'])
-            verify_loaded_content(info, expected, sha)
-            repo = self.config['registry'].rstrip('/') + '/' + target
-            tag = repo + ':' + sha
-            run(['docker', 'tag', record['image_ref'], tag])
-            run(['docker', 'push', tag], 600)
-            info = json.loads(run(['docker', 'image', 'inspect', tag]))[0]
-            digests = [d for d in info.get('RepoDigests', []) if re.fullmatch(re.escape(repo) + '@sha256:[a-f0-9]{64}', d)]
-            if len(digests) != 1:
-                raise ValueError('Ambiguous registry image identity')
-            images[target] = digests[0]
+            # Register each tag before the command: a failed command may have
+            # completed its side effect before losing the daemon connection.
+            local_tags = [record['image_ref']]
+            published = False
+            try:
+                run(['docker', 'load', '-i', str(root / record['archive'])], 600)
+                info = json.loads(run(['docker', 'image', 'inspect', record['image_ref']]))[0]
+                _, expected = archive_config(root / record['archive'], record['image_ref'])
+                verify_loaded_content(info, expected, sha)
+                repo = self.config['registry'].rstrip('/') + '/' + target
+                tag = repo + ':' + sha
+                local_tags.append(tag)
+                run(['docker', 'tag', record['image_ref'], tag])
+                run(['docker', 'push', tag], 600)
+                info = json.loads(run(['docker', 'image', 'inspect', tag]))[0]
+                digests = [d for d in info.get('RepoDigests', []) if re.fullmatch(re.escape(repo) + '@sha256:[a-f0-9]{64}', d)]
+                if len(digests) != 1:
+                    raise ValueError('Ambiguous registry image identity')
+                images[target] = digests[0]
+                published = True
+            finally:
+                cleanup_failed = False
+                for local_tag in reversed(local_tags):
+                    try:
+                        run(['docker', 'image', 'rm', local_tag])
+                    except (subprocess.SubprocessError, OSError):
+                        cleanup_failed = True
+                        print('Local release image cleanup failed; inspect the deployment runner', file=sys.stderr)
+                # Preserve the original publishing failure, but never report a
+                # successful stage if its local image cleanup failed.
+                if cleanup_failed and published:
+                    raise RuntimeError('Local release image cleanup incomplete')
         return images
 
     def capture(self):

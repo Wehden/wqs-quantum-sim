@@ -112,6 +112,16 @@ privately. Verify that SkyPilot reports the owned smoke jobs completed; any work
 termination needed for the live lifecycle drill uses SkyPilot and only resources
 created for the drill. Never terminate unrelated or active user jobs.
 
+After each image publication attempt, the deployer removes only that release's
+loaded source tag and any destination tag it attempted to create on the local
+Docker daemon. Cleanup also runs when loading, validation, tagging or pushing
+fails. It never prunes unrelated images, forces removal of images in use, or
+deletes registry images. A cleanup error is reported; an original publication
+error remains the primary failure. A successful publication with failed cleanup
+stops before admission is held so the operator can investigate disk retention.
+Process termination or an unavailable Docker daemon can still require manual
+cleanup using the recorded release SHA and scoped tags.
+
 ## Admission and rollout sequence
 
 The local CLI stores a durable hold in the same SQLite transaction domain as job
@@ -141,7 +151,7 @@ saturated cluster can prevent a drain indefinitely across operator retries.
 ## Deployment time budget
 
 The CD job allows 240 minutes. Its configured external-call budgets total about
-179 minutes when every stage approaches its limit:
+179 minutes before cleanup when every stage approaches its limit:
 
 | Stage | Budget |
 | --- | --- |
@@ -152,7 +162,10 @@ The CD job allows 240 minutes. Its configured external-call budgets total about
 | Admission control and deployment inventory calls | 16 minutes |
 | Three GitHub eligibility/current-main reads | 1.5 minutes |
 
-The remaining roughly 61 minutes covers checkout, artifact transfer, archive
+Scoped local image cleanup adds up to 12 minutes (two 120-second removals per
+image), bringing the configured call budget to about 191 minutes.
+
+The remaining roughly 49 minutes covers checkout, artifact transfer, archive
 verification, local state writes and receipt upload. This is an allocation, not a
 guarantee against stalled storage or runner failure. Per-stage deadlines remain
 unchanged; simulations still have no execution deadline. Interrupted rollouts
