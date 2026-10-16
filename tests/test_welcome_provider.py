@@ -29,7 +29,7 @@ def test_capabilities_and_subject_contract(rig):
     assert len(rig.calls) == 4
 
 
-@pytest.mark.parametrize('headers', [{}, {'Authorization': 'Bearer wrong'}, {'Cookie': 'qsim_admin=fake', 'Host': 'polecat'}])
+@pytest.mark.parametrize('headers', [{}, {'Authorization': 'Bearer wrong'}, {'Cookie': 'qsim_admin=fake', 'Host': 'admin.example.invalid'}])
 def test_no_browser_auth_or_invalid_bearer(rig, headers):
     assert client(rig).get(PREFIX + '/contacts', headers=headers).status_code == 401
     assert rig.calls == []
