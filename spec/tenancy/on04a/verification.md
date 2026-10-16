@@ -53,3 +53,9 @@ Not verified or authorized: real mapping/credential installation, cluster RBAC,
 TLS trust deployment, read-only PVC/WAL behavior, central outbox implementation,
 live welcome eligibility, mail delivery or multi-org enforcement. V8's central
 outbox behavior and R1/R2 require their respective owners' later gates.
+
+Automatic review round 1 identified applicant mapping parsing before bearer
+validation. Authentication now checks the verifier and immutable startup audience
+and org before reading mapping records. A regression test asserts that invalid
+bearers and missing read scope cannot trigger the mapping reader. A separate
+configuration-race test verifies sanitized failure without leaking exception data.

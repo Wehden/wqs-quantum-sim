@@ -49,7 +49,7 @@ def create_app(config: ProviderConfig, evidence: EvidenceReader | None = None):
         if not authorization.startswith('Bearer ') or not 1 <= len(authorization[7:]) <= 4096:
             raise HTTPException(401, 'Service authentication required')
         hashed = hashlib.sha256(authorization[7:].encode()).hexdigest()
-        binding = evidence.binding()
+        binding = evidence.binding_identity
         grant = next((g for g in config.grants() if g.active and hmac.compare_digest(g.sha256, hashed)), None)
         if not grant or grant.audience != 'wqs-welcome:' + binding.app_instance_id or grant.org_id != binding.org_id:
             raise HTTPException(401, 'Service authentication required')
@@ -62,7 +62,7 @@ def create_app(config: ProviderConfig, evidence: EvidenceReader | None = None):
         binding = authenticate(request, 'welcome:read')
         if (app_instance_id, org_id) != (binding.app_instance_id, binding.org_id):
             raise HTTPException(404, 'Scope not found')
-        return binding
+        return evidence.binding()
 
     @app.get('/provider/v1/capabilities')
     def capabilities(request: Request):

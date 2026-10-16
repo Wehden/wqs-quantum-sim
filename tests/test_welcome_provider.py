@@ -180,3 +180,29 @@ def test_service_revocation_reloaded(rig):
     rig.grant['active'] = False
     rig.config.auth_file.write_text(json.dumps([rig.grant]))
     assert c.get(PREFIX+'/contacts',headers=HEADERS).status_code == 401
+
+
+def test_config_race_never_leaks_exception(rig, monkeypatch, caplog):
+    from qsim.welcome_evidence import ProviderConfig
+    original = ProviderConfig.grants
+    calls = []
+    def racing(self):
+        calls.append(1)
+        if len(calls) == 2: raise ValueError('PRIVATE_CONFIGURATION_VALUE')
+        return original(self)
+    monkeypatch.setattr(ProviderConfig, 'grants', racing)
+    response = client(rig).get('/provider/v1/capabilities', headers=HEADERS)
+    assert response.status_code == 503
+    assert 'PRIVATE_CONFIGURATION_VALUE' not in response.text + caplog.text
+
+
+def test_invalid_bearer_does_not_read_mapping(rig, monkeypatch):
+    c = client(rig)
+    def forbidden_read(): raise AssertionError('Applicant mapping must not be read')
+    monkeypatch.setattr(rig.reader, 'binding', forbidden_read)
+    response = c.get(PREFIX+'/contacts',headers={'Authorization':'Bearer incorrect-key'})
+    assert response.status_code == 401
+    rig.grant['scopes'] = ['welcome:capabilities']
+    rig.config.auth_file.write_text(json.dumps([rig.grant]))
+    assert c.get(PREFIX+'/contacts',headers=HEADERS).status_code == 403
+    assert not rig.calls
