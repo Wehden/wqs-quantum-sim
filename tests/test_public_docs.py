@@ -34,3 +34,15 @@ def test_unsafe_configuration_rejected(monkeypatch, value):
 def test_default_remains_generic(monkeypatch):
     monkeypatch.delenv('QSIM_PUBLIC_URL', raising=False)
     assert public_docs.public_url() == public_docs.PLACEHOLDER
+
+
+@pytest.mark.parametrize('path', ['/static/index.html', '/static/agents.md'])
+def test_static_head_retains_get_metadata(monkeypatch, path):
+    monkeypatch.setenv('QSIM_PUBLIC_URL', 'https://quantum.example.test')
+    client = TestClient(app)
+    get = client.get(path)
+    head = client.head(path)
+    assert head.status_code == 200
+    assert head.content == b''
+    for header in ('content-type', 'content-length', 'content-disposition'):
+        assert head.headers.get(header) == get.headers.get(header)

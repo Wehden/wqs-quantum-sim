@@ -53,9 +53,8 @@ Configure `QSIM_REVIEW_EMAIL`, `QSIM_SMTP_SENDER`, `QSIM_SMTP_HOST`,
 `QSIM_SMTP_PORT` (default 587), `QSIM_SMTP_USERNAME`, and
 `QSIM_SMTP_PASSWORD_FILE`. Delivery uses STARTTLS. `QSIM_PUBLIC_URL`,
 `QSIM_CONSOLE_URL`, and `QSIM_MAIL_DOMAIN` set email links and message identity.
-The static developer and agent guides contain reserved example base URLs;
-replace them in your private deployment build. No operator credentials belong
-in frontend assets.
+The developer and agent guides also use `QSIM_PUBLIC_URL` at runtime. Promote the
+tested images unchanged. No operator credentials belong in frontend assets.
 
 ## Backups and upgrades
 

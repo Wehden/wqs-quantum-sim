@@ -330,14 +330,14 @@ def complete(job_id: str, body: Completion, authorization: str = Header(default=
 
 
 @app.get('/agents.md',include_in_schema=False)
-@app.get('/static/agents.md',include_in_schema=False)
+@app.api_route('/static/agents.md', methods=['GET', 'HEAD'], include_in_schema=False)
 def agent_guide():
     return Response(public_docs.render('agents.md'), media_type='text/markdown',
                     headers={'Content-Disposition': 'attachment; filename="qsim-agent-guide.md"'})
 
 
 @app.get("/")
-@app.get('/static/index.html',include_in_schema=False)
+@app.api_route('/static/index.html', methods=['GET', 'HEAD'], include_in_schema=False)
 def index():
     return HTMLResponse(public_docs.render('index.html'))
 
