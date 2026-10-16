@@ -146,6 +146,10 @@ def enqueue(body,user,idempotency_key):
                     raise HTTPException(410,"The idempotent job was deleted or expired; use a new key for new work")
                 return JSONResponse(store.public(existing),status_code=202,headers={'Location':'/api/jobs/'+existing['id'],'Idempotency-Replayed':'true'})
 
+        release = db.execute('SELECT release,smoke_owner FROM release_control WHERE singleton=1').fetchone()
+        if release['release'] and (not release['smoke_owner'] or user != release['smoke_owner']):
+            raise HTTPException(503, 'Release maintenance: retry new submissions later', headers={'Retry-After': '60'})
+
         directory = settings.DATA / job_id
         directory.mkdir(mode=0o700)
         # Only the controller reads this file; user tokens are never sent to compute pods.

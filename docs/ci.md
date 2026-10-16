@@ -40,14 +40,22 @@ An offline runner may leave its job queued; execution timeouts do not start whil
 queued. This failure-based fallback does not detect offline queues immediately.
 An operator can disable local CI and start a fresh run in that situation.
 
-## Packaged worker check
+## Packaged release checks
 
-A separate required GitHub-hosted job runs `bash tools/ci/check-worker.sh` to build
-the worker target and verify package isolation, all three engines and the supported
-QASM modes. This job needs Docker; the Standpunkt runner deliberately has no host
-Docker socket. Test-suite routing remains Standpunkt-first. The final result
-reports the image-job outcome and fails if it fails, even when the tests pass.
-No image is published; the per-run image tag is removed on exit.
+A separate required GitHub-hosted job runs `bash tools/ci/check-release.sh`.
+It builds the API, controller and worker targets, verifies non-root service imports,
+database initialization and installed SkyPilot configuration, then runs the isolated
+three-engine worker checks. Tests also validate actual SkyPilot SDK signatures;
+remote dispatch and failure recovery remain mocked in ordinary CI.
+
+Docker stays on the hosted runner. The final result fails if any image check fails.
+Successful main push runs retain the exact tested archives and checksum manifests
+for 14 days. Images are published only by the separately gated CD workflow; see
+[Releases and CD](releases.md). PR runs do not upload release bundles.
+
+For workflow dependency updates, dispatch CI with `hosted_tests: true` to exercise
+hosted Node/Python setup, the full suite and artifact upload. This explicit path
+skips Standpunkt; the default remains unchanged and manual runs cannot deploy.
 
 ## Main-branch integration gate
 
