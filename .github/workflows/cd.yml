@@ -30,7 +30,9 @@ jobs:
     if: needs.gate.outputs.sha != ''
     runs-on: [self-hosted, Linux, X64, wqs-deploy]
     environment: production
-    timeout-minutes: 60
+    # About 179 minutes of bounded deployment calls, plus artifact/runner overhead.
+    # Keep this above the stage budget documented in docs/releases.md.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

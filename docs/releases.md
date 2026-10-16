@@ -138,6 +138,26 @@ Read/result/callback routes remain logically enabled during a hold; API replacem
 can briefly interrupt connections after the drain. A permanently stuck job or
 saturated cluster can prevent a drain indefinitely across operator retries.
 
+## Deployment time budget
+
+The CD job allows 240 minutes. Its configured external-call budgets total about
+179 minutes when every stage approaches its limit:
+
+| Stage | Budget |
+| --- | --- |
+| Three image loads/pushes, including inspect/tag calls | 78 minutes |
+| Two drain waits, including the final status call and polling delay | About 34.2 minutes |
+| Backup and live acceptance hooks | 20 minutes |
+| Four deployment patches and rollout waits | About 29.3 minutes |
+| Admission control and deployment inventory calls | 16 minutes |
+| Three GitHub eligibility/current-main reads | 1.5 minutes |
+
+The remaining roughly 61 minutes covers checkout, artifact transfer, archive
+verification, local state writes and receipt upload. This is an allocation, not a
+guarantee against stalled storage or runner failure. Per-stage deadlines remain
+unchanged; simulations still have no execution deadline. Interrupted rollouts
+retain the recovery behavior below.
+
 ## Failure and operator recovery
 
 The private state directory stores `deployment.json`, prior images, stage, CI run,
