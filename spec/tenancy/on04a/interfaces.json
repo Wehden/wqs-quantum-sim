@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0",
+  "modules": {
+    "qsim/welcome_provider.py": {
+      "description": "Standalone read-only provider process",
+      "public_exports": [
+        {
+          "name": "create_app",
+          "kind": "function",
+          "signature": "create_app(config: ProviderConfig, evidence: EvidenceReader | None = None) -> FastAPI"
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "signature": "main() -> None"
+        }
+      ],
+      "internal_only": [
+        "authenticate_service",
+        "validate_scope"
+      ]
+    },
+    "qsim/welcome_evidence.py": {
+      "description": "Read-only authority observations and signed revisions",
+      "public_exports": [
+        {
+          "name": "EvidenceReader",
+          "kind": "class",
+          "signature": "EvidenceReader(config: ProviderConfig)"
+        },
+        {
+          "name": "ProviderConfig",
+          "kind": "type",
+          "signature": "Validated private provider configuration"
+        }
+      ],
+      "internal_only": [
+        "read_registry",
+        "read_requests",
+        "sign_revision",
+        "decode_cursor"
+      ]
+    }
+  }
+}
