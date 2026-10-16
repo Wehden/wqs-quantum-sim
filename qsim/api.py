@@ -13,9 +13,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from . import settings, store
+from . import public_docs
 from .streams import router as stream_router
 from .http_boundary import HttpBoundary
 from .qasm_adapter import SUPPORTED_COMBINATIONS
@@ -25,6 +26,7 @@ from .models import Submission, StimSubmission, QasmSubmission, Qasm3Submission,
 
 @asynccontextmanager
 async def lifespan(app):
+    public_docs.public_url()
     store.init()
     yield
 
@@ -328,14 +330,16 @@ def complete(job_id: str, body: Completion, authorization: str = Header(default=
 
 
 @app.get('/agents.md',include_in_schema=False)
+@app.get('/static/agents.md',include_in_schema=False)
 def agent_guide():
-    return FileResponse(Path(__file__).parent/'static'/'agents.md',
-                        media_type='text/markdown',filename='qsim-agent-guide.md')
+    return Response(public_docs.render('agents.md'), media_type='text/markdown',
+                    headers={'Content-Disposition': 'attachment; filename="qsim-agent-guide.md"'})
 
 
 @app.get("/")
+@app.get('/static/index.html',include_in_schema=False)
 def index():
-    return FileResponse(Path(__file__).parent / "static" / "index.html")
+    return HTMLResponse(public_docs.render('index.html'))
 
 
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")

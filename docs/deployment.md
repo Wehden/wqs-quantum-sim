@@ -20,6 +20,13 @@ The API serves port 8080. The controller runs `python -m qsim.controller`.
 | `QSIM_SKY_INFRA` | SkyPilot infrastructure selection, default `k8s`; supply your context |
 | `SKYPILOT_CONFIG` | Path to your private SkyPilot configuration |
 | `QSIM_TRUSTED_PROXY_CIDRS` | Explicit trusted proxy ranges, when using forwarded client addresses |
+| `QSIM_PUBLIC_URL` | Canonical HTTP(S) origin for developer/agent examples and approval mail; no credentials, path, query or fragment |
+
+Set `QSIM_PUBLIC_URL` on both API and admin deployments. The API validates it at
+startup and renders the public guides from the configured value. Without it,
+examples retain the reserved `simulation.example.invalid` placeholder. Host and
+forwarded-host headers never override this setting. Guide files in the image stay
+unchanged, so the same tested image can serve different environments.
 
 Copy `deploy/sky-config.yaml` into ignored `local/`, then configure your SkyPilot
 API server, Kubernetes context, and workload namespace there. Set `SKYPILOT_CONFIG`

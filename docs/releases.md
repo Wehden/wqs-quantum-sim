@@ -18,9 +18,12 @@ this PR is merged. First:
    This is separate from the isolated `wqs-local` CI runner. No cluster credentials
    are placed in hosted jobs or public configuration.
 2. Inventory the private deployment patch. Move required behavior into reviewed
-   generic code or runtime configuration before retiring it. Static guide URLs
-   still need a runtime/configuration solution: do not rebuild CI images privately
-   and claim they are the tested artifacts. Record parity evidence locally.
+   generic code or runtime configuration before retiring it. Set `QSIM_PUBLIC_URL`
+   to the service's canonical HTTP(S) origin. Both public guides, including their
+   `/static/` aliases, render that origin at runtime without modifying the image.
+   Credentials, paths, queries and fragments are rejected; request Host headers
+   never select the documented endpoint. Do not rebuild CI images privately and
+   claim they are the tested artifacts. Record parity evidence locally.
 3. Bootstrap the admission protocol in a separately controlled rollout. Existing
    versions lack `qsim.release_control` and fail CD preflight without changing
    admission or images. Keep the autonomous workflow disabled until the existing
