@@ -73,8 +73,26 @@ Required fields:
 | `state_dir` | Persistent private absolute directory, shared by all invocations |
 | `smoke_owner` | Dedicated API identity used only for release verification |
 | `roles` | Exactly `api`, `admin`, `controller`, `observer`, each with distinct `deployment` and named `container` |
+| `required_secrets` | Required nonempty list of 1–16 unique `{ "name": "example-credentials", "keys": ["token"] }` references in `namespace`; 1–64 unique keys per reference |
 | `backup_command` | Nonempty argv array for the installed private backup hook |
 | `verify_command` | Nonempty argv array for the installed private acceptance hook |
+
+Existing private configs must add `required_secrets` before adopting this release.
+There is no empty-list bypass. Inventory every runtime credential needed for
+release acceptance, including dependencies outside the four image-managed roles.
+Only named Secret GETs are used; grant `get` with the corresponding
+`resourceNames`, without Secret list/watch or mutation access. The preflight
+prints no values, encoded data or raw kubectl diagnostics. It checks key presence
+and nonempty stored data, not credential validity, expiry or rotation readiness.
+
+Each pass takes at most two attempts per reference, with a ten-second process
+timeout (eight-second Kubernetes request timeout) and a one-second retry delay.
+Read failures, including denied access, get at most one retry. Before publication,
+failure leaves admission and images untouched. A failure after backup retains
+the admission hold and records a failed deployment for operator recovery.
+A successful check is a point-in-time check; it cannot lock out concurrent
+credential changes. Operators must coordinate rotations with deployment.
+See [Secret management](secrets.md) for inventory and recovery requirements.
 
 Hooks are trusted local programs executed as argv, never interpolated shell text.
 They receive `WQS_RELEASE_SHA`. Credentials remain in private files/environment.
@@ -130,12 +148,12 @@ An existing idempotent request still returns its original job; reads, callbacks,
 results and cancellation remain available. The controller continues dispatching
 already-accepted queued jobs. There is no new job concurrency cap or job deadline.
 
-1. Validate CI, all artifacts, configuration and the existing admission protocol.
+1. Validate CI, all artifacts, configuration, required Secret keys and the existing admission protocol.
 2. Capture prior role images and worker image, publish new images, record the hold.
 3. Wait for all accepted jobs to finish and dispatcher cleanup to complete. After
    15 minutes without a drain, stop deployment and leave the hold for the operator.
    Do not cancel jobs to make progress.
-4. Take the verified backup. Recheck the pinned release is still current main.
+4. Take the verified backup. Recheck the pinned release is still current main and all required Secret keys remain available.
 5. Update controller (including its new worker digest), observer, admin, then API.
    Wait for each rollout. Old idle workers are never selected for new-image work;
    their normal SkyPilot idle lifecycle remains unchanged.
@@ -163,9 +181,9 @@ The CD job allows 240 minutes. Its configured external-call budgets total about
 | Three GitHub eligibility/current-main reads | 1.5 minutes |
 
 Scoped local image cleanup adds up to 12 minutes (two 120-second removals per
-image), bringing the configured call budget to about 191 minutes.
+image), bringing that configured call budget to about 191 minutes. The two Secret preflights add at most 672 seconds (16 references × two 10-second attempts plus one second between attempts × two passes), bringing the total to about 202.2 minutes.
 
-The remaining roughly 49 minutes covers checkout, artifact transfer, archive
+The remaining roughly 37.8 minutes covers checkout, artifact transfer, archive
 verification, local state writes and receipt upload. This is an allocation, not a
 guarantee against stalled storage or runner failure. Per-stage deadlines remain
 unchanged; simulations still have no execution deadline. Interrupted rollouts
