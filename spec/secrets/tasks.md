@@ -55,13 +55,22 @@ TASK-001 discovery precedes TASK-002 preflight and TASK-003 operating procedures
 - [x] Private inventory reconciled and gaps recorded.
 - [x] Preflight and failure-path tests pass.
 - [x] Operating procedures and config migration documented.
-- [ ] Exact-head CI and automatic review complete; owner merge pending.
-- [ ] Separately approved live projection/revocation and encrypted restore drills complete before claiming operational completion.
+- [x] Exact-head CI and clean automatic review complete; owner merged PR #22 as `1375c078dee7b658d42f94aa0ce3fd5f2a3c5152` on 2026-10-17. Main CI passed.
+- [x] Live synthetic projection/revocation and named Secret access/denial drill passed (46.65 seconds observed projection delay).
+- [x] Synthetic encrypted recovery and historical archive database-integrity drills passed within their documented scopes.
+- [ ] Installed deployment identity/configuration acceptance: deployment runner and private release config not installed.
+- [ ] Current complete encrypted backup, encryption-at-rest/key-custody evidence and production recovery acceptance remain pending.
+- [ ] Credential rotation explicitly deferred by owner; no rotation performed or required to close the non-rotation checks.
 
 ## Execution Notes (tooling, environment, checkpoints)
 
-Use a clean worktree from origin/main; preserve unrelated spec drafts. Use tools/ci/check.sh for full checks and pytest tests/test_cd_release.py for focused checks. The normal CI route remains Standpunkt-first. No Kubernetes mutations, credential creation, mail or CD activation in this implementation PR. Production encryption and backup verification need operator evidence; do not close these items from unit tests.
+Use a clean worktree from origin/main; preserve unrelated spec drafts. Use tools/ci/check.sh for full checks and pytest tests/test_cd_release.py for focused checks. The normal CI route remains Standpunkt-first. PR #22 made no Kubernetes mutations, credential changes, mail or CD activation. On 2026-10-17 the owner authorized operational acceptance without credential rotation; the follow-up used an isolated namespace and synthetic fixtures only. Production encryption and backup verification need operator evidence; do not close these items from unit tests.
 
 ## Traceability (REQ IDs -> TASK IDs)
 
 S1: 001,003. S2: 002,004. S3: 002,004. S4: 001,003. S5: 003. S6: 001,003 and separately approved live drill. S7: 003,004.
+
+
+## Operational acceptance follow-up (2026-10-17)
+
+Owner authorized reconciliation, operational acceptance and coordination with Laminar on encryption/backups, while excluding credential rotation. See verification.md for evidence and remaining gates. A projection-delay sample is an observation, not a promised revocation SLA. The private required_secrets fragment is prepared but not installed; no production release configuration exists to update. Do not mark bootstrap_verified or enable CD from these checks.
