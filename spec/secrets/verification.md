@@ -1,22 +1,36 @@
 # Secret-management verification
 
-Status: implementation prepared; production acceptance remains pending.
+Status: implementation merged and verified; operational acceptance partially complete.
 
-## Evidence
+## Implementation evidence
 
-- Baseline: origin/main 21a6473594d0a2b63a92eb3d4b569ed0952dbdb2, isolated implementation branch.
-- Read-only metadata inventory confirmed existing Secret-volume consumers and the invitation updater's named get/update permission. No subPath mounts were observed in the inspected application deployments. Private evidence is outside this repository.
-- Consumer source reads credentials from files; registry replacement preserves resourceVersion and rejects conflicting updates.
-- Full local CI: `bash tools/ci/check.sh` passed, 364 Python tests and 3 console tests; dependency consistency passed.
-- Focused tests: 49 passed in tests/test_cd_release.py.
-- Actual kubectl Go-template formatting verified with a synthetic client-side dry-run Secret. Nonempty key detection succeeded without emitting values or creating a Kubernetes object.
+- PR #22 head `83461cf19be17ba70010bf091f203704bf1ad7ce` passed CI: Standpunkt tests, GitHub-hosted image checks, hosted test fallback skipped. Automatic code review completed with no findings.
+- Owner merged PR #22 as `1375c078dee7b658d42f94aa0ce3fd5f2a3c5152` on 2026-10-17. Post-merge main CI passed; CD was skipped.
+- Full local CI passed: 364 Python tests, 3 console tests and dependency consistency. Focused CD tests: 49 passed.
 - No runtime dependencies, public APIs, Secret names or application authentication behavior changed.
 
-## Pending evidence
+## Authorized operational checks (2026-10-17)
 
-- Exact-head hosted/Standpunkt CI results and automatic review.
-- Control-plane encryption status could not be confirmed because privileged read access was unavailable. No permission change attempted.
-- Current backup encryption, key custody, application data coverage and isolated restoration remain unverified. Compression is not encryption evidence.
-- Real deployment-identity denied-access drill, projected-volume revocation timing, any credential rotation and production acceptance require separately approved execution.
+The owner authorized operational acceptance and Laminar coordination, explicitly excluding credential rotation. Private evidence remains outside this repository; the table contains no production credentials or topology.
 
-The implementation PR does not enable CD, change credentials or deploy application images.
+| Check | Result and limit |
+| --- | --- |
+| Required Secret preflight | Merged implementation passed against the existing production references using the operator kubeconfig. This is not proof for a deployment-runner identity. |
+| Private release configuration | Required-secret inventory fragment prepared. Repository runner inventory has only the ordinary test runner; no deployment runner or configured release-config path. The fragment has not been installed as a functioning CD configuration. |
+| Existing workload permissions | Operator authorization checks confirm API/default and observer identities cannot directly read the invitation registry; the invitation updater can get/update its named registry but cannot list Secrets or get the mail Secret. |
+| Isolated in-cluster permissions | Synthetic probe with a mounted service-account credential received 200 for its allowed Secret and 403 for another. Merged preflight also accepted the allowed reference and failed closed on the denied reference under reader impersonation. |
+| Projected registry update | Synthetic identity changed from active to inactive without changing its key. Mounted-file observation followed 46.65 seconds after the update request started. One sample confirms eventual propagation, not a maximum or instantaneous-revocation guarantee. |
+| Synthetic encrypted restore | Online SQLite snapshot, encrypted archive round trip, matching-key pending delivery recovery and artifact preservation passed. Actual auth code accepted the restored active identity and denied it after synthetic revocation. Wrong encryption key and tampered archive were rejected. No mail sent. |
+| Historical application backup | Existing older archive's isolated SQLite integrity check passed. It has no approval table or registry/encryption-key files and no archive-level encryption. Underlying filesystem encryption remains unverified. It is not a complete current recovery set. |
+
+The synthetic restore used temporary local fixtures, removed after verification. The cluster drill used a dedicated owned namespace with no production volumes, non-root execution and API-only network egress. Deletion of the owned namespace was verified and recorded in the private receipt. Production keys, deployments and job data were untouched.
+
+## Remaining acceptance gates
+
+- Obtain Laminar's current evidence for control-plane encryption, key custody, encrypted backup copies, current application-data coverage and tested recovery. Request sent; evidence pending at this checkpoint. Earlier privileged encryption-status check was denied; no permission escalation or encryption changes attempted.
+- Install the separately approved trusted deployment runner and private release configuration before testing the real deployment identity. A prepared reference fragment does not satisfy this gate.
+- Demonstrate restoration of a current complete encrypted recovery set, including application data, registry and matching delivery-encryption material. Synthetic and historical drills do not substitute for that evidence.
+- Agree an operational revocation target and verify it against the actual consumer path if a bounded guarantee is required. The measured projection delay is not an SLA.
+- Credential rotation remains deferred by owner. No credential is rotated as part of acceptance.
+
+Do not enable CD, claim production deployment, or mark secret-management acceptance complete from the merged PR or these partial results.
