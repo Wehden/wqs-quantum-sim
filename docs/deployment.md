@@ -87,3 +87,9 @@ Active simulations have no pod lifetime, controller dispatch deadline, simulator
 Roll out the worker image, controller, and SkyPilot pod configuration together when removing the old deadlines. Existing pods and old worker images retain their original limits; drain idle old workers through SkyPilot before accepting new work with the updated image. Do not restart active simulations to apply this change.
 
 Memory (3 GiB per simulation process), output-size and circuit limits remain. Infrastructure failures, OOM kills, and explicit cancellation can still stop a job. Callback HTTP requests retain a 20-second per-attempt timeout with five attempts; delivery failure can prevent recording a result after simulation finishes. SSE connections still rotate after five minutes without cancelling the simulation.
+
+## Secret management
+
+Use the existing Kubernetes Secret references and keep provisioning separate from
+application CD. See [Secret management](secrets.md) for inventory, rotation,
+backup and release-preflight requirements.

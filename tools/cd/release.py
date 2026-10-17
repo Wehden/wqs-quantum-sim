@@ -118,6 +118,23 @@ def validate_config(config):
     for field in ('namespace', 'registry', 'state_dir', 'smoke_owner'):
         if not isinstance(config.get(field), str) or not config[field]:
             raise ValueError('Missing private configuration')
+    references = config.get('required_secrets')
+    if not isinstance(references, list) or not 1 <= len(references) <= 16:
+        raise ValueError('Required secret inventory must contain 1 to 16 references')
+    names = set()
+    for reference in references:
+        if not isinstance(reference, dict) or set(reference) != {'name', 'keys'}:
+            raise ValueError('Invalid secret reference')
+        name, keys = reference['name'], reference['keys']
+        if (not isinstance(name, str) or len(name) > 253
+                or not all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label)
+                           for label in name.split('.')) or name in names):
+            raise ValueError('Invalid or duplicate secret name')
+        names.add(name)
+        if (not isinstance(keys, list) or not 1 <= len(keys) <= 64
+                or any(not isinstance(key, str) or not re.fullmatch(r'[A-Za-z0-9._-]{1,253}', key)
+                       for key in keys) or len(set(keys)) != len(keys)):
+            raise ValueError('Invalid required secret keys')
     if not Path(config['state_dir']).is_absolute():
         raise ValueError('State directory must be absolute')
     if set(config['roles']) != set(ROLES):
@@ -144,6 +161,23 @@ class Deployer:
 
     def kube(self, *args, timeout=120):
         return run(['kubectl', '-n', self.config['namespace'], *args], timeout)
+
+    def preflight_secrets(self):
+        # kubectl retrieves the object internally, but emits only nonempty key
+        # names. Neither encoded values nor raw diagnostics reach release logs.
+        template = '{{range $key, $value := .data}}{{if $value}}{{$key}}{{"\\n"}}{{end}}{{end}}'
+        for reference in self.config['required_secrets']:
+            for attempt in range(2):
+                try:
+                    keys = set(self.kube('get', 'secret', reference['name'],
+                        '--request-timeout=8s', '-o', 'go-template=' + template, timeout=10).splitlines())
+                    break
+                except (subprocess.SubprocessError, OSError):
+                    if attempt == 1:
+                        raise RuntimeError('Required secret unavailable; inspect private inventory') from None
+                    time.sleep(1)
+            if not set(reference['keys']).issubset(keys):
+                raise ValueError('Required secret key missing or empty; inspect private inventory')
 
     def control(self, action, sha):
         role = self.config['roles']['api']
@@ -248,6 +282,7 @@ class Deployer:
                     return previous
             if not current(sha):
                 raise ValueError('Release superseded')
+            self.preflight_secrets()
             # This must fail on old application versions, before publishing or mutation.
             state = self.control('status', sha)
             if state['protocol'] != 1 or state['release']:
@@ -269,6 +304,7 @@ class Deployer:
                 receipt['backup_completed'] = time.time()
                 if not current(sha):
                     raise ValueError('Release superseded before mutation; hold retained for operator')
+                self.preflight_secrets()
                 receipt['status'] = 'deploying'
                 write_record(receipt_path, receipt)
                 for role in ('controller', 'observer', 'admin', 'api'):

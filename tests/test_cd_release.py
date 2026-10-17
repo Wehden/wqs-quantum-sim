@@ -20,7 +20,8 @@ def config(tmp_path):
     return {'bootstrap_verified': True, 'namespace': 'test', 'registry': 'registry.example.invalid/wqs',
             'state_dir': str(tmp_path/'state'), 'smoke_owner': 'verifier',
             'roles': {role: {'deployment': role, 'container': role} for role in release.ROLES},
-            'backup_command': ['backup'], 'verify_command': ['verify']}
+            'backup_command': ['backup'], 'verify_command': ['verify'],
+            'required_secrets': [{'name': 'example-credentials', 'keys': ['token']}]}
 
 
 def evidence():
@@ -84,6 +85,9 @@ class Fake(release.Deployer):
         self.held = False
         self.failure = failure
 
+    def preflight_secrets(self):
+        self.calls.append('secrets')
+
     def control(self, action, sha):
         self.calls.append(action)
         if action == 'hold': self.held = True
@@ -114,7 +118,7 @@ def test_success_order_and_rerun_does_not_redeploy(tmp_path, services):
     deploy = Fake(config(tmp_path))
     record = deploy.deploy(bundle(tmp_path), SHA, '123')
     assert record['status'] == 'verified'
-    assert deploy.calls == ['status', 'publish', 'hold', 'status', 'controller', 'observer', 'admin', 'api', 'smoke', 'status', 'open']
+    assert deploy.calls == ['secrets', 'status', 'publish', 'hold', 'status', 'secrets', 'controller', 'observer', 'admin', 'api', 'smoke', 'status', 'open']
     assert not deploy.held
     count = len(deploy.calls)
     assert deploy.deploy(tmp_path, SHA, '123')['status'] == 'verified'
@@ -308,3 +312,85 @@ def test_cleanup_attempts_both_tags_and_preserves_original_error(tmp_path, monke
         release.Deployer(config(tmp_path)).publish(tmp_path, {'api': records['api']}, SHA)
     assert removed == [destination, source]
     assert 'cleanup failed' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('references', [None, [], [{}], [{'name': '-bad', 'keys': ['token']}],
+    [{'name': 'good', 'keys': []}], [{'name': 'good', 'keys': ['token', 'token']}],
+    [{'name': 'good', 'keys': ['bad/key']}], [{'name': 'good', 'keys': [None]}],
+    [{'name': 'a..b', 'keys': ['token']}], [{'name': 'a'*64, 'keys': ['token']}],
+    [{'name': 'good', 'keys': ['token'], 'namespace': 'other'}],
+    [{'name': 'good', 'keys': ['token']}] * 2,
+    [{'name': f'secret-{i}', 'keys': ['token']} for i in range(17)]])
+def test_secret_inventory_is_required_bounded_and_validated(tmp_path, references):
+    cfg = config(tmp_path); cfg['required_secrets'] = references
+    with pytest.raises(ValueError): release.Deployer(cfg)
+
+
+def test_secret_check_only_gets_named_resource_and_nonempty_key_names(tmp_path, monkeypatch):
+    calls = []
+    def command(args, timeout=120, **kwargs):
+        calls.append((args, timeout))
+        return 'token\nextra-key'
+    monkeypatch.setattr(release, 'run', command)
+    release.Deployer(config(tmp_path)).preflight_secrets()
+    args, timeout = calls[0]
+    assert args[:6] == ['kubectl', '-n', 'test', 'get', 'secret', 'example-credentials']
+    assert '--request-timeout=8s' in args and timeout == 10
+    assert '{{if $value}}{{$key}}' in args[-1] and '{{$value}}' not in args[-1]
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('keys', ['', 'unrelated\n'])
+def test_secret_check_rejects_missing_or_empty_keys(tmp_path, monkeypatch, keys):
+    deploy = release.Deployer(config(tmp_path))
+    monkeypatch.setattr(deploy, 'kube', lambda *a, **kw: keys)
+    with pytest.raises(ValueError, match='missing or empty'): deploy.preflight_secrets()
+
+
+@pytest.mark.parametrize('kind', ['denied', 'timeout', 'missing-binary'])
+def test_secret_read_errors_are_bounded_and_sanitized(tmp_path, monkeypatch, capsys, kind):
+    import subprocess
+    deploy = release.Deployer(config(tmp_path)); calls = []
+    canary = 'synthetic-credential-DO-NOT-LOG'
+    def kube(*args, **kwargs):
+        calls.append(args)
+        if kind == 'denied': raise subprocess.CalledProcessError(1, args, output=canary, stderr=canary)
+        if kind == 'timeout': raise subprocess.TimeoutExpired(args, 10, output=canary, stderr=canary)
+        raise FileNotFoundError(canary)
+    monkeypatch.setattr(deploy, 'kube', kube)
+    monkeypatch.setattr(release.time, 'sleep', lambda _: None)
+    with pytest.raises(RuntimeError) as error: deploy.preflight_secrets()
+    import traceback
+    assert canary not in ''.join(traceback.format_exception(error.type, error.value, error.tb))
+    assert capsys.readouterr() == ('', '')
+    assert len(calls) == 2
+
+
+def test_secret_check_recovers_from_one_transient_failure(tmp_path, monkeypatch):
+    import subprocess
+    deploy = release.Deployer(config(tmp_path)); calls = []
+    def kube(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 1: raise subprocess.TimeoutExpired(args, 10)
+        return 'token'
+    monkeypatch.setattr(deploy, 'kube', kube)
+    monkeypatch.setattr(release.time, 'sleep', lambda _: None)
+    deploy.preflight_secrets()
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize('failure_at', [1, 2])
+def test_missing_secrets_block_before_side_effects_or_rollout(tmp_path, services, monkeypatch, failure_at):
+    deploy = Fake(config(tmp_path)); checks = []
+    def preflight():
+        checks.append(True)
+        if len(checks) == failure_at: raise ValueError('Required secret missing')
+    monkeypatch.setattr(deploy, 'preflight_secrets', preflight)
+    with pytest.raises(ValueError, match='Required secret'): deploy.deploy(bundle(tmp_path), SHA, '123')
+    assert not any(role in deploy.calls for role in release.ROLES)
+    if failure_at == 1:
+        assert deploy.calls == []
+        assert not (tmp_path/'state/deployment.json').exists()
+    else:
+        assert deploy.held and 'open' not in deploy.calls
+        assert json.loads((tmp_path/'state/deployment.json').read_text())['status'] == 'failed'
