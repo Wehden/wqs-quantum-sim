@@ -1,0 +1,8 @@
+{
+  "name": "wqs-production",
+  "visibility": "selected",
+  "selected_repository_ids": [0],
+  "allows_public_repositories": true,
+  "restricted_to_workflows": true,
+  "selected_workflows": ["Wehden/wqs-quantum-sim/.github/workflows/cd.yml@refs/heads/main"]
+}

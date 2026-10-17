@@ -1,0 +1,35 @@
+# Match private release-config deployment and Secret references before applying.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wqs-deployer
+  namespace: wqs
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [wqs-api, wqs-admin, wqs-controller, wqs-observer]
+    verbs: [get, list, watch, patch]
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: ['']
+    resources: [pods/exec]
+    verbs: [create, get]
+  - apiGroups: ['']
+    resources: [secrets]
+    resourceNames: [wqs-users, wqs-admin, wqs-smtp]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wqs-deployer
+  namespace: wqs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wqs-deployer
+subjects:
+  - kind: ServiceAccount
+    name: wqs-deployer
+    namespace: wqs-cd
