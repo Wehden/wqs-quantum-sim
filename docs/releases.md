@@ -15,6 +15,9 @@ this PR is merged. First:
 1. Configure the GitHub `production` environment to permit only main deployments.
    Use a dedicated trusted runner labelled `wqs-deploy`, with Docker, kubectl,
    Python 3.12+, gh, local registry access and namespace-scoped credentials.
+   Select the workflow-restricted `wqs-production` organization runner group.
+   Follow the [deployment runner bootstrap](deployment-runner.md) for access checks,
+   private configuration and namespace-scoped permissions.
    This is separate from the isolated `wqs-local` CI runner. No cluster credentials
    are placed in hosted jobs or public configuration.
 2. Inventory the private deployment patch. Move required behavior into reviewed

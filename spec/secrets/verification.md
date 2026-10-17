@@ -27,10 +27,20 @@ The synthetic restore used temporary local fixtures, removed after verification.
 
 ## Remaining acceptance gates
 
-- Obtain Laminar's current evidence for control-plane encryption, key custody, encrypted backup copies, current application-data coverage and tested recovery. Request sent; evidence pending at this checkpoint. Earlier privileged encryption-status check was denied; no permission escalation or encryption changes attempted.
+- The operator subsequently confirmed control-plane Secret encryption is disabled. LaminarAuth now owns key custody and backup coordination, including encrypted copies and tested recovery. No encryption changes or credential rotation were performed by WQS.
 - Install the separately approved trusted deployment runner and private release configuration before testing the real deployment identity. A prepared reference fragment does not satisfy this gate.
 - Demonstrate restoration of a current complete encrypted recovery set, including application data, registry and matching delivery-encryption material. Synthetic and historical drills do not substitute for that evidence.
 - Agree an operational revocation target and verify it against the actual consumer path if a bounded guarantee is required. The measured projection delay is not an SLA.
 - Credential rotation remains deferred by owner. No credential is rotated as part of acceptance.
 
 Do not enable CD, claim production deployment, or mark secret-management acceptance complete from the merged PR or these partial results.
+
+## Deployment runner preparation
+
+The runner package and private configuration template are now prepared separately
+from activation. See [deployment runner bootstrap](../../docs/deployment-runner.md).
+The public repository requires an organization runner group restricted to the CD
+workflow on main. Current operator access cannot administer that group. The
+template remains at zero replicas; the private release config remains unverified
+and uninstalled. Image/tool tests and configuration tests do not close the real
+deployment-identity or production recovery gates.

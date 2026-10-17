@@ -1,0 +1,20 @@
+{
+  "bootstrap_verified": false,
+  "namespace": "wqs",
+  "registry": "registry.example.invalid/wqs",
+  "state_dir": "/runner/release-state",
+  "smoke_owner": "release-verifier",
+  "roles": {
+    "api": {"deployment": "wqs-api", "container": "api"},
+    "admin": {"deployment": "wqs-admin", "container": "admin"},
+    "controller": {"deployment": "wqs-controller", "container": "controller"},
+    "observer": {"deployment": "wqs-observer", "container": "observer"}
+  },
+  "required_secrets": [
+    {"name": "wqs-users", "keys": ["users.json"]},
+    {"name": "wqs-admin", "keys": ["encryption-key", "session-key"]},
+    {"name": "wqs-smtp", "keys": ["app-password"]}
+  ],
+  "backup_command": ["/private/hooks/backup"],
+  "verify_command": ["/private/hooks/verify"]
+}

@@ -28,7 +28,11 @@ jobs:
   deploy:
     needs: gate
     if: needs.gate.outputs.sha != ''
-    runs-on: [self-hosted, Linux, X64, wqs-deploy]
+    # The organization group restricts access to this workflow on main.
+    # Labels alone do not protect deployment credentials in a public repository.
+    runs-on:
+      group: wqs-production
+      labels: [self-hosted, Linux, X64, wqs-deploy]
     environment: production
     # About 203 minutes of bounded deployment calls (including cleanup and Secret checks), plus artifact/runner overhead.
     # Keep this above the stage budget documented in docs/releases.md.

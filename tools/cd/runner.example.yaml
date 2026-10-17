@@ -1,0 +1,130 @@
+# Render privately. Do not apply placeholders or scale up before access checks.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wqs-cd
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wqs-deployer
+  namespace: wqs-cd
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wqs-deployer
+  namespace: wqs-cd
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wqs-deployer
+  namespace: wqs-cd
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: wqs-deployer
+  template:
+    metadata:
+      labels:
+        app: wqs-deployer
+    spec:
+      serviceAccountName: wqs-deployer
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: runner-node.example.invalid
+        kubernetes.io/arch: amd64
+      securityContext:
+        fsGroup: 1001
+      containers:
+        - name: runner
+          image: registry.example.invalid/wqs-deployer@sha256:REPLACE_WITH_TESTED_DIGEST
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - {name: RUNNER_ORGANIZATION, value: 'https://github.com/Wehden'}
+            - {name: RUNNER_GROUP, value: wqs-production}
+            - {name: DOCKER_HOST, value: 'tcp://localhost:2376'}
+            - {name: DOCKER_TLS_VERIFY, value: '1'}
+            - {name: DOCKER_CERT_PATH, value: /certs/client}
+            - {name: DOCKER_CONFIG, value: /private/registry}
+          resources:
+            requests: {cpu: '1', memory: 1Gi}
+            limits: {cpu: '4', memory: 4Gi}
+          volumeMounts:
+            - {name: state, mountPath: /runner, subPath: runner}
+            - {name: tls, mountPath: /certs/client, subPath: client, readOnly: true}
+            - {name: api-token, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true}
+            - {name: private, mountPath: /private, readOnly: true}
+            - {name: registration, mountPath: /registration, readOnly: true}
+        # Privileged DinD is host-sensitive even without host mounts. Install
+        # only after reviewing the dedicated node and workflow trust boundary.
+        - name: docker
+          image: docker:dind@sha256:3e5756e2b6dad6a5f1f5deacf0a19f9eaa2581b76ae092b2d4a118162e1d4d4e
+          env:
+            - {name: DOCKER_TLS_CERTDIR, value: /certs}
+          securityContext:
+            privileged: true
+          resources:
+            requests: {cpu: '1', memory: 2Gi}
+            limits: {cpu: '4', memory: 8Gi}
+          volumeMounts:
+            - {name: state, mountPath: /var/lib/docker, subPath: docker}
+            - {name: tls, mountPath: /certs}
+      volumes:
+        - name: state
+          persistentVolumeClaim: {claimName: wqs-deployer}
+        - name: tls
+          emptyDir: {}
+        - name: private
+          secret:
+            secretName: wqs-release-private
+            defaultMode: 0440
+            items:
+              - {key: release.json, path: release.json}
+              - {key: registry-config.json, path: registry/config.json}
+              - {key: backup, path: hooks/backup, mode: 0550}
+              - {key: verify, path: hooks/verify, mode: 0550}
+        - name: registration
+          secret:
+            secretName: wqs-runner-registration
+            optional: true
+            defaultMode: 0440
+        - name: api-token
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - {key: ca.crt, path: ca.crt}
+---
+# No inbound Service; runner polls GitHub. TLS is additional daemon protection.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wqs-deployer
+  namespace: wqs-cd
+spec:
+  podSelector:
+    matchLabels: {app: wqs-deployer}
+  policyTypes: [Ingress]
+  ingress: []
