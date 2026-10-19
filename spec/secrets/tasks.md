@@ -58,7 +58,8 @@ TASK-001 discovery precedes TASK-002 preflight and TASK-003 operating procedures
 - [x] Exact-head CI and clean automatic review complete; owner merged PR #22 as `1375c078dee7b658d42f94aa0ce3fd5f2a3c5152` on 2026-10-17. Main CI passed.
 - [x] Live synthetic projection/revocation and named Secret access/denial drill passed (46.65 seconds observed projection delay).
 - [x] Synthetic encrypted recovery and historical archive database-integrity drills passed within their documented scopes.
-- [ ] Installed deployment identity/configuration acceptance: deployment runner and private release config not installed.
+- [x] Restricted deployment runner registered; zero-replica infrastructure and named-resource RBAC checks completed.
+- [ ] Install the private release configuration and hooks, and verify the real runner execution path. Registration alone does not close deployment acceptance.
 - [ ] Current complete encrypted backup, encryption-at-rest/key-custody evidence and production recovery acceptance remain pending.
 - [ ] Credential rotation explicitly deferred by owner; no rotation performed or required to close the non-rotation checks.
 
@@ -74,3 +75,7 @@ S1: 001,003. S2: 002,004. S3: 002,004. S4: 001,003. S5: 003. S6: 001,003 and sep
 ## Operational acceptance follow-up (2026-10-17)
 
 Owner authorized reconciliation, operational acceptance and coordination with Laminar on encryption/backups, while excluding credential rotation. See verification.md for evidence and remaining gates. A projection-delay sample is an observation, not a promised revocation SLA. The private required_secrets fragment is prepared but not installed; no production release configuration exists to update. Do not mark bootstrap_verified or enable CD from these checks.
+
+## Reconciliation, 2026-10-19
+
+PR #24 is merged. The deployment runner is registered but remains stopped. Application acceptance hooks are implemented locally; the full local suite passed 390 Python tests and three console tests, with a separate runner-image smoke check. PR review, merge, installation and live acceptance remain pending. LaminarAuth now publishes the v1 recovery contract and schema; WQS adapter integration is the next implementation task. Custody, encryption and exact-set recovery evidence remain required. CD stays disabled, and credential rotation stays deferred.

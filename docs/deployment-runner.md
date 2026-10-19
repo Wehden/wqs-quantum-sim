@@ -88,6 +88,7 @@ cluster secret-management process. Its keys are:
 | `registry-config.json` | `/private/registry/config.json` | Docker authentication config; `{}` only if the registry needs no authentication |
 | `backup` | `/private/hooks/backup` | Executable backup hook |
 | `verify` | `/private/hooks/verify` | Executable acceptance hook |
+| `smoke-api-key` | `/private/auth/smoke-api-key` | Dedicated identity matching `smoke_owner`; provision separately, never log |
 
 Hooks must have a shebang and use tools available in the image. If additional
 dependencies are required, add and test them before installing the hooks. Backup
@@ -96,6 +97,9 @@ in [the release contract](releases.md#private-configuration-contract). Missing
 hooks keep the runner stopped. Never install success stubs. LaminarAuth owns key
 custody and backup work; WQS owns the release hook integration and application
 acceptance. Existing credentials are not rotated by this bootstrap.
+
+The acceptance implementation and its installation prerequisites are documented
+in [release hooks](release-hooks.md). Source tests do not authorize a live smoke run.
 
 ## Installation and acceptance sequence
 

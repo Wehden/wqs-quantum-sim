@@ -16,5 +16,10 @@
     {"name": "wqs-smtp", "keys": ["app-password"]}
   ],
   "backup_command": ["/private/hooks/backup"],
-  "verify_command": ["/private/hooks/verify"]
+  "verify_command": ["/private/hooks/verify"],
+  "acceptance": {
+    "api_url": "https://api.example.invalid",
+    "admin_health_url": "http://admin.example.invalid/healthz",
+    "token_file": "/private/auth/smoke-api-key"
+  }
 }

@@ -98,6 +98,9 @@ credential changes. Operators must coordinate rotations with deployment.
 See [Secret management](secrets.md) for inventory and recovery requirements.
 
 Hooks are trusted local programs executed as argv, never interpolated shell text.
+See [release hooks](release-hooks.md) for the acceptance implementation and the
+unresolved backup contract dependencies. Neither source availability nor synthetic
+tests close the production acceptance gates.
 They receive `WQS_RELEASE_SHA`. Credentials remain in private files/environment.
 Both have a ten-minute verification deadline. Hook stdout must be JSON; captured
 output is never copied into public CI logs. Backup returns
