@@ -50,11 +50,16 @@ def test_github_uses_paginated_compatible_cli(monkeypatch):
     assert access.github('example', 'repositories') == [{'id': 1}, {'id': 2}]
 
 
-def test_example_configuration_cannot_enable_cd():
+def test_example_configuration_cannot_enable_cd(tmp_path):
     config = json.loads((ROOT / 'tools/cd/release-config.example.json').read_text())
     with pytest.raises(ValueError):
         release.validate_config(config)
     config['bootstrap_verified'] = True
+    with pytest.raises(ValueError):
+        release.validate_config(config)
+    token = tmp_path / 'smoke-token'
+    token.write_text('synthetic-token')
+    config['acceptance']['token_file'] = str(token)
     release.validate_config(config)
 
 

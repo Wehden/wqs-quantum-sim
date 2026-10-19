@@ -8,6 +8,7 @@ docker run --rm --network none --read-only --cap-drop ALL \
   --security-opt no-new-privileges --entrypoint bash "$image" -euc '
     test "$(id -u)" = 1001
     python3 -c "import sys; assert sys.version_info[:2] == (3, 12)"
+    python3 -c "import numpy; assert numpy.__version__ == \"2.5.4\""
     gh --version
     docker --version
     kubectl version --client=true

@@ -17,10 +17,14 @@ def event(**changes):
 
 
 def config(tmp_path):
+    (tmp_path / 'smoke-token').write_text('synthetic-token')
     return {'bootstrap_verified': True, 'namespace': 'test', 'registry': 'registry.example.invalid/wqs',
             'state_dir': str(tmp_path/'state'), 'smoke_owner': 'verifier',
             'roles': {role: {'deployment': role, 'container': role} for role in release.ROLES},
             'backup_command': ['backup'], 'verify_command': ['verify'],
+            'acceptance': {'api_url': 'https://api.example.invalid',
+                           'admin_health_url': 'http://admin.example.invalid/healthz',
+                           'token_file': str(tmp_path / 'smoke-token')},
             'required_secrets': [{'name': 'example-credentials', 'keys': ['token']}]}
 
 
@@ -394,3 +398,26 @@ def test_missing_secrets_block_before_side_effects_or_rollout(tmp_path, services
     else:
         assert deploy.held and 'open' not in deploy.calls
         assert json.loads((tmp_path/'state/deployment.json').read_text())['status'] == 'failed'
+
+
+@pytest.mark.parametrize('case', ['missing', 'url', 'port', 'path', 'unreadable', 'empty', 'newline'])
+def test_acceptance_preflight_before_side_effects(tmp_path, monkeypatch, case):
+    cfg = config(tmp_path)
+    if case == 'missing':
+        del cfg['acceptance']
+    elif case == 'url':
+        cfg['acceptance']['api_url'] = 'file:///tmp/api'
+    elif case == 'port':
+        cfg['acceptance']['admin_health_url'] = 'https://admin.example.invalid:bad'
+    elif case == 'path':
+        cfg['acceptance']['token_file'] = 'relative'
+    elif case == 'unreadable':
+        (tmp_path / 'smoke-token').unlink()
+    else:
+        (tmp_path / 'smoke-token').write_text('' if case == 'empty' else 'one\ntwo')
+    calls = []
+    monkeypatch.setattr(release, 'run', lambda *a, **kw: calls.append(a))
+    with pytest.raises(ValueError):
+        release.Deployer(cfg)
+    assert not calls
+    assert not (tmp_path / 'state').exists()

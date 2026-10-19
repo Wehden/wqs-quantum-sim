@@ -100,6 +100,7 @@ spec:
               - {key: registry-config.json, path: registry/config.json}
               - {key: backup, path: hooks/backup, mode: 0550}
               - {key: verify, path: hooks/verify, mode: 0550}
+              - {key: smoke-api-key, path: auth/smoke-api-key}
         - name: registration
           secret:
             secretName: wqs-runner-registration

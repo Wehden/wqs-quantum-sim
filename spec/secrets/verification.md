@@ -44,3 +44,9 @@ workflow on main. Current operator access cannot administer that group. The
 template remains at zero replicas; the private release config remains unverified
 and uninstalled. Image/tool tests and configuration tests do not close the real
 deployment-identity or production recovery gates.
+
+## Current reconciliation, 2026-10-19
+
+This update supersedes the earlier runner-preparation status above. PR #24 is merged at `fb47a0800f80aa96f4e8287282e65d646fda0edc`. The restricted deployment runner is registered, with infrastructure and named-resource RBAC checks completed. It remains at zero replicas and `WQS_CD_ENABLED=false`. Private configuration and hook installation, actual runner execution, and production recovery acceptance are still pending.
+
+Application acceptance source passed the full local suite (390 Python tests and three console tests) and the runner-image smoke check. These are source checks, not live acceptance. LaminarAuth has published `docs/backup-recovery-contract.md` and its v1 schema; their publication does not establish custody, trust authority or accepted recovery. Credential rotation remains deferred.

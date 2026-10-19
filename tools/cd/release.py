@@ -112,9 +112,36 @@ def validate_bundle(root, sha):
     return result
 
 
+def acceptance_token(config):
+    options = config.get('acceptance')
+    if not isinstance(options, dict) or set(options) != {'api_url', 'admin_health_url', 'token_file'}:
+        raise ValueError('Complete acceptance configuration required')
+    for name in ('api_url', 'admin_health_url'):
+        value = options[name]
+        if not isinstance(value, str) or any(ord(c) <= 32 or ord(c) >= 127 for c in value):
+            raise ValueError('Invalid acceptance URL')
+        url = urllib.parse.urlsplit(value)
+        if (url.scheme not in ('http', 'https') or not url.hostname or url.username or url.password
+                or url.query or url.fragment):
+            raise ValueError('Invalid acceptance URL')
+        _ = url.port
+    value = options['token_file']
+    if not isinstance(value, str) or not Path(value).is_absolute():
+        raise ValueError('Absolute acceptance token path required')
+    try:
+        with Path(value).open() as source:
+            token = source.read(4097).strip()
+    except (OSError, UnicodeError):
+        raise ValueError('Acceptance token unavailable') from None
+    if not token or len(token) > 4096 or any(ord(c) <= 32 or ord(c) >= 127 for c in token):
+        raise ValueError('Invalid acceptance token')
+    return token
+
+
 def validate_config(config):
     if not config.get('bootstrap_verified'):
         raise ValueError('Bootstrap verification required')
+    acceptance_token(config)
     for field in ('namespace', 'registry', 'state_dir', 'smoke_owner'):
         if not isinstance(config.get(field), str) or not config[field]:
             raise ValueError('Missing private configuration')
