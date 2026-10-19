@@ -79,13 +79,7 @@ class Acceptance:
             raise ValueError('Full release SHA required')
         self.config, self.sha = config, sha
         self.options = config['acceptance']
-        for name in ('api_url', 'admin_health_url'):
-            url = urllib.parse.urlsplit(self.options[name])
-            if url.scheme not in ('http', 'https') or not url.hostname or url.username or url.password or url.query or url.fragment:
-                raise ValueError('Invalid private acceptance URL')
-        self.token = Path(self.options['token_file']).read_text().strip()
-        if not self.token or '\n' in self.token or '\r' in self.token:
-            raise ValueError('Smoke identity token unavailable')
+        self.token = release.acceptance_token(config)
         self.deadline = time.monotonic() + 540
         self.http = urllib.request.build_opener(NoRedirect)
         self.jobs = {}
