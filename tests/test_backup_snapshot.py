@@ -182,3 +182,30 @@ def test_mount_verifier_binds_pod_pvc_image_and_revision(monkeypatch):
     pvc['metadata']['uid'] = 'replacement'
     with pytest.raises(ValueError, match='identity mismatch'):
         volume.verify(context, Path('/data'))
+
+
+@pytest.mark.parametrize('change', ['registry', 'key', 'version', 'delivered', 'hold', 'in-flight'])
+def test_post_storage_validation_rejects_live_mutation(source, change):
+    import os
+    snapshot, output = source
+    manifest = snapshot.create(output)
+    if change == 'registry':
+        snapshot.registry.value = b'[]'
+    elif change == 'key':
+        snapshot.delivery_key.value = Fernet.generate_key()
+    elif change == 'version':
+        snapshot.registry.read = lambda: (('synthetic-uid', '2'), snapshot.registry.value)
+    else:
+        with store.connect() as db:
+            if change == 'delivered':
+                db.execute("UPDATE key_requests SET key_cipher=NULL")
+            elif change == 'hold':
+                db.execute("UPDATE release_control SET release=''")
+            else:
+                db.execute("UPDATE key_requests SET delivery_state='SENDING'")
+    fd = os.open(output, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(ValueError):
+            snapshot.validate(fd, manifest)
+    finally:
+        os.close(fd)

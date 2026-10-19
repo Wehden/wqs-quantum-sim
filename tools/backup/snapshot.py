@@ -142,6 +142,8 @@ class Snapshot:
         self.lock_fd, self.max_bytes, self.volume = parent_lock_fd, max_bytes, volume
         self.expected = None
         self.ledger_bytes = None
+        self.source_versions = None
+        self.database_digest = None
 
     def create(self, destination):
         """Parent must keep its lock throughout this call and subsequent capture."""
@@ -241,6 +243,8 @@ class Snapshot:
                 require(self.registry.read() == registry_before and self.delivery_key.read() == key_before, 'secret changed across snapshot')
                 require(read_private(self.state / 'deployment.json') == self.ledger_bytes, 'parent ledger changed')
                 held(db, sha)
+                self.source_versions = (registry_before, key_before)
+                self.database_digest = self.database_fingerprint(db)
                 source_at = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
             finally:
                 db.rollback()
@@ -256,6 +260,26 @@ class Snapshot:
         verify_manifest(manifest)
         self.expected = canonical(manifest)
         return manifest
+
+    def database_fingerprint(self, db):
+        fingerprint = hashlib.sha256()
+        for statement in db.iterdump():
+            self.budget.remaining()
+            fingerprint.update(statement.encode())
+            fingerprint.update(b'\n')
+        return fingerprint.digest()
+
+    def validate_source(self):
+        uri = 'file:' + quote(str(self.data / 'jobs.sqlite3'), safe='/')
+        with closing(sqlite3.connect(uri + '?mode=rw', uri=True, timeout=self.budget.remaining(5))) as db:
+            db.execute('BEGIN IMMEDIATE')
+            try:
+                held(db, self.context['scope']['release_sha'])
+                require(self.database_fingerprint(db) == self.database_digest, 'database changed across capture')
+                require((self.registry.read(), self.delivery_key.read()) == self.source_versions,
+                        'secret changed across capture')
+            finally:
+                db.rollback()
 
     def validate(self, root, manifest):
         require_parent_lock(self.lock_fd, self.state)
@@ -274,5 +298,6 @@ class Snapshot:
                     require(size <= entry['size'], 'staged snapshot grew')
                     hasher.update(block)
                 require({'sha256': hasher.hexdigest(), 'size': size} == {k: entry[k] for k in ('sha256', 'size')}, 'staged snapshot changed')
+        self.validate_source()
         self.budget.remaining()
         return True
