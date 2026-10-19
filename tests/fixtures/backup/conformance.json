@@ -1,0 +1,590 @@
+{
+  "label": "SYNTHETIC CONFORMANCE FIXTURES - NOT OPERATIONAL EVIDENCE",
+  "fixture_format": 1,
+  "opaque_ciphertext_utf8": "SYNTHETIC OPAQUE CIPHERTEXT BYTES - NOT AGE ENCRYPTION",
+  "base": {
+    "graph": {
+      "records": {
+        "manifest": {
+          "schema_id": "backup-recovery-set-v1",
+          "contract_version": 1,
+          "canonical_profile": "backup-json-v1",
+          "record_id": "SYNTHETIC-manifest-1",
+          "evidence_type": "manifest",
+          "context": {
+            "set_id": "SYNTHETIC-set-1",
+            "set_type": "wqs",
+            "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+            "format_version": 1,
+            "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+            "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+            "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+            "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+          },
+          "created_at": "2026-10-17T12:01:00Z",
+          "inventory": [
+            {"path": "database.synthetic", "kind": "regular", "role": "database", "sha256": "8c61b074bd1dc06b0fdd9028f10120ad34b2b5caf0b4bf30b43491a47253bcdb", "size": 19},
+            {"path": "results.synthetic", "kind": "regular", "role": "results", "sha256": "fb6ae6efcc5272cac15dfb070bdf7559e8c174eb2460ab131b8ea8de56ad0f0b", "size": 18},
+            {"path": "invitation_registry.synthetic", "kind": "regular", "role": "invitation_registry", "sha256": "dc81ebdb6b22c96afd4ce9297faa20c7121adced5f0071a7fed94870b37a47bb", "size": 30},
+            {"path": "pending_delivery_key.synthetic", "kind": "regular", "role": "pending_delivery_key", "sha256": "5ec69916e8817c3b1f86238469ef444db11e26278219eac2cd4467f07e1d02d2", "size": 31},
+            {"path": "runner_ledger.synthetic", "kind": "regular", "role": "runner_ledger", "sha256": "a7a1a68b127a46cf4e500b33bff3dbd51864819431c1e22db51d2086e6362b7e", "size": 24},
+            {"path": "release_receipts.synthetic", "kind": "regular", "role": "release_receipts", "sha256": "53c6475a2783a2737d0937bbbdde38ba6ff0d9a07aa53de9c23a70ea25dd924c", "size": 27},
+            {"path": "image_inventory.synthetic", "kind": "regular", "role": "image_inventory", "sha256": "0644f4204764eadab1bc3e5a56c0259ef33ebf7a1e4741a8face44bc3e652158", "size": 26},
+            {"path": "registry_access.synthetic", "kind": "regular", "role": "registry_access", "sha256": "bb733bf9ff7cf95ffe3cf9441a22ad896995048f214a0b0f580fd5fba606aa77", "size": 26}
+          ],
+          "dependencies": {
+            "kind": "wqs",
+            "database": "database.synthetic",
+            "results": ["results.synthetic"],
+            "invitation_registry": "invitation_registry.synthetic",
+            "pending_delivery_key": "pending_delivery_key.synthetic",
+            "runner_ledger": "runner_ledger.synthetic",
+            "release_receipts": ["release_receipts.synthetic"],
+            "image_inventory": "image_inventory.synthetic",
+            "registry_access": "registry_access.synthetic",
+            "pvc_identity": "SYNTHETIC-current-pvc",
+            "parent_coordinated": true,
+            "ledger_state": "holding",
+            "admission_held": true,
+            "cd_enabled": false
+          }
+        },
+        "capture_readback": {
+          "schema_id": "backup-recovery-set-v1",
+          "contract_version": 1,
+          "canonical_profile": "backup-json-v1",
+          "record_id": "SYNTHETIC-capture_readback-1",
+          "evidence_type": "capture_readback",
+          "context": {
+            "set_id": "SYNTHETIC-set-1",
+            "set_type": "wqs",
+            "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+            "format_version": 1,
+            "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+            "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+            "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+            "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+          },
+          "created_at": "2026-10-17T12:02:00Z",
+          "manifest_ref": {"record_id": "SYNTHETIC-manifest-1", "evidence_type": "manifest", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c0ad859b8bf7a3ecf8f7d190201d279821e7463e7a0626ccc92d66e5a0ecae4f", "size": 3185},
+          "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+          "object_ref": "SYNTHETIC-object-1",
+          "outcome": "readback_verified"
+        },
+        "capture_checkpoint": {
+          "schema_id": "backup-recovery-set-v1",
+          "contract_version": 1,
+          "canonical_profile": "backup-json-v1",
+          "record_id": "SYNTHETIC-capture_checkpoint-1",
+          "evidence_type": "capture_checkpoint",
+          "context": {
+            "set_id": "SYNTHETIC-set-1",
+            "set_type": "wqs",
+            "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+            "format_version": 1,
+            "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+            "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+            "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+            "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+          },
+          "created_at": "2026-10-17T12:03:00Z",
+          "capture_ref": {"record_id": "SYNTHETIC-capture_readback-1", "evidence_type": "capture_readback", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "5c648a02e14193972384542e8169f5e809d59957d6994468fd04b40081e0246b", "size": 1752},
+          "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+          "restore_session_id": "SYNTHETIC-session-1",
+          "authority_id": "SYNTHETIC-checkpoint-owner",
+          "expires_at": "2026-10-17T13:00:00Z",
+          "purpose": "isolated_verification"
+        },
+        "full_restore": {
+          "schema_id": "backup-recovery-set-v1",
+          "contract_version": 1,
+          "canonical_profile": "backup-json-v1",
+          "record_id": "SYNTHETIC-full_restore-1",
+          "evidence_type": "full_restore",
+          "context": {
+            "set_id": "SYNTHETIC-set-1",
+            "set_type": "wqs",
+            "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+            "format_version": 1,
+            "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+            "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+            "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+            "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+          },
+          "created_at": "2026-10-17T12:04:00Z",
+          "capture_ref": {"record_id": "SYNTHETIC-capture_readback-1", "evidence_type": "capture_readback", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "5c648a02e14193972384542e8169f5e809d59957d6994468fd04b40081e0246b", "size": 1752},
+          "checkpoint_ref": {"record_id": "SYNTHETIC-capture_checkpoint-1", "evidence_type": "capture_checkpoint", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c62009bd23ea0946f8cdecd3af7286d0fd86cf0bb32a33b1da0b8ebd6bc123a0", "size": 1864},
+          "manifest_ref": {"record_id": "SYNTHETIC-manifest-1", "evidence_type": "manifest", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c0ad859b8bf7a3ecf8f7d190201d279821e7463e7a0626ccc92d66e5a0ecae4f", "size": 3185},
+          "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+          "restore_session_id": "SYNTHETIC-session-1",
+          "custody_ref": "SYNTHETIC-secondary-custody",
+          "bootstrap_ref": "SYNTHETIC-bootstrap",
+          "isolation_ref": "SYNTHETIC-isolation",
+          "checks": {"inventory_verified": true, "dependencies_verified": true, "consistency_verified": true, "owner_checks_passed": true, "independent_bootstrap_verified": true, "effects_blocked": true, "source_reference_matched": true, "admission_held": true, "cd_disabled": true, "independent_route_access_verified": true},
+          "disposition": "passed",
+          "performed_by": "SYNTHETIC-hardware-1",
+          "route_proofs": [
+            {
+              "proof_id": "SYNTHETIC-proof-SYNTHETIC-hardware-1",
+              "member": {"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"},
+              "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+              "restore_session_id": "SYNTHETIC-session-1",
+              "created_at": "2026-10-17T12:03:10Z",
+              "authority_id": "SYNTHETIC-route-owner-SYNTHETIC-hardware-1",
+              "custody_ref": "SYNTHETIC-custody-SYNTHETIC-hardware-1",
+              "bootstrap_ref": "SYNTHETIC-bootstrap-SYNTHETIC-hardware-1",
+              "other_routes_unavailable": true,
+              "independent_access_verified": true,
+              "outcome": "decrypted_and_verified",
+              "set_id": "SYNTHETIC-set-1",
+              "checkpoint_ref": {"record_id": "SYNTHETIC-capture_checkpoint-1", "evidence_type": "capture_checkpoint", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c62009bd23ea0946f8cdecd3af7286d0fd86cf0bb32a33b1da0b8ebd6bc123a0", "size": 1864}
+            },
+            {
+              "proof_id": "SYNTHETIC-proof-SYNTHETIC-native-1",
+              "member": {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"},
+              "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+              "restore_session_id": "SYNTHETIC-session-SYNTHETIC-native-1",
+              "created_at": "2026-10-17T12:03:11Z",
+              "authority_id": "SYNTHETIC-route-owner-SYNTHETIC-native-1",
+              "custody_ref": "SYNTHETIC-custody-SYNTHETIC-native-1",
+              "bootstrap_ref": "SYNTHETIC-bootstrap-SYNTHETIC-native-1",
+              "other_routes_unavailable": true,
+              "independent_access_verified": true,
+              "outcome": "decrypted_and_verified",
+              "set_id": "SYNTHETIC-set-1",
+              "checkpoint_ref": {"record_id": "SYNTHETIC-capture_checkpoint-1", "evidence_type": "capture_checkpoint", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c62009bd23ea0946f8cdecd3af7286d0fd86cf0bb32a33b1da0b8ebd6bc123a0", "size": 1864}
+            }
+          ]
+        },
+        "owner_acceptance": {
+          "schema_id": "backup-recovery-set-v1",
+          "contract_version": 1,
+          "canonical_profile": "backup-json-v1",
+          "record_id": "SYNTHETIC-owner_acceptance-1",
+          "evidence_type": "owner_acceptance",
+          "context": {
+            "set_id": "SYNTHETIC-set-1",
+            "set_type": "wqs",
+            "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+            "format_version": 1,
+            "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+            "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+            "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+            "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+          },
+          "created_at": "2026-10-17T12:05:00Z",
+          "capture_ref": {"record_id": "SYNTHETIC-capture_readback-1", "evidence_type": "capture_readback", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "5c648a02e14193972384542e8169f5e809d59957d6994468fd04b40081e0246b", "size": 1752},
+          "checkpoint_ref": {"record_id": "SYNTHETIC-capture_checkpoint-1", "evidence_type": "capture_checkpoint", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c62009bd23ea0946f8cdecd3af7286d0fd86cf0bb32a33b1da0b8ebd6bc123a0", "size": 1864},
+          "restore_ref": {"record_id": "SYNTHETIC-full_restore-1", "evidence_type": "full_restore", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "ff08925a3209881bc932b52e76ef811b42088f480cf1d02f43051d870c83a2cc", "size": 4744},
+          "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+          "restore_session_id": "SYNTHETIC-session-1",
+          "authority_id": "SYNTHETIC-acceptance-owner",
+          "purpose": "current_promotion",
+          "accepted_at": "2026-10-17T12:05:00Z",
+          "expires_at": "2026-10-17T13:00:00Z",
+          "decision": "accepted"
+        }
+      },
+      "updates": [
+        {
+          "schema_id": "backup-recovery-set-v1",
+          "contract_version": 1,
+          "canonical_profile": "backup-json-v1",
+          "record_id": "SYNTHETIC-ledger_update-1",
+          "evidence_type": "ledger_update",
+          "context": {
+            "set_id": "SYNTHETIC-set-1",
+            "set_type": "wqs",
+            "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+            "format_version": 1,
+            "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+            "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+            "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+            "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+          },
+          "created_at": "2026-10-17T12:06:00Z",
+          "capture_ref": {"record_id": "SYNTHETIC-capture_readback-1", "evidence_type": "capture_readback", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "5c648a02e14193972384542e8169f5e809d59957d6994468fd04b40081e0246b", "size": 1752},
+          "previous_ref": {"record_id": "SYNTHETIC-capture_readback-1", "evidence_type": "capture_readback", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "5c648a02e14193972384542e8169f5e809d59957d6994468fd04b40081e0246b", "size": 1752},
+          "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+          "sequence": 1,
+          "ledger": {"sha256": "fb7013f1485b3ba497ae7c823812506ed74a8d1bd067043ee09aa052d702989e", "size": 29},
+          "state": "verified",
+          "admission_held": true,
+          "cd_enabled": false
+        }
+      ]
+    },
+    "authority": {
+      "label": "SYNTHETIC TEST AUTHORITY",
+      "available": true,
+      "expected_context": {
+        "set_id": "SYNTHETIC-set-1",
+        "set_type": "wqs",
+        "scope": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+        "format_version": 1,
+        "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+        "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+        "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+        "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+      },
+      "expected_ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+      "expected_manifest": {"record_id": "SYNTHETIC-manifest-1", "evidence_type": "manifest", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c0ad859b8bf7a3ecf8f7d190201d279821e7463e7a0626ccc92d66e5a0ecae4f", "size": 3185},
+      "expected_capture": {"record_id": "SYNTHETIC-capture_readback-1", "evidence_type": "capture_readback", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "5c648a02e14193972384542e8169f5e809d59957d6994468fd04b40081e0246b", "size": 1752},
+      "trusted_checkpoint": {"record_id": "SYNTHETIC-capture_checkpoint-1", "evidence_type": "capture_checkpoint", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c62009bd23ea0946f8cdecd3af7286d0fd86cf0bb32a33b1da0b8ebd6bc123a0", "size": 1864},
+      "trusted_acceptance": {"record_id": "SYNTHETIC-owner_acceptance-1", "evidence_type": "owner_acceptance", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "8b408a983b0a003f6d7fa3c89ec9c3cc03f7d731a411c08a7b9d6c40dddaa6ab", "size": 2394},
+      "trusted_updates": [{"record_id": "SYNTHETIC-ledger_update-1", "evidence_type": "ledger_update", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "b322bc75a64e7ce7ae4e5bd6142b6dcd9eba88fdff5dcc795bbdfc783891a60a", "size": 2108}],
+      "checkpoint_owner": "SYNTHETIC-checkpoint-owner",
+      "acceptance_owner": "SYNTHETIC-acceptance-owner",
+      "untrusted_writers": ["SYNTHETIC-writer", "SYNTHETIC-storage-account"],
+      "superseded_ids": [],
+      "now": "2026-10-17T12:10:00Z",
+      "max_source_age_seconds": 3600,
+      "purpose": "current_promotion",
+      "historical_authorized": false,
+      "historical_decision": null,
+      "route_inventory": [
+        {
+          "member": {"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"},
+          "public_key_id": "SYNTHETIC-public-key-SYNTHETIC-hardware-1",
+          "custody_ref": "SYNTHETIC-custody-SYNTHETIC-hardware-1",
+          "bootstrap_ref": "SYNTHETIC-bootstrap-SYNTHETIC-hardware-1",
+          "proof_owner": "SYNTHETIC-route-owner-SYNTHETIC-hardware-1",
+          "independent_custody_verified": true,
+          "device_ref": "SYNTHETIC-device-SYNTHETIC-hardware-1"
+        },
+        {
+          "member": {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"},
+          "public_key_id": "SYNTHETIC-public-key-SYNTHETIC-native-1",
+          "custody_ref": "SYNTHETIC-custody-SYNTHETIC-native-1",
+          "bootstrap_ref": "SYNTHETIC-bootstrap-SYNTHETIC-native-1",
+          "proof_owner": "SYNTHETIC-route-owner-SYNTHETIC-native-1",
+          "independent_custody_verified": true,
+          "device_ref": null
+        }
+      ],
+      "trusted_route_proofs": [{"proof_id": "SYNTHETIC-proof-SYNTHETIC-hardware-1", "sha256": "c68789142522c79fc6267208be1c2f1550436f9060a1d2b0a9cea30cdcf0cc3a", "size": 1033}, {"proof_id": "SYNTHETIC-proof-SYNTHETIC-native-1", "sha256": "4aae1921362a728eb3c249135e819b0ce1517d1ffbd848e1bd41dc0887aa6e98", "size": 1005}]
+    }
+  },
+  "variants": {
+    "laminarauth": {
+      "context": {
+        "set_id": "SYNTHETIC-set-1",
+        "set_type": "laminarauth",
+        "scope": {"kind": "application", "app_id": "SYNTHETIC-laminarauth", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"},
+        "format_version": 1,
+        "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+        "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+        "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+        "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+      },
+      "inventory": [
+        {"path": "rdb.synthetic", "kind": "regular", "role": "rdb", "sha256": "6688ef6bd7e17bd5be07587386399225f50b20d269635b5864f08282f2501dda", "size": 14},
+        {"path": "aof_manifest.synthetic", "kind": "regular", "role": "aof_manifest", "sha256": "4bb92c0cacc83d3c5f4593c4af83b8624874a1dc1bca99b7e4263a410de499cd", "size": 23},
+        {"path": "aof_files.synthetic", "kind": "regular", "role": "aof_files", "sha256": "5a47c35fe462d97cc9d84fa418712dcee21086874fb661f7dcc58f7654cdf8dd", "size": 20},
+        {"path": "log_segments.synthetic", "kind": "regular", "role": "log_segments", "sha256": "267f326d23498820363685dd1ec6123c50a362fd948eb8bdf62a77697e917c4e", "size": 23},
+        {"path": "expected_projection.synthetic", "kind": "regular", "role": "expected_projection", "sha256": "a6fc52a3b8ed617106995a05211f9e1894308d51e22ecb57858320e375057b6c", "size": 30}
+      ],
+      "dependencies": {
+        "kind": "laminarauth",
+        "rdb": "rdb.synthetic",
+        "aof_manifest": "aof_manifest.synthetic",
+        "aof_files": ["aof_files.synthetic"],
+        "log_segments": ["log_segments.synthetic"],
+        "log_start": "SYNTHETIC-log-seed",
+        "log_end": "SYNTHETIC-boundary-1",
+        "coverage_validated": true,
+        "expected_projection": {"path": "expected_projection.synthetic", "schema": "SYNTHETIC-projection-v1", "sha256": "a6fc52a3b8ed617106995a05211f9e1894308d51e22ecb57858320e375057b6c", "size": 30, "boundary": "SYNTHETIC-boundary-1", "source_workload": "SYNTHETIC-workload"}
+      }
+    },
+    "platform": {
+      "context": {
+        "set_id": "SYNTHETIC-set-1",
+        "set_type": "platform",
+        "scope": {"kind": "platform", "cluster_id": "SYNTHETIC-cluster", "app_id": {"applicability": "not_applicable", "reason": "Platform set has no app/org/release mapping"}, "org_id": {"applicability": "not_applicable", "reason": "Platform set has no app/org/release mapping"}, "release_sha": {"applicability": "not_applicable", "reason": "Platform set has no app/org/release mapping"}},
+        "format_version": 1,
+        "source": {"revision": "2222222222222222222222222222222222222222", "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333", "workload": "SYNTHETIC-workload", "storage": "SYNTHETIC-current-pvc"},
+        "boundary": {"method": "SYNTHETIC parent-held lock and drained boundary", "cursor": "SYNTHETIC-boundary-1", "source_at": "2026-10-17T12:00:00Z"},
+        "recipients": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+        "recipients_digest": {"sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca", "size": 450}
+      },
+      "inventory": [
+        {"path": "datastore.synthetic", "kind": "regular", "role": "datastore", "sha256": "1b0f67e7531ccf94da8b413396760e1909cdc61b2260a735305cad5e64cc7be0", "size": 20},
+        {"path": "server_token.synthetic", "kind": "regular", "role": "server_token", "sha256": "ed099786825e424989cc9b3463c515b73a10938c7c8a604de89f2d5d4965035a", "size": 23},
+        {"path": "runtime_inventory.synthetic", "kind": "regular", "role": "runtime_inventory", "sha256": "906802c9563520e0f3662abf70955bf6060048725e46518070fca6996bc615f6", "size": 28},
+        {"path": "encryption_config.synthetic", "kind": "regular", "role": "encryption_config", "sha256": "897acdced2223f23f1a2778a09f3fa6900baec7d065a6f8d5130d66b692e726d", "size": 28},
+        {"path": "encryption_key_material.synthetic", "kind": "regular", "role": "encryption_key_material", "sha256": "3091cfefcf9756977af034ee302b51929520a4714aab55027a18416c2d4713e5", "size": 34}
+      ],
+      "dependencies": {"kind": "platform", "datastore": "datastore.synthetic", "datastore_mode": "sqlite", "server_token": "server_token.synthetic", "encryption": {"state": "enabled", "config": "encryption_config.synthetic", "key_material": ["encryption_key_material.synthetic"]}, "runtime_inventory": "runtime_inventory.synthetic", "k3s_version": "SYNTHETIC-v1.36.3+k3s1", "owner_verified": true}
+    }
+  },
+  "canonical_vectors": [
+    {"name": "sort-and-types", "input_json": " {\"z\":null,\"a\":[true,false,0,9007199254740991],\"A\":\"text\"} ", "canonical_json": "{\"A\":\"text\",\"a\":[true,false,0,9007199254740991],\"z\":null}", "sha256": "1ae86945329c864a6385bf3099d3f6da7ab68b5b0e2f128a1776e49d15b997cb", "size": 57},
+    {"name": "escaping", "input_json": "{\"slash\":\"a/b\",\"quote\":\"\\\"\",\"backslash\":\"\\\\\"}", "canonical_json": "{\"backslash\":\"\\\\\",\"quote\":\"\\\"\",\"slash\":\"a/b\"}", "sha256": "2d4d9ff1894e6e214c11e65c770315c977f599c31594cd0e55d166116369f361", "size": 45},
+    {"name": "empty-containers", "input_json": "{\"object\":{},\"array\":[],\"text\":\"\"}", "canonical_json": "{\"array\":[],\"object\":{},\"text\":\"\"}", "sha256": "393fa1f8e0b63625829df4ed36cb09a25ba3e52a2ddd1dcef8e3d0563f6532c1", "size": 34}
+  ],
+  "invalid_metadata": [
+    {"name": "duplicate-key", "input_json": "{\"a\":1,\"a\":2}"},
+    {"name": "negative-zero", "input_json": "-0"},
+    {"name": "negative-integer", "input_json": "-1"},
+    {"name": "float", "input_json": "1.0"},
+    {"name": "exponent", "input_json": "1e2"},
+    {"name": "unsafe-integer", "input_json": "9007199254740992"},
+    {"name": "nan", "input_json": "NaN"},
+    {"name": "infinity", "input_json": "Infinity"},
+    {"name": "unicode", "input_json": "\"\\u00e9\""},
+    {"name": "control", "input_json": "\"\\n\""},
+    {"name": "nonascii-key", "input_json": "{\"\\u00e9\":1}"},
+    {"name": "BOM", "input_json": "\ufeff{}"},
+    {"name": "leading-zero", "input_json": "01"}
+  ],
+  "cases": [
+    {"name": "accepted-current-wqs", "variant": "wqs", "operations": [], "reseal_synthetic": false, "schema_valid": true, "eligible": true},
+    {"name": "accepted-current-redis", "variant": "laminarauth", "operations": [], "reseal_synthetic": false, "schema_valid": true, "eligible": true},
+    {"name": "accepted-current-platform", "variant": "platform", "operations": [], "reseal_synthetic": false, "schema_valid": true, "eligible": true},
+    {
+      "name": "accepted-platform-encryption-disabled",
+      "variant": "platform",
+      "operations": [
+        {"op": "set", "path": "/graph/records/manifest/dependencies/encryption", "value": {"state": "disabled", "disposition": "SYNTHETIC owner verified disabled"}},
+        {
+          "op": "set",
+          "path": "/graph/records/manifest/inventory",
+          "value": [
+            {"path": "datastore.synthetic", "kind": "regular", "role": "datastore", "sha256": "1b0f67e7531ccf94da8b413396760e1909cdc61b2260a735305cad5e64cc7be0", "size": 20},
+            {"path": "server_token.synthetic", "kind": "regular", "role": "server_token", "sha256": "ed099786825e424989cc9b3463c515b73a10938c7c8a604de89f2d5d4965035a", "size": 23},
+            {"path": "runtime_inventory.synthetic", "kind": "regular", "role": "runtime_inventory", "sha256": "906802c9563520e0f3662abf70955bf6060048725e46518070fca6996bc615f6", "size": 28}
+          ]
+        }
+      ],
+      "reseal_synthetic": true,
+      "schema_valid": true,
+      "eligible": true
+    },
+    {
+      "name": "accepted-exact-historical-recovery",
+      "variant": "wqs",
+      "operations": [
+        {"op": "set", "path": "/graph/records/owner_acceptance/purpose", "value": "historical_recovery"},
+        {"op": "set", "path": "/authority/purpose", "value": "historical_recovery"},
+        {"op": "set", "path": "/authority/historical_authorized", "value": true},
+        {"op": "set", "path": "/authority/historical_decision", "value": {"record_id": "SYNTHETIC-owner_acceptance-1", "evidence_type": "owner_acceptance", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "602eb5c38601f8fa0f20d461e6aab44b9e6504fa2ac63374cedb24a1f23c8e18", "size": 2396}}
+      ],
+      "reseal_synthetic": true,
+      "schema_valid": true,
+      "eligible": true
+    },
+    {"name": "historical-decision-cannot-promote", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/purpose", "value": "historical_recovery"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "historical-missing-separate-authorization", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/purpose", "value": "historical_recovery"}, {"op": "set", "path": "/authority/purpose", "value": "historical_recovery"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {
+      "name": "historical-wrong-decision-binding",
+      "variant": "wqs",
+      "operations": [
+        {"op": "set", "path": "/graph/records/owner_acceptance/purpose", "value": "historical_recovery"},
+        {"op": "set", "path": "/authority/purpose", "value": "historical_recovery"},
+        {"op": "set", "path": "/authority/historical_authorized", "value": true},
+        {"op": "set", "path": "/authority/historical_decision", "value": {"record_id": "SYNTHETIC-owner_acceptance-1", "evidence_type": "owner_acceptance", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c52ccd038baf829c123db4d940d39953889babc1eeafa187ac93953a74fa2e34", "size": 1989}}
+      ],
+      "reseal_synthetic": true,
+      "schema_valid": true,
+      "eligible": false
+    },
+    {"name": "anchor-unavailable", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/available", "value": false}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "checkpoint-only", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/full_restore"}, {"op": "remove", "path": "/graph/records/owner_acceptance"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "ciphertext-only", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/capture_checkpoint"}, {"op": "remove", "path": "/graph/records/full_restore"}, {"op": "remove", "path": "/graph/records/owner_acceptance"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-independent-set", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/set_id", "value": "SYNTHETIC-other-set"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-independent-release", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/scope/release_sha", "value": "4444444444444444444444444444444444444444"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-independent-org", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/scope/org_id", "value": "SYNTHETIC-other-org"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-independent-app", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/scope/app_id", "value": "SYNTHETIC-other-app"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-independent-cluster", "variant": "platform", "operations": [{"op": "set", "path": "/authority/expected_context/scope/cluster_id", "value": "SYNTHETIC-other-cluster"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {
+      "name": "substitution-matching-writer-digests",
+      "variant": "wqs",
+      "operations": [
+        {"op": "set", "path": "/graph/records/capture_readback/ciphertext/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        {"op": "set", "path": "/graph/records/capture_checkpoint/ciphertext/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        {"op": "set", "path": "/graph/records/full_restore/ciphertext/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        {"op": "set", "path": "/graph/records/owner_acceptance/ciphertext/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        {"op": "set", "path": "/graph/updates/0/ciphertext/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      ],
+      "reseal_synthetic": true,
+      "schema_valid": true,
+      "eligible": false
+    },
+    {"name": "same-id-changed-source-receipt", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/capture_readback/object_ref", "value": "SYNTHETIC-replacement"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "same-id-changed-restore-receipt", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/custody_ref", "value": "SYNTHETIC-replacement"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "same-id-changed-update", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/ledger/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-reference-size", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/restore_ref/size", "value": 1}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "changed-anchor", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/trusted_acceptance/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "writer-self-acceptance", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/authority_id", "value": "SYNTHETIC-writer"}, {"op": "set", "path": "/authority/acceptance_owner", "value": "SYNTHETIC-writer"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "storage-self-checkpoint", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/capture_checkpoint/authority_id", "value": "SYNTHETIC-storage-account"}, {"op": "set", "path": "/authority/checkpoint_owner", "value": "SYNTHETIC-storage-account"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "wrong-authority", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/authority_id", "value": "SYNTHETIC-unrecognized"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "superseded-acceptance", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/superseded_ids", "value": ["SYNTHETIC-owner_acceptance-1"]}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "superseded-capture", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/superseded_ids", "value": ["SYNTHETIC-capture_readback-1"]}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "expired-at-exact-deadline", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/now", "value": "2026-10-17T13:00:00Z"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "expired-owner-before-checkpoint", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/expires_at", "value": "2026-10-17T12:10:00Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "future-evidence", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/created_at", "value": "2026-10-17T12:20:00Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "out-of-order-checkpoint", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/capture_checkpoint/created_at", "value": "2026-10-17T12:06:00Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "expired-before-restore", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/capture_checkpoint/expires_at", "value": "2026-10-17T12:04:00Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "wrong-acceptance-time", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/accepted_at", "value": "2026-10-17T12:06:00Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "stale-source", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/max_source_age_seconds", "value": 599}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "missing-expiry", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/owner_acceptance/expires_at"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "invalid-calendar-date", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/created_at", "value": "2026-02-30T12:01:00Z"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "noncanonical-time-offset", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/created_at", "value": "2026-10-17T12:01:00+00:00"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "wrong-restore-session", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/restore_session_id", "value": "SYNTHETIC-other-session"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "missing-manifest-file", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/manifest/inventory/0"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "duplicate-inventory", "variant": "wqs", "operations": [{"op": "append", "path": "/graph/records/manifest/inventory", "value": {"path": "database.synthetic", "kind": "regular", "role": "database", "sha256": "8c61b074bd1dc06b0fdd9028f10120ad34b2b5caf0b4bf30b43491a47253bcdb", "size": 19}}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "path-traversal", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/inventory/0/path", "value": "database/../database.synthetic"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "absolute-path", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/inventory/0/path", "value": "/etc/passwd"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "link-not-regular", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/inventory/0/kind", "value": "symlink"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "unsafe-double-separator", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/inventory/0/path", "value": "database//name"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {
+      "name": "wrong-owner-dependencies",
+      "variant": "wqs",
+      "operations": [
+        {
+          "op": "set",
+          "path": "/graph/records/manifest/dependencies",
+          "value": {
+            "kind": "laminarauth",
+            "rdb": "rdb.synthetic",
+            "aof_manifest": "aof_manifest.synthetic",
+            "aof_files": ["aof_files.synthetic"],
+            "log_segments": ["log_segments.synthetic"],
+            "log_start": "SYNTHETIC-log-seed",
+            "log_end": "SYNTHETIC-boundary-1",
+            "coverage_validated": true,
+            "expected_projection": {"path": "expected_projection.synthetic", "schema": "SYNTHETIC-projection-v1", "sha256": "a6fc52a3b8ed617106995a05211f9e1894308d51e22ecb57858320e375057b6c", "size": 30, "boundary": "SYNTHETIC-boundary-1", "source_workload": "SYNTHETIC-workload"}
+          }
+        }
+      ],
+      "reseal_synthetic": true,
+      "schema_valid": true,
+      "eligible": false
+    },
+    {"name": "wrong-current-pvc", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/pvc_identity", "value": "SYNTHETIC-old-pvc"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "missing-pending-key", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/manifest/dependencies/pending_delivery_key"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "missing-runner-ledger", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/runner_ledger", "value": "missing.synthetic"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "missing-image-access", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/registry_access", "value": "missing.synthetic"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "parent-lock-not-coordinated", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/parent_coordinated", "value": false}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "missing-AOF-file", "variant": "laminarauth", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/aof_files", "value": ["missing.synthetic"]}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "wrong-log-boundary", "variant": "laminarauth", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/log_end", "value": "SYNTHETIC-wrong-boundary"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "wrong-source-reference-boundary", "variant": "laminarauth", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/expected_projection/boundary", "value": "SYNTHETIC-wrong-boundary"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "tampered-source-reference", "variant": "laminarauth", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/expected_projection/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "missing-server-token", "variant": "platform", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/server_token", "value": "missing.synthetic"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "missing-encryption-material", "variant": "platform", "operations": [{"op": "set", "path": "/graph/records/manifest/dependencies/encryption/key_material", "value": []}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "platform-cannot-invent-app-context", "variant": "platform", "operations": [{"op": "set", "path": "/graph/records/manifest/context/scope", "value": {"kind": "application", "app_id": "SYNTHETIC-wqs", "org_id": "SYNTHETIC-org", "release_sha": "1111111111111111111111111111111111111111"}}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "self-referential-update", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/previous_ref", "value": {"record_id": "SYNTHETIC-ledger_update-1", "evidence_type": "ledger_update", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "e6d980b8d3680c812261b36c5c3eee5c8c41e7b3fbede8c2dfac96cfe8eb94f6", "size": 1703}}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "missing-anchored-update", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/updates/0"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "wrong-update-sequence", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/sequence", "value": 2}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "update-before-capture", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/created_at", "value": "2026-10-17T12:01:00Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "update-cannot-release-admission", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/admission_held", "value": false}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "update-cannot-enable-CD", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/cd_enabled", "value": true}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "restore-with-effects-enabled", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/checks/effects_blocked", "value": false}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "no-independent-route-access", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/checks/independent_route_access_verified", "value": false}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "no-source-projection-comparison", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/checks/source_reference_matched", "value": false}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "unknown-version", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/capture_readback/contract_version", "value": 2}], "reseal_synthetic": false, "schema_valid": false, "eligible": false},
+    {"name": "unknown-field", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/owner_acceptance/trusted", "value": true}], "reseal_synthetic": false, "schema_valid": false, "eligible": false},
+    {"name": "accepted-hybrid-native-full-restore", "variant": "wqs", "operations": [], "reseal_synthetic": false, "schema_valid": true, "eligible": true, "performed_route": 1},
+    {"name": "accepted-two-hardware-first-route", "variant": "wqs", "operations": [], "reseal_synthetic": false, "schema_valid": true, "eligible": true, "recipient_variant": "two_hardware"},
+    {"name": "accepted-two-hardware-second-route", "variant": "wqs", "operations": [], "reseal_synthetic": false, "schema_valid": true, "eligible": true, "recipient_variant": "two_hardware", "performed_route": 1},
+    {"name": "one-recipient-rejected", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/context/recipients", "value": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}]}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {"name": "duplicate-key-id", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/1/key_id", "value": "SYNTHETIC-hardware-1"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false, "reseal_context": true},
+    {"name": "relabelled-identical-key", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/1", "value": {"key_id": "SYNTHETIC-relabelled", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}}], "reseal_synthetic": false, "schema_valid": true, "eligible": false, "reseal_context": true},
+    {"name": "duplicate-fingerprint", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/1/fingerprint", "value": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false, "reseal_context": true},
+    {"name": "decoded-key-alias", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/route_inventory/1/public_key_id", "value": "SYNTHETIC-public-key-SYNTHETIC-hardware-1"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "unverified-custody-route", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/route_inventory/1/independent_custody_verified", "value": false}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "same-device-twice", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/route_inventory/1/device_ref", "value": "SYNTHETIC-device-SYNTHETIC-hardware-2"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false, "recipient_variant": "two_hardware"},
+    {"name": "recipient-dropped", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/capture_readback/context/recipients/1"}], "reseal_synthetic": false, "schema_valid": false, "eligible": false},
+    {"name": "recipient-added", "variant": "wqs", "operations": [{"op": "append", "path": "/graph/records/manifest/context/recipients", "value": {"key_id": "SYNTHETIC-hardware-2", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqp", "fingerprint": "88a3739983a847aa84075c0732bb65dca4d9ed29482c7b137f9877a014664e79"}}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "recipient-changed", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/manifest/context/recipients/1/key_id", "value": "SYNTHETIC-changed"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {
+      "name": "recipient-order-reversed",
+      "variant": "wqs",
+      "operations": [
+        {
+          "op": "set",
+          "path": "/authority/expected_context/recipients",
+          "value": [{"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}, {"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}]
+        }
+      ],
+      "reseal_synthetic": false,
+      "schema_valid": true,
+      "eligible": false,
+      "reseal_context": true
+    },
+    {"name": "wrong-recipient-set-digest", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients_digest/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false, "reseal_context": true},
+    {"name": "unknown-recipient-type", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/0/type", "value": "age-plugin-unreviewed"}], "reseal_synthetic": false, "schema_valid": false, "eligible": false, "reseal_context": true},
+    {"name": "unreleased-tag-profile", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/0/value", "value": "age1tag1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"}], "reseal_synthetic": false, "schema_valid": false, "eligible": false, "reseal_context": true},
+    {"name": "native-with-plugin-encoding", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/1/value", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"}], "reseal_synthetic": false, "schema_valid": false, "eligible": false, "reseal_context": true},
+    {"name": "plugin-with-native-encoding", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/0/value", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"}], "reseal_synthetic": false, "schema_valid": false, "eligible": false, "reseal_context": true},
+    {"name": "uppercase-recipient-alias", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/0/value", "value": "AGE1YUBIKEY1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"}], "reseal_synthetic": false, "schema_valid": false, "eligible": false, "reseal_context": true},
+    {"name": "recipient-fingerprint-changed", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/1/fingerprint", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false, "reseal_context": true},
+    {"name": "expected-recipient-mismatch", "variant": "wqs", "operations": [{"op": "set", "path": "/authority/expected_context/recipients/1/key_id", "value": "SYNTHETIC-other"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false},
+    {"name": "ledger-recipient-mismatch", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/updates/0/context/recipients/1/key_id", "value": "SYNTHETIC-other"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "missing-route-proof", "variant": "wqs", "operations": [{"op": "remove", "path": "/graph/records/full_restore/route_proofs/1"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false},
+    {
+      "name": "duplicate-route-proof",
+      "variant": "wqs",
+      "operations": [
+        {
+          "op": "set",
+          "path": "/graph/records/full_restore/route_proofs/1",
+          "value": {
+            "proof_id": "SYNTHETIC-proof-SYNTHETIC-hardware-1",
+            "member": {"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"},
+            "ciphertext": {"sha256": "4e4c9ccb5c80f6598b409cff2d46f90b7a1ffe7a697c109e5576cd2d86421428", "size": 54},
+            "restore_session_id": "SYNTHETIC-session-1",
+            "created_at": "2026-10-17T12:03:10Z",
+            "authority_id": "SYNTHETIC-route-owner-SYNTHETIC-hardware-1",
+            "custody_ref": "SYNTHETIC-custody-SYNTHETIC-hardware-1",
+            "bootstrap_ref": "SYNTHETIC-bootstrap-SYNTHETIC-hardware-1",
+            "other_routes_unavailable": true,
+            "independent_access_verified": true,
+            "outcome": "decrypted_and_verified",
+            "set_id": "SYNTHETIC-set-1",
+            "checkpoint_ref": {"record_id": "SYNTHETIC-capture_checkpoint-1", "evidence_type": "capture_checkpoint", "schema_id": "backup-recovery-set-v1", "contract_version": 1, "sha256": "c62009bd23ea0946f8cdecd3af7286d0fd86cf0bb32a33b1da0b8ebd6bc123a0", "size": 1864}
+          }
+        }
+      ],
+      "reseal_synthetic": true,
+      "schema_valid": true,
+      "eligible": false,
+      "reseal_proofs": true
+    },
+    {"name": "wrong-member-route-proof", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/member", "value": {"key_id": "SYNTHETIC-hardware-2", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqp", "fingerprint": "88a3739983a847aa84075c0732bb65dca4d9ed29482c7b137f9877a014664e79"}}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-session-reused", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/restore_session_id", "value": "SYNTHETIC-session-1"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-wrong-ciphertext", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/ciphertext/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-before-checkpoint", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/created_at", "value": "2026-10-17T12:02:59Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-after-full-restore", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/created_at", "value": "2026-10-17T12:04:01Z"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-invalid-date", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/created_at", "value": "2026-02-30T12:03:11Z"}], "reseal_synthetic": true, "schema_valid": false, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-id-reused", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/proof_id", "value": "SYNTHETIC-proof-SYNTHETIC-hardware-1"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "same-id-proof-content-tampered", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/bootstrap_ref", "value": "SYNTHETIC-changed"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "route-proof-wrong-owner", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/authority_id", "value": "SYNTHETIC-writer"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-other-key-present", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/other_routes_unavailable", "value": false}], "reseal_synthetic": true, "schema_valid": false, "eligible": false, "reseal_proofs": true},
+    {"name": "unproved-full-restore-member", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/performed_by", "value": "SYNTHETIC-other"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false},
+    {"name": "route-proof-wrong-set", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/set_id", "value": "SYNTHETIC-other-set"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "route-proof-wrong-checkpoint", "variant": "wqs", "operations": [{"op": "set", "path": "/graph/records/full_restore/route_proofs/1/checkpoint_ref/sha256", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}], "reseal_synthetic": true, "schema_valid": true, "eligible": false, "reseal_proofs": true},
+    {"name": "superseded-route-proof", "variant": "wqs", "operations": [{"op": "append", "path": "/authority/superseded_ids", "value": "SYNTHETIC-proof-SYNTHETIC-hardware-1"}], "reseal_synthetic": false, "schema_valid": true, "eligible": false}
+  ],
+  "recipient_variants": {
+    "hybrid": [{"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}, {"key_id": "SYNTHETIC-native-1", "type": "age-x25519", "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"}],
+    "two_hardware": [
+      {"key_id": "SYNTHETIC-hardware-2", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqp", "fingerprint": "88a3739983a847aa84075c0732bb65dca4d9ed29482c7b137f9877a014664e79"},
+      {"key_id": "SYNTHETIC-hardware-1", "type": "age-plugin-yubikey-piv-p256-v0.5.1", "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"}
+    ]
+  },
+  "byte_vectors": [
+    {"name": "UTF8-object", "input_hex": "7b7d", "valid": true, "canonical_json": "{}"},
+    {"name": "UTF8-spaced-object", "input_hex": "207b2261223a20317d20", "valid": true, "canonical_json": "{\"a\":1}"},
+    {"name": "UTF8-BOM", "input_hex": "efbbbf7b7d", "valid": false},
+    {"name": "UTF16-LE-BOM", "input_hex": "fffe7b007d00", "valid": false},
+    {"name": "UTF16-BE-BOM", "input_hex": "feff007b007d", "valid": false},
+    {"name": "UTF16-LE", "input_hex": "7b007d00", "valid": false},
+    {"name": "UTF16-BE", "input_hex": "007b007d", "valid": false},
+    {"name": "UTF32-LE-BOM", "input_hex": "fffe00007b0000007d000000", "valid": false},
+    {"name": "UTF32-BE-BOM", "input_hex": "0000feff0000007b0000007d", "valid": false},
+    {"name": "UTF32-LE", "input_hex": "7b0000007d000000", "valid": false},
+    {"name": "UTF32-BE", "input_hex": "0000007b0000007d", "valid": false},
+    {"name": "non-UTF8", "input_hex": "22e922", "valid": false}
+  ]
+}

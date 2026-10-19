@@ -1523,6 +1523,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+backup = [
+    { name = "jsonschema" },
+]
 controller = [
     { name = "skypilot", extra = ["kubernetes"] },
 ]
@@ -1538,6 +1541,7 @@ worker = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "jsonschema" },
     { name = "pytest" },
 ]
 
@@ -1547,6 +1551,7 @@ requires-dist = [
     { name = "cryptography", specifier = "==50.0.2" },
     { name = "fastapi", specifier = "==0.143.0" },
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "jsonschema", marker = "extra == 'backup'", specifier = "==4.26.0" },
     { name = "numpy", marker = "extra == 'worker'", specifier = "==2.5.4" },
     { name = "ply", marker = "extra == 'worker'", specifier = "==3.11" },
     { name = "pyyaml", specifier = "==6.0.3" },
@@ -1557,10 +1562,13 @@ requires-dist = [
     { name = "skypilot", extras = ["kubernetes"], marker = "extra == 'controller'", specifier = "==0.14.0" },
     { name = "uvicorn", specifier = "==0.35.0" },
 ]
-provides-extras = ["worker", "controller"]
+provides-extras = ["backup", "worker", "controller"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = "==9.1.1" }]
+dev = [
+    { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "pytest", specifier = "==9.1.1" },
+]
 
 [[package]]
 name = "qsimcirq"

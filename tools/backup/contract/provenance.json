@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/Wehden/LaminarAuth",
+  "commit": "6f4674e2ae02a6e9fe8ced33117ac5a17b77fc78",
+  "files": [
+    {
+      "upstream": "schemas/backup-recovery-set-v1.schema.json",
+      "local": "tools/backup/contract/schema.json",
+      "sha256": "4f4f96d643aa9c4c77222cc13c17038472e4ee607c644dc9761d8d4bbfd6dfb9"
+    },
+    {
+      "upstream": "tests/contracts/fixtures/backup-recovery-v1.json",
+      "local": "tests/fixtures/backup/conformance.json",
+      "sha256": "b63927cb901f20c0c0577f4df1a1e0cb511e57f92f9d276551766412d1ba1643"
+    }
+  ]
+}

@@ -1,0 +1,577 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:laminarauth:backup-recovery-set:v1",
+  "title": "Backup recovery set contract v1",
+  "description": "Structure only; normative policy, independent authority and exact byte validation are also required. All refs are local.",
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "pattern": "^[ -~]+$"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "uint": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "positive": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "timestamp": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "blob": {
+      "type": "object",
+      "properties": {"sha256": {"$ref": "#/$defs/sha256"}, "size": {"$ref": "#/$defs/positive"}},
+      "required": ["sha256", "size"],
+      "additionalProperties": false
+    },
+    "recipient": {
+      "type": "object",
+      "properties": {
+        "key_id": {"$ref": "#/$defs/id"},
+        "type": {"enum": ["age-x25519", "age-plugin-yubikey-piv-p256-v0.5.1"]},
+        "value": {"$ref": "#/$defs/text"},
+        "fingerprint": {"$ref": "#/$defs/sha256"}
+      },
+      "required": ["key_id", "type", "value", "fingerprint"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "age-x25519"}}},
+          "then": {"properties": {"value": {"pattern": "^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$"}}},
+          "else": {"properties": {"value": {"pattern": "^age1yubikey1[023456789acdefghjklmnpqrstuvwxyz]+$"}}}
+        }
+      ]
+    },
+    "not_applicable": {
+      "type": "object",
+      "properties": {"applicability": {"const": "not_applicable"}, "reason": {"$ref": "#/$defs/text"}},
+      "required": ["applicability", "reason"],
+      "additionalProperties": false
+    },
+    "app_scope": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "application"},
+        "app_id": {"$ref": "#/$defs/id"},
+        "org_id": {"$ref": "#/$defs/id"},
+        "release_sha": {"$ref": "#/$defs/revision"}
+      },
+      "required": ["kind", "app_id", "org_id", "release_sha"],
+      "additionalProperties": false
+    },
+    "platform_scope": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "platform"},
+        "cluster_id": {"$ref": "#/$defs/id"},
+        "app_id": {"$ref": "#/$defs/not_applicable"},
+        "org_id": {"$ref": "#/$defs/not_applicable"},
+        "release_sha": {"$ref": "#/$defs/not_applicable"}
+      },
+      "required": ["kind", "cluster_id", "app_id", "org_id", "release_sha"],
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "set_id": {"$ref": "#/$defs/id"},
+        "set_type": {"enum": ["wqs", "laminarauth", "platform"]},
+        "scope": {"oneOf": [{"$ref": "#/$defs/app_scope"}, {"$ref": "#/$defs/platform_scope"}]},
+        "format_version": {"const": 1},
+        "source": {
+          "type": "object",
+          "properties": {
+            "revision": {"$ref": "#/$defs/revision"},
+            "image_or_executable_digest": {"$ref": "#/$defs/sha256"},
+            "workload": {"$ref": "#/$defs/id"},
+            "storage": {"$ref": "#/$defs/id"}
+          },
+          "required": ["revision", "image_or_executable_digest", "workload", "storage"],
+          "additionalProperties": false
+        },
+        "boundary": {
+          "type": "object",
+          "properties": {
+            "method": {"$ref": "#/$defs/text"},
+            "cursor": {"$ref": "#/$defs/id"},
+            "source_at": {"$ref": "#/$defs/timestamp"}
+          },
+          "required": ["method", "cursor", "source_at"],
+          "additionalProperties": false
+        },
+        "recipients": {"type": "array", "items": {"$ref": "#/$defs/recipient"}, "minItems": 2},
+        "recipients_digest": {"$ref": "#/$defs/blob"}
+      },
+      "required": ["set_id", "set_type", "scope", "format_version", "source", "boundary", "recipients", "recipients_digest"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"set_type": {"const": "platform"}}},
+          "then": {"properties": {"scope": {"$ref": "#/$defs/platform_scope"}}},
+          "else": {"properties": {"scope": {"$ref": "#/$defs/app_scope"}}}
+        }
+      ]
+    },
+    "path": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._/-]*$"},
+    "file": {
+      "type": "object",
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "kind": {"const": "regular"},
+        "role": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"$ref": "#/$defs/uint"}
+      },
+      "required": ["path", "kind", "role", "sha256", "size"],
+      "additionalProperties": false
+    },
+    "binding": {
+      "type": "object",
+      "properties": {
+        "record_id": {"$ref": "#/$defs/id"},
+        "evidence_type": {
+          "enum": ["manifest", "capture_readback", "capture_checkpoint", "full_restore", "owner_acceptance", "ledger_update"]
+        },
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"$ref": "#/$defs/positive"}
+      },
+      "required": ["record_id", "evidence_type", "schema_id", "contract_version", "sha256", "size"],
+      "additionalProperties": false
+    },
+    "ref_manifest": {"allOf": [{"$ref": "#/$defs/binding"}, {"properties": {"evidence_type": {"const": "manifest"}}}]},
+    "ref_capture": {"allOf": [{"$ref": "#/$defs/binding"}, {"properties": {"evidence_type": {"const": "capture_readback"}}}]},
+    "ref_checkpoint": {"allOf": [{"$ref": "#/$defs/binding"}, {"properties": {"evidence_type": {"const": "capture_checkpoint"}}}]},
+    "ref_restore": {"allOf": [{"$ref": "#/$defs/binding"}, {"properties": {"evidence_type": {"const": "full_restore"}}}]},
+    "wqs_dependencies": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "wqs"},
+        "database": {"$ref": "#/$defs/path"},
+        "results": {"type": "array", "items": {"$ref": "#/$defs/path"}, "minItems": 1},
+        "invitation_registry": {"$ref": "#/$defs/path"},
+        "pending_delivery_key": {"$ref": "#/$defs/path"},
+        "runner_ledger": {"$ref": "#/$defs/path"},
+        "release_receipts": {"type": "array", "items": {"$ref": "#/$defs/path"}, "minItems": 1},
+        "image_inventory": {"$ref": "#/$defs/path"},
+        "registry_access": {"$ref": "#/$defs/path"},
+        "pvc_identity": {"$ref": "#/$defs/id"},
+        "parent_coordinated": {"const": true},
+        "ledger_state": {"enum": ["holding", "interrupted", "failed", "nonverified"]},
+        "admission_held": {"const": true},
+        "cd_enabled": {"const": false}
+      },
+      "required": [
+        "kind",
+        "database",
+        "results",
+        "invitation_registry",
+        "pending_delivery_key",
+        "runner_ledger",
+        "release_receipts",
+        "image_inventory",
+        "registry_access",
+        "pvc_identity",
+        "parent_coordinated",
+        "ledger_state",
+        "admission_held",
+        "cd_enabled"
+      ],
+      "additionalProperties": false
+    },
+    "projection": {
+      "type": "object",
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "schema": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"$ref": "#/$defs/positive"},
+        "boundary": {"$ref": "#/$defs/id"},
+        "source_workload": {"$ref": "#/$defs/id"}
+      },
+      "required": ["path", "schema", "sha256", "size", "boundary", "source_workload"],
+      "additionalProperties": false
+    },
+    "redis_dependencies": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "laminarauth"},
+        "rdb": {"$ref": "#/$defs/path"},
+        "aof_manifest": {"$ref": "#/$defs/path"},
+        "aof_files": {"type": "array", "items": {"$ref": "#/$defs/path"}, "minItems": 1},
+        "log_segments": {"type": "array", "items": {"$ref": "#/$defs/path"}, "minItems": 1},
+        "log_start": {"$ref": "#/$defs/id"},
+        "log_end": {"$ref": "#/$defs/id"},
+        "coverage_validated": {"const": true},
+        "expected_projection": {"$ref": "#/$defs/projection"}
+      },
+      "required": [
+        "kind",
+        "rdb",
+        "aof_manifest",
+        "aof_files",
+        "log_segments",
+        "log_start",
+        "log_end",
+        "coverage_validated",
+        "expected_projection"
+      ],
+      "additionalProperties": false
+    },
+    "platform_dependencies": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "platform"},
+        "datastore": {"$ref": "#/$defs/path"},
+        "datastore_mode": {"enum": ["sqlite", "embedded_etcd", "external"]},
+        "server_token": {"$ref": "#/$defs/path"},
+        "encryption": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "state": {"const": "enabled"},
+                "config": {"$ref": "#/$defs/path"},
+                "key_material": {"type": "array", "items": {"$ref": "#/$defs/path"}, "minItems": 1}
+              },
+              "required": ["state", "config", "key_material"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {"state": {"const": "disabled"}, "disposition": {"$ref": "#/$defs/text"}},
+              "required": ["state", "disposition"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "runtime_inventory": {"$ref": "#/$defs/path"},
+        "k3s_version": {"$ref": "#/$defs/text"},
+        "owner_verified": {"const": true}
+      },
+      "required": [
+        "kind",
+        "datastore",
+        "datastore_mode",
+        "server_token",
+        "encryption",
+        "runtime_inventory",
+        "k3s_version",
+        "owner_verified"
+      ],
+      "additionalProperties": false
+    },
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "canonical_profile": {"const": "backup-json-v1"},
+        "record_id": {"$ref": "#/$defs/id"},
+        "context": {"$ref": "#/$defs/context"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_type": {"const": "manifest"},
+        "inventory": {"type": "array", "items": {"$ref": "#/$defs/file"}, "minItems": 1},
+        "dependencies": {
+          "oneOf": [
+            {"$ref": "#/$defs/wqs_dependencies"},
+            {"$ref": "#/$defs/redis_dependencies"},
+            {"$ref": "#/$defs/platform_dependencies"}
+          ]
+        }
+      },
+      "required": [
+        "schema_id",
+        "contract_version",
+        "canonical_profile",
+        "record_id",
+        "context",
+        "created_at",
+        "evidence_type",
+        "inventory",
+        "dependencies"
+      ],
+      "additionalProperties": false
+    },
+    "capture_readback": {
+      "type": "object",
+      "properties": {
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "canonical_profile": {"const": "backup-json-v1"},
+        "record_id": {"$ref": "#/$defs/id"},
+        "context": {"$ref": "#/$defs/context"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_type": {"const": "capture_readback"},
+        "manifest_ref": {"$ref": "#/$defs/ref_manifest"},
+        "ciphertext": {"$ref": "#/$defs/blob"},
+        "object_ref": {"$ref": "#/$defs/id"},
+        "outcome": {"const": "readback_verified"}
+      },
+      "required": [
+        "schema_id",
+        "contract_version",
+        "canonical_profile",
+        "record_id",
+        "context",
+        "created_at",
+        "evidence_type",
+        "manifest_ref",
+        "ciphertext",
+        "object_ref",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
+    "capture_checkpoint": {
+      "type": "object",
+      "properties": {
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "canonical_profile": {"const": "backup-json-v1"},
+        "record_id": {"$ref": "#/$defs/id"},
+        "context": {"$ref": "#/$defs/context"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_type": {"const": "capture_checkpoint"},
+        "capture_ref": {"$ref": "#/$defs/ref_capture"},
+        "ciphertext": {"$ref": "#/$defs/blob"},
+        "restore_session_id": {"$ref": "#/$defs/id"},
+        "authority_id": {"$ref": "#/$defs/id"},
+        "expires_at": {"$ref": "#/$defs/timestamp"},
+        "purpose": {"const": "isolated_verification"}
+      },
+      "required": [
+        "schema_id",
+        "contract_version",
+        "canonical_profile",
+        "record_id",
+        "context",
+        "created_at",
+        "evidence_type",
+        "capture_ref",
+        "ciphertext",
+        "restore_session_id",
+        "authority_id",
+        "expires_at",
+        "purpose"
+      ],
+      "additionalProperties": false
+    },
+    "full_restore": {
+      "type": "object",
+      "properties": {
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "canonical_profile": {"const": "backup-json-v1"},
+        "record_id": {"$ref": "#/$defs/id"},
+        "context": {"$ref": "#/$defs/context"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_type": {"const": "full_restore"},
+        "capture_ref": {"$ref": "#/$defs/ref_capture"},
+        "checkpoint_ref": {"$ref": "#/$defs/ref_checkpoint"},
+        "manifest_ref": {"$ref": "#/$defs/ref_manifest"},
+        "ciphertext": {"$ref": "#/$defs/blob"},
+        "restore_session_id": {"$ref": "#/$defs/id"},
+        "custody_ref": {"$ref": "#/$defs/id"},
+        "bootstrap_ref": {"$ref": "#/$defs/id"},
+        "isolation_ref": {"$ref": "#/$defs/id"},
+        "checks": {
+          "type": "object",
+          "properties": {
+            "inventory_verified": {"const": true},
+            "dependencies_verified": {"const": true},
+            "consistency_verified": {"const": true},
+            "owner_checks_passed": {"const": true},
+            "independent_route_access_verified": {"const": true},
+            "independent_bootstrap_verified": {"const": true},
+            "effects_blocked": {"const": true},
+            "source_reference_matched": {"const": true},
+            "admission_held": {"const": true},
+            "cd_disabled": {"const": true}
+          },
+          "required": [
+            "inventory_verified",
+            "dependencies_verified",
+            "consistency_verified",
+            "owner_checks_passed",
+            "independent_route_access_verified",
+            "independent_bootstrap_verified",
+            "effects_blocked",
+            "source_reference_matched",
+            "admission_held",
+            "cd_disabled"
+          ],
+          "additionalProperties": false
+        },
+        "disposition": {"const": "passed"},
+        "route_proofs": {"type": "array", "items": {"$ref": "#/$defs/route_proof"}, "minItems": 2},
+        "performed_by": {"$ref": "#/$defs/id"}
+      },
+      "required": [
+        "schema_id",
+        "contract_version",
+        "canonical_profile",
+        "record_id",
+        "context",
+        "created_at",
+        "evidence_type",
+        "capture_ref",
+        "checkpoint_ref",
+        "manifest_ref",
+        "ciphertext",
+        "restore_session_id",
+        "custody_ref",
+        "bootstrap_ref",
+        "isolation_ref",
+        "checks",
+        "disposition",
+        "route_proofs",
+        "performed_by"
+      ],
+      "additionalProperties": false
+    },
+    "owner_acceptance": {
+      "type": "object",
+      "properties": {
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "canonical_profile": {"const": "backup-json-v1"},
+        "record_id": {"$ref": "#/$defs/id"},
+        "context": {"$ref": "#/$defs/context"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_type": {"const": "owner_acceptance"},
+        "capture_ref": {"$ref": "#/$defs/ref_capture"},
+        "checkpoint_ref": {"$ref": "#/$defs/ref_checkpoint"},
+        "restore_ref": {"$ref": "#/$defs/ref_restore"},
+        "ciphertext": {"$ref": "#/$defs/blob"},
+        "restore_session_id": {"$ref": "#/$defs/id"},
+        "authority_id": {"$ref": "#/$defs/id"},
+        "purpose": {"enum": ["current_promotion", "historical_recovery"]},
+        "accepted_at": {"$ref": "#/$defs/timestamp"},
+        "expires_at": {"$ref": "#/$defs/timestamp"},
+        "decision": {"const": "accepted"}
+      },
+      "required": [
+        "schema_id",
+        "contract_version",
+        "canonical_profile",
+        "record_id",
+        "context",
+        "created_at",
+        "evidence_type",
+        "capture_ref",
+        "checkpoint_ref",
+        "restore_ref",
+        "ciphertext",
+        "restore_session_id",
+        "authority_id",
+        "purpose",
+        "accepted_at",
+        "expires_at",
+        "decision"
+      ],
+      "additionalProperties": false
+    },
+    "ledger_update": {
+      "type": "object",
+      "properties": {
+        "schema_id": {"const": "backup-recovery-set-v1"},
+        "contract_version": {"const": 1},
+        "canonical_profile": {"const": "backup-json-v1"},
+        "record_id": {"$ref": "#/$defs/id"},
+        "context": {"$ref": "#/$defs/context"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "evidence_type": {"const": "ledger_update"},
+        "capture_ref": {"$ref": "#/$defs/ref_capture"},
+        "previous_ref": {
+          "oneOf": [
+            {"$ref": "#/$defs/ref_capture"},
+            {"allOf": [{"$ref": "#/$defs/binding"}, {"properties": {"evidence_type": {"const": "ledger_update"}}}]}
+          ]
+        },
+        "ciphertext": {"$ref": "#/$defs/blob"},
+        "sequence": {"$ref": "#/$defs/positive"},
+        "ledger": {"$ref": "#/$defs/blob"},
+        "state": {"enum": ["holding", "interrupted", "failed", "nonverified", "verified"]},
+        "admission_held": {"const": true},
+        "cd_enabled": {"const": false}
+      },
+      "required": [
+        "schema_id",
+        "contract_version",
+        "canonical_profile",
+        "record_id",
+        "context",
+        "created_at",
+        "evidence_type",
+        "capture_ref",
+        "previous_ref",
+        "ciphertext",
+        "sequence",
+        "ledger",
+        "state",
+        "admission_held",
+        "cd_enabled"
+      ],
+      "additionalProperties": false
+    },
+    "final_result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {"evidence_type": {"const": "final_result"}, "verified": {"const": true}, "backup_id": {"$ref": "#/$defs/id"}},
+          "required": ["evidence_type", "verified", "backup_id"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "evidence_type": {"const": "final_result"},
+            "verified": {"const": false},
+            "backup_id": {"type": "null"},
+            "failure": {"enum": ["unavailable", "ineligible", "timeout"]}
+          },
+          "required": ["evidence_type", "verified", "backup_id", "failure"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "route_proof": {
+      "type": "object",
+      "properties": {
+        "proof_id": {"$ref": "#/$defs/id"},
+        "member": {"$ref": "#/$defs/recipient"},
+        "ciphertext": {"$ref": "#/$defs/blob"},
+        "restore_session_id": {"$ref": "#/$defs/id"},
+        "created_at": {"$ref": "#/$defs/timestamp"},
+        "authority_id": {"$ref": "#/$defs/id"},
+        "custody_ref": {"$ref": "#/$defs/id"},
+        "bootstrap_ref": {"$ref": "#/$defs/id"},
+        "other_routes_unavailable": {"const": true},
+        "independent_access_verified": {"const": true},
+        "outcome": {"const": "decrypted_and_verified"},
+        "set_id": {"$ref": "#/$defs/id"},
+        "checkpoint_ref": {"$ref": "#/$defs/ref_checkpoint"}
+      },
+      "required": [
+        "proof_id",
+        "member",
+        "ciphertext",
+        "restore_session_id",
+        "created_at",
+        "authority_id",
+        "custody_ref",
+        "bootstrap_ref",
+        "other_routes_unavailable",
+        "independent_access_verified",
+        "outcome",
+        "set_id",
+        "checkpoint_ref"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/manifest"},
+    {"$ref": "#/$defs/capture_readback"},
+    {"$ref": "#/$defs/capture_checkpoint"},
+    {"$ref": "#/$defs/full_restore"},
+    {"$ref": "#/$defs/owner_acceptance"},
+    {"$ref": "#/$defs/ledger_update"},
+    {"$ref": "#/$defs/final_result"}
+  ]
+}
