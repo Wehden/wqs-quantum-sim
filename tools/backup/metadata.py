@@ -6,11 +6,9 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
-from jsonschema import Draft202012Validator, FormatChecker
 
 CONTRACT_COMMIT = "6f4674e2ae02a6e9fe8ced33117ac5a17b77fc78"
 SCHEMA = json.loads((Path(__file__).parent / "contract/schema.json").read_text())
-VALIDATOR = Draft202012Validator(SCHEMA, format_checker=FormatChecker())
 MAX_INT = 9007199254740991
 
 def require(condition, message):
@@ -86,8 +84,10 @@ def timestamp(value):
 
 
 def validate_record(record):
+    from jsonschema import Draft202012Validator, FormatChecker
+    validator = Draft202012Validator(SCHEMA, format_checker=FormatChecker())
     canonical(record)
-    errors = list(VALIDATOR.iter_errors(record))
+    errors = list(validator.iter_errors(record))
     require(not errors, "schema failure")
     if record["evidence_type"] != "final_result":
         timestamp(record["created_at"])

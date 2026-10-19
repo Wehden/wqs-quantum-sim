@@ -137,8 +137,9 @@ def test_parent_symlink_cannot_escape(setup):
         run(setup)
 
 
-def test_cli_fails_closed():
-    result = subprocess.run([sys.executable, '-m', 'tools.backup.capture'], capture_output=True, text=True)
+@pytest.mark.parametrize('flags', [[], ['-S']])
+def test_cli_fails_closed(flags):
+    result = subprocess.run([sys.executable, *flags, '-m', 'tools.backup.capture'], capture_output=True, text=True)
     assert result.returncode == 1
     assert json.loads(result.stdout) == unavailable_result()
 
