@@ -161,7 +161,9 @@ class NativeLoad:
         validate_wqs(manifest, loaded)
         # Open the actual database in its native SQLite form; do not claim load
         # based solely on parsing the archive's in-memory copy.
+        # The destination is offline and fully checkpointed; immutable mode
+        # prevents verification itself from creating WAL/SHM sidecars.
         from urllib.parse import quote
-        with closing(sqlite3.connect('file:' + quote(str(database), safe='/') + '?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect('file:' + quote(str(database), safe='/') + '?mode=ro&immutable=1', uri=True)) as db:
             require(db.execute('PRAGMA quick_check').fetchone()[0] == 'ok', 'loaded SQLite integrity failure')
             db.execute('SELECT id FROM jobs LIMIT 1').fetchall()

@@ -363,3 +363,17 @@ def test_false_provenance_flags_and_different_source_do_not_block_actual_load(ba
     assert result['verified'] is True
     with sqlite3.connect(Path(destinations['data_dir'])/'jobs.sqlite3') as db:
         assert db.execute('SELECT release FROM release_control WHERE singleton=1').fetchone()[0] == ''
+
+
+def test_native_verification_leaves_no_sidecars_and_restore_can_repeat(backup):
+    _, archive, manifest, destinations = backup
+    _, files = unpack(archive.read_bytes())
+    database_bytes = files[manifest['dependencies']['database']]
+    assert database_bytes[18:20] == b'\x02\x02'  # Retained WAL-mode header.
+    loader = NativeLoad(destinations)
+    database = Path(destinations['data_dir']) / 'jobs.sqlite3'
+    for _ in range(2):
+        loader.load(manifest, files)
+        assert database.read_bytes() == database_bytes
+        assert not any(Path(str(database) + suffix).exists()
+                       for suffix in ('-wal', '-shm', '-journal'))
