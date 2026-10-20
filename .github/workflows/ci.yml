@@ -100,7 +100,7 @@ jobs:
   local:
     name: Local execution
     needs: validate-child
-    if: needs.validate-child.result == 'success'
+    if: ${{ !cancelled() && needs.validate-child.result == 'success' }}
     runs-on: [self-hosted, Linux, X64, wqs-ci-local]
     outputs:
       tests: ${{ steps.tests.outcome }}

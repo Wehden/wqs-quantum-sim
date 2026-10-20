@@ -174,3 +174,14 @@ def test_dispatch_intent_written_before_post():
         return f(method,path,body)
     m.Controller(api,lambda:f.now,f.sleep,records.append).run('1','1',SHA,'main')
     assert records[-1]['child_run_id']==2
+
+
+def test_workflow_signal_and_cleanup_contract():
+    import yaml
+    workflow=yaml.safe_load((Path(__file__).parents[1]/'.github/workflows/ci.yml').read_text())
+    steps=workflow['jobs']['attempt']['steps']
+    assert next(s for s in steps if s.get('id')=='attempt')['run'].startswith('exec python3 ')
+    cleanup_step=next(s for s in steps if '--cleanup' in s.get('run',''))
+    assert cleanup_step['if']=='always()'
+    assert cleanup_step['timeout-minutes']==2
+    assert '!cancelled()' in workflow['jobs']['local']['if']
