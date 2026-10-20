@@ -1,0 +1,36 @@
+name: CI capacity acceptance
+
+# Bounded, credential-free slot occupancy test. Trigger ordinary PR CI while
+# both holds are running to test overflow against the actual capacity snapshot.
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hold:
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.label.name == 'ci-capacity-test' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        slot: [1, 2]
+    runs-on: [self-hosted, Linux, X64, wqs-ci-local]
+    timeout-minutes: 7
+    steps:
+      - name: Hold one local CI slot for five minutes
+        env:
+          SLOT: ${{ matrix.slot }}
+        shell: bash
+        run: |
+          printf 'capacity acceptance: runner=%s run=%s attempt=%s slot=%s\n' \
+            "$RUNNER_NAME" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$SLOT"
+          sleep 300
+          printf 'capacity acceptance: runner=%s completed hold\n' "$RUNNER_NAME"

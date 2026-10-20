@@ -1,0 +1,119 @@
+# Render BOTH image references to the reviewed immutable build before applying.
+# New PVCs are per-slot; never copy the legacy runner PVC or production state.
+apiVersion: v1
+kind: Service
+metadata:
+  name: wqs-ci
+  namespace: wqs-ci
+spec:
+  clusterIP: None
+  selector:
+    app: wqs-ci-local
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wqs-ci
+  namespace: wqs-ci
+spec:
+  serviceName: wqs-ci
+  replicas: 2
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: wqs-ci-local
+  template:
+    metadata:
+      labels:
+        app: wqs-ci-local
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        kubernetes.io/hostname: standpunkt
+      securityContext:
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: owner
+          image: laminarflow:30500/wqs/ci-runner@sha256:17fec9e20e50023882509aae2c52b536fead249c1e5bab4948daca712d678562
+          command: [chown, '1001:1001', /runner]
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN]
+          volumeMounts:
+            - name: data
+              mountPath: /runner
+      containers:
+        - name: runner
+          image: laminarflow:30500/wqs/ci-runner@sha256:17fec9e20e50023882509aae2c52b536fead249c1e5bab4948daca712d678562
+          env:
+            - name: RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: RUNNER_REPOSITORY
+              value: https://github.com/Wehden/wqs-quantum-sim
+            - name: RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: registration
+                  key: token
+                  optional: true
+          resources:
+            requests:
+              cpu: '1'
+              memory: 1Gi
+            limits:
+              cpu: '6'
+              memory: 5Gi
+          securityContext:
+            runAsUser: 1001
+            runAsGroup: 1001
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /runner
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 8Gi
+---
+# Preserve the live ordinary-CI namespace boundary. No cluster or LAN egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runner-boundary
+  namespace: wqs-ci
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {port: 53, protocol: UDP}
+        - {port: 53, protocol: TCP}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16]
+      ports:
+        - {port: 443, protocol: TCP}
