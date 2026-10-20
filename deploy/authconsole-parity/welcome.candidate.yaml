@@ -61,7 +61,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: provider
-        image: laminarflow:30500/qsim/admin-console@sha256:95d63f5e25295dc9a78b9d6e99709a948895fcbc75b3eff1a1625fd68774a188
+        image: laminarflow:30500/qsim/admin-console@sha256:e8eeb14e4582bd401ef1615d56d30d2391a96fcfe1c91f0199e8e620b650f90b
         command:
         - python
         - -m

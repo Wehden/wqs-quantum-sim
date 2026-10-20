@@ -1,9 +1,9 @@
 # WQS Authconsole deployment candidate
 
-Prepared from owner code f1190b5; NOT approval to apply. All three processes use
-`laminarflow:30500/qsim/admin-console@sha256:95d63f5e25295dc9a78b9d6e99709a948895fcbc75b3eff1a1625fd68774a188`.
+Prepared from owner code 34aa0fb; NOT approval to apply. All three processes use
+`laminarflow:30500/qsim/admin-console@sha256:e8eeb14e4582bd401ef1615d56d30d2391a96fcfe1c91f0199e8e620b650f90b`.
 The root build/import check passed without network. Management and legacy tests:
-31 passed; prior full suite: 639 passed, 6 subtests; isolated real HTTP/TLS/browser
+33 passed; prior full suite: 639 passed, 6 subtests; isolated real HTTP/TLS/browser
 acceptance passed using synthetic registry, fake SMTP and a real API key check.
 Independent owner security review passed. Live TLS/network/SMTP remain untested.
 
@@ -93,3 +93,8 @@ Welcome registration proposal: `backend_namespace=qsim`,
 This digest derives from the fixed capability schema and proposed scope/revision;
 verify against the authenticated running provider before registration. The mapping
 is still awaiting review; these proposed identifiers are not a mapping receipt.
+
+Command-contention review correction at 34aa0fb commits the payload-bound intent
+before execution-lock acquisition. Deterministic concurrent duplicate/conflict and
+pre-lock crash regressions pass; independent verification passed 33 management and
+legacy tests. The image above was rebuilt from that reviewed source.
