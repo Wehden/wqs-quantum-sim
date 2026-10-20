@@ -71,7 +71,9 @@ the existing workflow, local job name and accepted execution bound. Outputs are
 `lane=local|hosted`, `outcome=success|failure|capacity_unavailable`, `child_run_id`
 and a safe reason. Consumers must gate success on outcome, not controller exit alone.
 For runner-dispatched Kubernetes jobs, a successful child may explicitly signal
-scheduling failure with a successful job named `Local capacity unavailable`; this is
+scheduling failure with `--capacity-marker "Local capacity unavailable"` and a successful job of that
+name. The required marker must be terminal (success for capacity, skipped otherwise),
+and the local execution job must succeed. This is
 accepted only if the local job was assigned. That marker must depend on completed
 cleanup and must never represent test failure. WQS does not use that marker because
 its tests run directly inside the runner pod.

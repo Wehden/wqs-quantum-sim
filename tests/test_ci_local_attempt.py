@@ -24,8 +24,8 @@ class Fake:
         if '/runs?event=' in path:
             return {'workflow_runs': [{'id': 2, 'head_sha': self.child_sha, 'display_title': 'ci-local-1-1-' + SHA}]}
         if '/jobs?' in path:
-            jobs = [{'name': 'Local execution', 'runner_id': 7 if self.accepted or (self.cancelled and self.raced) else 0}]
-            if self.marker: jobs.append({'name': 'Local capacity unavailable', 'conclusion': 'success'})
+            jobs = [{'name': 'Local execution', 'status':'completed', 'conclusion':'success', 'runner_id': 7 if self.accepted or (self.cancelled and self.raced) else 0}]
+            if self.marker: jobs.append({'name': 'Local capacity unavailable', 'status':'completed', 'conclusion': 'success'})
             return {'jobs': jobs}
         if path.endswith('/cancel'):
             self.cancelled = True
@@ -35,7 +35,7 @@ class Fake:
             return {'status': 'completed' if done else 'in_progress', 'conclusion': self.conclusion or 'cancelled'}
         raise AssertionError(path)
     def run(self):
-        return m.Controller(self, lambda: self.now, self.sleep).run('1','1',SHA,'main',queue_timeout=4,execution_timeout=4)
+        return m.Controller(self, lambda: self.now, self.sleep).run('1','1',SHA,'main',capacity_marker='Local capacity unavailable' if self.marker else '',queue_timeout=4,execution_timeout=4)
 
 @pytest.mark.parametrize('conclusion,outcome', [('success','success'), ('failure','failure'), ('cancelled','failure')])
 def test_accepted_never_retries(conclusion, outcome):
@@ -197,7 +197,21 @@ def test_terminal_job_refresh_finds_late_capacity_marker():
             inventories+=1
             if inventories==1: result['jobs']=result['jobs'][:1]
         return result
-    result=m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main')
+    result=m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main',capacity_marker='Local capacity unavailable')
     assert inventories==2
     assert result['lane']=='hosted'
     assert result['outcome']=='capacity_unavailable'
+
+
+@pytest.mark.parametrize('marker_status,marker_conclusion,local_conclusion,expected', [('completed','skipped','success','success'),('in_progress',None,'success','failure'),('completed','success','failure','failure'),('missing',None,'success','failure')])
+def test_required_capacity_marker_and_local_success(marker_status,marker_conclusion,local_conclusion,expected):
+    f=Fake(accepted=True,conclusion='success',marker=True)
+    def api(method,path,body=None):
+        result=f(method,path,body)
+        if '/jobs?' in path:
+            result['jobs'][0]['conclusion']=local_conclusion
+            result['jobs'][1].update(status=marker_status,conclusion=marker_conclusion)
+            if marker_status=='missing': result['jobs'].pop()
+        return result
+    result=m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main',capacity_marker='Local capacity unavailable')
+    assert result['outcome']==expected

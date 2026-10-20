@@ -119,7 +119,7 @@ class Controller:
         raise ValueError('Child cancellation not confirmed; hosted fallback withheld')
 
     def run(self, parent_id, attempt, sha, ref, workflow='ci.yml', job_name='Local execution',
-            capacity_marker='Local capacity unavailable', queue_timeout=120, execution_timeout=1800):
+            capacity_marker='', queue_timeout=120, execution_timeout=1800):
         parent = validate_parent(self.api, parent_id, attempt, sha, workflow)
         if ref != parent['head_branch']:
             raise ValueError('Dispatch ref differs from parent branch')
@@ -173,10 +173,13 @@ class Controller:
                 # before classifying capacity markers or accepted execution.
                 jobs = self.jobs(run_id)
                 accepted = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in jobs)
-                capacity = any(j['name'] == capacity_marker and j.get('conclusion') == 'success' for j in jobs)
-                if accepted and run['conclusion'] == 'success' and capacity:
+                local_ok = any(j['name'] == job_name and j.get('status') == 'completed' and j.get('conclusion') == 'success' for j in jobs)
+                markers = [j for j in jobs if j['name'] == capacity_marker] if capacity_marker else []
+                marker_valid = not capacity_marker or (len(markers) == 1 and markers[0].get('status') == 'completed' and markers[0].get('conclusion') in ('success', 'skipped'))
+                capacity = bool(markers and markers[0].get('conclusion') == 'success')
+                if accepted and local_ok and marker_valid and run['conclusion'] == 'success' and capacity:
                     return dict(lane='hosted', outcome='capacity_unavailable', child_run_id=run_id, reason='Child explicitly reported scheduling unavailable.')
-                passed = accepted and run['conclusion'] == 'success'
+                passed = accepted and local_ok and marker_valid and run['conclusion'] == 'success'
                 return dict(lane='local', outcome='success' if passed else 'failure', child_run_id=run_id,
                             reason='Local attempt passed.' if passed else 'Local execution or child validation failed; no hosted retry.')
             if execution_deadline is not None and self.clock() >= execution_deadline:
@@ -249,6 +252,7 @@ def main():
     parser.add_argument('--state-file', default=os.path.join(os.environ.get('RUNNER_TEMP', '.'), 'local-attempt.json'))
     parser.add_argument('--workflow', default='ci.yml')
     parser.add_argument('--job-name', default='Local execution')
+    parser.add_argument('--capacity-marker', default='')
     parser.add_argument('--execution-timeout', type=int, default=1800)
     args = parser.parse_args()
     if not 60 <= args.execution_timeout <= 14400:
@@ -269,7 +273,7 @@ def main():
         with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
             out.write(f"parent_event={parent['event']}\nparent_head_sha={parent['head_sha']}\n")
         return
-    result = Controller(api, record_child=lambda child: write_child_receipt(args.state_file, child)).run(*identity, os.environ['LOCAL_DISPATCH_REF'], args.workflow, args.job_name, execution_timeout=args.execution_timeout)
+    result = Controller(api, record_child=lambda child: write_child_receipt(args.state_file, child)).run(*identity, os.environ['LOCAL_DISPATCH_REF'], args.workflow, args.job_name, capacity_marker=args.capacity_marker, execution_timeout=args.execution_timeout)
     with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
         for key, value in result.items():
             out.write(f'{key}={value}\n')
