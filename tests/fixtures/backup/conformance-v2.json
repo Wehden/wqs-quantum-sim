@@ -81,8 +81,8 @@
         "path": "runner_ledger.synthetic",
         "kind": "regular",
         "role": "runner_ledger",
-        "sha256": "b4f34071f8aebb5ee45ed5abf1a6bb5c6e594b9b35789b23b843a8c0d834e9ac",
-        "size": 30
+        "sha256": "9cc253b471b03e0ec5c01834c5532f40051d097795b7952cd66d6858cf8892fe",
+        "size": 69
       },
       {
         "path": "release_receipts.synthetic",
@@ -132,7 +132,7 @@
     "results.synthetic": "SYNTHETIC results bytes\n",
     "invitation_registry.synthetic": "SYNTHETIC invitation_registry bytes\n",
     "pending_delivery_key.synthetic": "SYNTHETIC pending_delivery_key bytes\n",
-    "runner_ledger.synthetic": "SYNTHETIC runner_ledger bytes\n",
+    "runner_ledger.synthetic": "{\"sha\":\"1111111111111111111111111111111111111111\",\"status\":\"holding\"}",
     "release_receipts.synthetic": "SYNTHETIC release_receipts bytes\n",
     "image_inventory.synthetic": "SYNTHETIC image_inventory bytes\n",
     "registry_access.synthetic": "SYNTHETIC registry_access bytes\n"

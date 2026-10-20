@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from .metadata import canonical, digest, require, timestamp, verify_manifest
 
-CONTRACT_COMMIT = "fdec5b863579fd775a776eb93f7cc1ed910cf015"
+CONTRACT_COMMIT = "1b87f5c50b13120629f5d853579cfeae31154a27"
 
 
 def validate_record(record):

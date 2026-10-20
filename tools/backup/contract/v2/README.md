@@ -1,7 +1,7 @@
 # LaminarAuth recovery contract v2
 
 Schema and portable fixtures are vendored byte-for-byte from
-[LaminarAuth fdec5b8](https://github.com/Wehden/LaminarAuth/tree/fdec5b863579fd775a776eb93f7cc1ed910cf015).
+[LaminarAuth 1b87f5c](https://github.com/Wehden/LaminarAuth/tree/1b87f5c50b13120629f5d853579cfeae31154a27).
 Exact paths and SHA-256 hashes are recorded in `provenance.json` and tested.
 LaminarAuth's MIT attribution is retained in [../LICENSE](../LICENSE).
 
