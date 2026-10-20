@@ -79,3 +79,17 @@ Owner authorized reconciliation, operational acceptance and coordination with La
 ## Reconciliation, 2026-10-19
 
 PR #24 is merged. The deployment runner is registered but remains stopped. Application acceptance hooks are implemented locally; the full local suite passed 390 Python tests and three console tests, with a separate runner-image smoke check. PR review, merge, installation and live acceptance remain pending. LaminarAuth now publishes the v1 recovery contract and schema; WQS adapter integration is the next implementation task. Custody, encryption and exact-set recovery evidence remain required. CD stays disabled, and credential rotation stays deferred.
+
+## Recovery policy amendment: creation and direct load v2
+
+The authorized v2 policy supersedes independent checkpoint/authority, per-route
+proof, custody-mapping approval, staging restore, and owner-acceptance gates.
+See [the implementation contract](../../docs/backup-recovery-v2.md).
+
+- [ ] Merge reviewed v2 contract pin and WQS consumer changes.
+- [ ] Install actual v2 capture integration; creation must match the CD-requested set ID.
+- [ ] Configure an explicit native destination for operational recovery when requested.
+- [ ] Complete unrelated protocol, runtime-parity and application acceptance gates.
+
+Source tests use disposable destinations and existing test-created identities;
+no production restore, credential rotation, or bootstrap/CD change is implied.

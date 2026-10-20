@@ -87,14 +87,20 @@ def capture(source, manifest, expected_context, providers, work_dir, *, now=None
     encrypt must encrypt the complete payload to all approved recipients. put
     must create a new object and return its opaque reference, never overwrite.
     """
-    validate_record(manifest)
+    validator = validate_record
+    if manifest.get('contract_version') == 2:
+        from .v2 import validate_record as validator
+    validator(manifest)
     verify_manifest(manifest)
     context = manifest['context']
     require(manifest['evidence_type'] == 'manifest' and context['set_type'] == 'wqs', 'WQS manifest required')
     require(canonical(context) == canonical(expected_context), 'independent context mismatch')
     deps = manifest['dependencies']
-    require(deps['parent_coordinated'] is True and deps['admission_held'] is True
-            and deps['cd_enabled'] is False and deps['ledger_state'] == 'holding', 'held release required')
+    if manifest['contract_version'] == 1:
+        require(deps['parent_coordinated'] is True and deps['admission_held'] is True
+                and deps['cd_enabled'] is False and deps['ledger_state'] == 'holding', 'held release required')
+    # V2 flags describe the source. Actual source consistency is checked by the
+    # configured provider below, not inferred from metadata flag values.
     members = context['recipients']
     require(members == sorted(members, key=lambda m: (m['type'], m['value'])), 'recipient ordering')
     for key in ('key_id', 'value', 'fingerprint'):
@@ -130,7 +136,7 @@ def capture(source, manifest, expected_context, providers, work_dir, *, now=None
             receipt.update(record_id=uuid.uuid4().hex, evidence_type='capture_readback', created_at=created,
                            manifest_ref=binding(manifest), ciphertext=ciphertext, object_ref=object_ref,
                            outcome='readback_verified')
-            validate_record(receipt)
+            validator(receipt)
             return receipt
     finally:
         os.close(root)

@@ -1,0 +1,431 @@
+{
+  "label": "SYNTHETIC v2 format conformance; no decrypt or native load proof",
+  "fixture_format": 2,
+  "manifest": {
+    "schema_id": "backup-recovery-set-v2",
+    "contract_version": 2,
+    "canonical_profile": "backup-json-v1",
+    "record_id": "SYNTHETIC-manifest-1",
+    "evidence_type": "manifest",
+    "context": {
+      "set_id": "SYNTHETIC-set-1",
+      "set_type": "wqs",
+      "scope": {
+        "kind": "application",
+        "app_id": "SYNTHETIC-wqs",
+        "org_id": "SYNTHETIC-org",
+        "release_sha": "1111111111111111111111111111111111111111"
+      },
+      "format_version": 1,
+      "source": {
+        "revision": "2222222222222222222222222222222222222222",
+        "image_or_executable_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "workload": "SYNTHETIC-workload",
+        "storage": "SYNTHETIC-current-pvc"
+      },
+      "boundary": {
+        "method": "SYNTHETIC parent-held lock and drained boundary",
+        "cursor": "SYNTHETIC-boundary-1",
+        "source_at": "2026-10-17T12:00:00Z"
+      },
+      "recipients": [
+        {
+          "key_id": "SYNTHETIC-hardware-1",
+          "type": "age-plugin-yubikey-piv-p256-v0.5.1",
+          "value": "age1yubikey1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+          "fingerprint": "a69d897923bbfd65ebdb8c86e486cef696e999df368117f9dbae9b075b0de944"
+        },
+        {
+          "key_id": "SYNTHETIC-native-1",
+          "type": "age-x25519",
+          "value": "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+          "fingerprint": "d3eeac9b7373788d7a6c5f4f404c1959e6371277e3cec7211ffe73e5dc307d72"
+        }
+      ],
+      "recipients_digest": {
+        "sha256": "f6d5389b127dc7a12b63433a8c87224b986f4bd1bebb7470fd0e456d787fefca",
+        "size": 450
+      }
+    },
+    "created_at": "2026-10-17T12:01:00Z",
+    "inventory": [
+      {
+        "path": "database.synthetic",
+        "kind": "regular",
+        "role": "database",
+        "sha256": "e6a0e7979f403c8b532e6c1f1ca2b5e9a9f96df8d58bab74072b8ad942cb6e63",
+        "size": 25
+      },
+      {
+        "path": "results.synthetic",
+        "kind": "regular",
+        "role": "results",
+        "sha256": "8ca9ea23aade818f99f0b6d561b75aa580abba9680280fb1887db7dad61bf1ed",
+        "size": 24
+      },
+      {
+        "path": "invitation_registry.synthetic",
+        "kind": "regular",
+        "role": "invitation_registry",
+        "sha256": "6307694ee21eb9f44d209ccd186bf146b6c50962fabdbd7c859f87d678481b64",
+        "size": 36
+      },
+      {
+        "path": "pending_delivery_key.synthetic",
+        "kind": "regular",
+        "role": "pending_delivery_key",
+        "sha256": "44b9b024850e941f4ee849c22712e995728135732b2eb1b7bf53a60327171170",
+        "size": 37
+      },
+      {
+        "path": "runner_ledger.synthetic",
+        "kind": "regular",
+        "role": "runner_ledger",
+        "sha256": "b4f34071f8aebb5ee45ed5abf1a6bb5c6e594b9b35789b23b843a8c0d834e9ac",
+        "size": 30
+      },
+      {
+        "path": "release_receipts.synthetic",
+        "kind": "regular",
+        "role": "release_receipts",
+        "sha256": "8b2ebf06def7e95d531973d8282507beb22506e4e4be86803532958ac56ddde7",
+        "size": 33
+      },
+      {
+        "path": "image_inventory.synthetic",
+        "kind": "regular",
+        "role": "image_inventory",
+        "sha256": "0efb9bd9fd5e0137e7851bf0aedfe2a1877b72738d2fea17b23b3834eabba63a",
+        "size": 32
+      },
+      {
+        "path": "registry_access.synthetic",
+        "kind": "regular",
+        "role": "registry_access",
+        "sha256": "a777b48fbc68b78015f80b4b3fae63533c196425adef4fa934ea3774d1965789",
+        "size": 32
+      }
+    ],
+    "dependencies": {
+      "kind": "wqs",
+      "database": "database.synthetic",
+      "results": [
+        "results.synthetic"
+      ],
+      "invitation_registry": "invitation_registry.synthetic",
+      "pending_delivery_key": "pending_delivery_key.synthetic",
+      "runner_ledger": "runner_ledger.synthetic",
+      "release_receipts": [
+        "release_receipts.synthetic"
+      ],
+      "image_inventory": "image_inventory.synthetic",
+      "registry_access": "registry_access.synthetic",
+      "pvc_identity": "SYNTHETIC-current-pvc",
+      "parent_coordinated": true,
+      "ledger_state": "holding",
+      "admission_held": true,
+      "cd_enabled": false
+    }
+  },
+  "payload_utf8": {
+    "database.synthetic": "SYNTHETIC database bytes\n",
+    "results.synthetic": "SYNTHETIC results bytes\n",
+    "invitation_registry.synthetic": "SYNTHETIC invitation_registry bytes\n",
+    "pending_delivery_key.synthetic": "SYNTHETIC pending_delivery_key bytes\n",
+    "runner_ledger.synthetic": "SYNTHETIC runner_ledger bytes\n",
+    "release_receipts.synthetic": "SYNTHETIC release_receipts bytes\n",
+    "image_inventory.synthetic": "SYNTHETIC image_inventory bytes\n",
+    "registry_access.synthetic": "SYNTHETIC registry_access bytes\n"
+  },
+  "canonical_vectors": [
+    {
+      "name": "sort-and-types",
+      "input_json": " {\"z\":null,\"a\":[true,false,0,9007199254740991],\"A\":\"text\"} ",
+      "canonical_json": "{\"A\":\"text\",\"a\":[true,false,0,9007199254740991],\"z\":null}",
+      "sha256": "1ae86945329c864a6385bf3099d3f6da7ab68b5b0e2f128a1776e49d15b997cb",
+      "size": 57
+    },
+    {
+      "name": "escaping",
+      "input_json": "{\"slash\":\"a/b\",\"quote\":\"\\\"\",\"backslash\":\"\\\\\"}",
+      "canonical_json": "{\"backslash\":\"\\\\\",\"quote\":\"\\\"\",\"slash\":\"a/b\"}",
+      "sha256": "2d4d9ff1894e6e214c11e65c770315c977f599c31594cd0e55d166116369f361",
+      "size": 45
+    },
+    {
+      "name": "empty-containers",
+      "input_json": "{\"object\":{},\"array\":[],\"text\":\"\"}",
+      "canonical_json": "{\"array\":[],\"object\":{},\"text\":\"\"}",
+      "sha256": "393fa1f8e0b63625829df4ed36cb09a25ba3e52a2ddd1dcef8e3d0563f6532c1",
+      "size": 34
+    }
+  ],
+  "invalid_metadata": [
+    {
+      "name": "duplicate-key",
+      "input_json": "{\"a\":1,\"a\":2}"
+    },
+    {
+      "name": "negative-zero",
+      "input_json": "-0"
+    },
+    {
+      "name": "negative-integer",
+      "input_json": "-1"
+    },
+    {
+      "name": "float",
+      "input_json": "1.0"
+    },
+    {
+      "name": "exponent",
+      "input_json": "1e2"
+    },
+    {
+      "name": "unsafe-integer",
+      "input_json": "9007199254740992"
+    },
+    {
+      "name": "nan",
+      "input_json": "NaN"
+    },
+    {
+      "name": "infinity",
+      "input_json": "Infinity"
+    },
+    {
+      "name": "unicode",
+      "input_json": "\"\\u00e9\""
+    },
+    {
+      "name": "control",
+      "input_json": "\"\\n\""
+    },
+    {
+      "name": "nonascii-key",
+      "input_json": "{\"\\u00e9\":1}"
+    },
+    {
+      "name": "BOM",
+      "input_json": "\ufeff{}"
+    },
+    {
+      "name": "leading-zero",
+      "input_json": "01"
+    }
+  ],
+  "byte_vectors": [
+    {
+      "name": "UTF8-object",
+      "input_hex": "7b7d",
+      "valid": true,
+      "canonical_json": "{}"
+    },
+    {
+      "name": "UTF8-spaced-object",
+      "input_hex": "207b2261223a20317d20",
+      "valid": true,
+      "canonical_json": "{\"a\":1}"
+    },
+    {
+      "name": "UTF8-BOM",
+      "input_hex": "efbbbf7b7d",
+      "valid": false
+    },
+    {
+      "name": "UTF16-LE-BOM",
+      "input_hex": "fffe7b007d00",
+      "valid": false
+    },
+    {
+      "name": "UTF16-BE-BOM",
+      "input_hex": "feff007b007d",
+      "valid": false
+    },
+    {
+      "name": "UTF16-LE",
+      "input_hex": "7b007d00",
+      "valid": false
+    },
+    {
+      "name": "UTF16-BE",
+      "input_hex": "007b007d",
+      "valid": false
+    },
+    {
+      "name": "UTF32-LE-BOM",
+      "input_hex": "fffe00007b0000007d000000",
+      "valid": false
+    },
+    {
+      "name": "UTF32-BE-BOM",
+      "input_hex": "0000feff0000007b0000007d",
+      "valid": false
+    },
+    {
+      "name": "UTF32-LE",
+      "input_hex": "7b0000007d000000",
+      "valid": false
+    },
+    {
+      "name": "UTF32-BE",
+      "input_hex": "0000007b0000007d",
+      "valid": false
+    },
+    {
+      "name": "non-UTF8",
+      "input_hex": "22e922",
+      "valid": false
+    }
+  ],
+  "empty_variants": [
+    [],
+    [
+      "results"
+    ],
+    [
+      "release_receipts"
+    ],
+    [
+      "results",
+      "release_receipts"
+    ]
+  ],
+  "invalid_manifests": [
+    {
+      "name": "missing-file",
+      "path": [
+        "inventory",
+        0,
+        "path"
+      ],
+      "value": "absent.synthetic"
+    },
+    {
+      "name": "wrong-role",
+      "path": [
+        "inventory",
+        0,
+        "role"
+      ],
+      "value": "other"
+    },
+    {
+      "name": "wrong-hash",
+      "path": [
+        "inventory",
+        0,
+        "sha256"
+      ],
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "wrong-size",
+      "path": [
+        "inventory",
+        0,
+        "size"
+      ],
+      "value": 999
+    },
+    {
+      "name": "unsafe-path",
+      "path": [
+        "inventory",
+        0,
+        "path"
+      ],
+      "value": "../escape"
+    },
+    {
+      "name": "reserved-name",
+      "path": [
+        "inventory",
+        0,
+        "path"
+      ],
+      "value": "manifest.json"
+    },
+    {
+      "name": "absolute-path",
+      "path": [
+        "inventory",
+        0,
+        "path"
+      ],
+      "value": "/escape"
+    },
+    {
+      "name": "backslash",
+      "path": [
+        "inventory",
+        0,
+        "path"
+      ],
+      "value": "a\\b"
+    },
+    {
+      "name": "wrong-format",
+      "path": [
+        "context",
+        "format_version"
+      ],
+      "value": 2
+    },
+    {
+      "name": "wrong-contract",
+      "path": [
+        "contract_version"
+      ],
+      "value": 1
+    },
+    {
+      "name": "wrong-schema",
+      "path": [
+        "schema_id"
+      ],
+      "value": "backup-recovery-set-v1"
+    },
+    {
+      "name": "wrong-profile",
+      "path": [
+        "canonical_profile"
+      ],
+      "value": "unknown"
+    },
+    {
+      "name": "recipient-digest",
+      "path": [
+        "context",
+        "recipients_digest",
+        "sha256"
+      ],
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "recipient-fingerprint",
+      "path": [
+        "context",
+        "recipients",
+        0,
+        "fingerprint"
+      ],
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "invalid-date",
+      "path": [
+        "created_at"
+      ],
+      "value": "2026-02-30T00:00:00Z"
+    },
+    {
+      "name": "wrong-owner",
+      "path": [
+        "dependencies",
+        "kind"
+      ],
+      "value": "platform"
+    }
+  ]
+}

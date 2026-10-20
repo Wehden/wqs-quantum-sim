@@ -115,7 +115,7 @@ def services(monkeypatch):
     monkeypatch.setattr(release, 'current', lambda sha: True)
     monkeypatch.setattr(release, 'github', lambda path: event()['workflow_run'])
     monkeypatch.setattr(release, 'run', lambda args, *a, **kw: json.dumps(
-        {'verified': True, 'backup_id': 'local-test-backup'} if args == ['backup'] else evidence()))
+        {'evidence_type': 'creation_result', 'created': True, 'backup_id': kw['env']['WQS_BACKUP_SET_ID']} if args == ['backup'] else evidence()))
 
 
 def test_success_order_and_rerun_does_not_redeploy(tmp_path, services):
@@ -422,3 +422,37 @@ def test_acceptance_preflight_before_side_effects(tmp_path, monkeypatch, case):
         release.Deployer(cfg)
     assert not calls
     assert not (tmp_path / 'state').exists()
+
+
+@pytest.mark.parametrize('raw', [
+    '{}', '[]', '{"evidence_type":"final_result","verified":true,"backup_id":"expected"}',
+    '{"evidence_type":"creation_result","created":1,"backup_id":"expected"}',
+    '{"evidence_type":"creation_result","created":true,"backup_id":"other"}',
+    '{"evidence_type":"creation_result","created":false,"backup_id":null,"failure":"load_failed"}',
+    '{"evidence_type":"creation_result","created":true,"backup_id":"expected","extra":true}',
+    '{"evidence_type":"creation_result","created":false,"created":true,"backup_id":"expected"}',
+])
+def test_creation_result_rejects_ambiguous_or_wrong_receipts(raw):
+    with pytest.raises(ValueError):
+        release.verify_creation(raw, 'expected')
+
+
+def test_creation_result_matches_exact_invocation():
+    assert release.verify_creation('{"evidence_type":"creation_result","created":true,"backup_id":"expected"}', 'expected')['created'] is True
+
+
+@pytest.mark.parametrize('failure', ['nonzero', 'wrong-set', 'restore'])
+def test_failed_creation_never_applies_images(tmp_path, services, monkeypatch, failure):
+    import subprocess
+    def backup(*args, **kwargs):
+        if failure == 'nonzero':
+            raise subprocess.CalledProcessError(1, ['backup'])
+        return json.dumps({'evidence_type': 'final_result', 'verified': True, 'backup_id': 'wrong'} if failure == 'restore' else
+                          {'evidence_type': 'creation_result', 'created': True, 'backup_id': 'wrong'})
+    monkeypatch.setattr(release, 'run', backup)
+    deploy = Fake(config(tmp_path))
+    with pytest.raises((ValueError, subprocess.CalledProcessError)):
+        deploy.deploy(bundle(tmp_path), SHA, '123')
+    assert deploy.held
+    assert not set(release.ROLES).intersection(deploy.calls)
+    assert 'open' not in deploy.calls

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+age_bin=$(bash tools/ci/install-age.sh)
+export PATH="$age_bin:$PATH"
 uv sync --frozen --extra worker --extra controller
 uv pip check
 mkdir -p test-results

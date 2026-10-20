@@ -32,7 +32,9 @@ this PR is merged. First:
    strategy can start a surge pod that cannot acquire the controller lock and is
    rejected before any image or admission mutation. Preserve encryption material, callback secrets and job data.
 4. Install the private config and backup/verification hooks described below.
-   Test backup restoration independently. Rehearse interrupted deployment and
+   Require actual encrypted backup creation/readback before each release. Direct
+   restore is a separate explicit operation under v2, not an independent approval
+   prerequisite. Rehearse interrupted deployment and
    recovery with synthetic jobs. Confirm registry retention preserves successful
    images and every rollback target beyond GitHub artifact expiry.
 5. Set `WQS_RELEASE_CONFIG` to the private config's absolute path on the deployment
@@ -101,11 +103,15 @@ Hooks are trusted local programs executed as argv, never interpolated shell text
 See [release hooks](release-hooks.md) for the acceptance implementation and the
 unresolved backup contract dependencies. Neither source availability nor synthetic
 tests close the production acceptance gates.
-They receive `WQS_RELEASE_SHA`. Credentials remain in private files/environment.
+They receive `WQS_RELEASE_SHA`. The backup command additionally receives a unique
+`WQS_BACKUP_SET_ID`, which its creation result must match exactly. Credentials
+remain in private files/environment.
 Both have a ten-minute verification deadline. Hook stdout must be JSON; captured
 output is never copied into public CI logs. Backup returns
-`{"verified":true,"backup_id":"private-record-id"}` only after a consistent,
-recoverable backup of database, results and required invitation/key material.
+`{"evidence_type":"creation_result","created":true,"backup_id":"requested-set-id"}`
+only after actual consistent capture, encryption, storage and readback of database,
+results and required invitation/key material. Creation does not claim restore
+success and never initiates a restore. See [recovery v2](backup-recovery-v2.md).
 
 The verifier must check readiness and actual deployed image identities for all
 four roles, observer freshness and controller progress. It uses the dedicated

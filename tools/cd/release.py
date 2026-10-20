@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 import tarfile
 import urllib.request
 
@@ -19,6 +20,25 @@ ROLES = {'api': 'api', 'admin': 'api', 'controller': 'controller', 'observer': '
 
 def run(args, timeout=120, env=None):
     return subprocess.run(args, check=True, capture_output=True, text=True, timeout=timeout, env=env).stdout.strip()
+
+
+def verify_creation(raw, expected_id):
+    """Accept only this invocation's creation result, never restore evidence."""
+    def pairs(items):
+        value = {}
+        for key, item in items:
+            if key in value:
+                raise ValueError('Duplicate backup result field')
+            value[key] = item
+        return value
+    result = json.loads(raw, object_pairs_hook=pairs)
+    if (not isinstance(result, dict)
+            or set(result) != {'evidence_type', 'created', 'backup_id'}
+            or result['evidence_type'] != 'creation_result'
+            or result['created'] is not True
+            or result['backup_id'] != expected_id):
+        raise ValueError('Matching successful backup creation result required')
+    return result
 
 
 def github(path):
@@ -324,10 +344,13 @@ class Deployer:
                 self.control('hold', sha)
                 self.wait_drain(sha)
                 evidence_env = {**os.environ, 'WQS_RELEASE_SHA': sha}
-                backup = json.loads(run(self.config['backup_command'], 600, env=evidence_env))
-                if backup.get('verified') is not True or not backup.get('backup_id'):
-                    raise ValueError('Verified backup receipt required')
+                backup_set_id = uuid.uuid4().hex
+                receipt['backup_requested_id'] = backup_set_id
+                write_record(receipt_path, receipt)
+                backup_env = {**evidence_env, 'WQS_BACKUP_SET_ID': backup_set_id}
+                backup = verify_creation(run(self.config['backup_command'], 600, env=backup_env), backup_set_id)
                 receipt['backup_id'] = backup['backup_id']
+                receipt['backup_evidence_type'] = 'creation_result'
                 receipt['backup_completed'] = time.time()
                 if not current(sha):
                     raise ValueError('Release superseded before mutation; hold retained for operator')
