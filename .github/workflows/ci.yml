@@ -19,20 +19,28 @@ jobs:
     name: Choose and explain CI path
     runs-on: ubuntu-24.04
     outputs:
-      lane: ${{ steps.choose.outputs.lane }}
+      lane: ${{ steps.choose.outputs.lane || steps.hosted.outputs.lane }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Only trusted events may execute a router from this checkout.
       - id: choose
+        if: (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main')
         env:
           LOCAL_ENABLED: ${{ vars.WQS_LOCAL_CI_ENABLED }}
+          CI_LOCAL_RUNNER_STATUS: ${{ vars.CI_LOCAL_RUNNER_STATUS }}
         run: python3 tools/ci/route.py
+      - id: hosted
+        if: ${{ !((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main')) }}
+        run: echo "lane=hosted" >> "$GITHUB_OUTPUT"
   local:
     name: Standpunkt / Clifft + Google qsim + Aer / Python 3.12
     needs: route
-    if: needs.route.outputs.lane == 'local'
-    runs-on: [self-hosted, Linux, X64, wqs-local]
+    if: >-
+      needs.route.outputs.lane == 'local' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
+    runs-on: [self-hosted, Linux, X64, wqs-ci-local]
     continue-on-error: true
     outputs:
       tests: ${{ steps.tests.outcome }}

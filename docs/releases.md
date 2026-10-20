@@ -250,7 +250,8 @@ dependency consistency and the isolated three-engine worker.
 
 Use CI's manual `hosted_tests: true` input on main to exercise Node/Python setup,
 tests and artifact upload on the hosted lane. This does not qualify a deployment.
-The default stays Standpunkt-first with hosted fallback after a failed attempt.
-An offline queued runner remains a known routing limitation, not an availability
+Trusted events use Standpunkt only when the two-slot capacity snapshot is fresh
+and reports an idle runner; otherwise they start hosted. A runner failing after
+routing remains a queue-time race, not an availability
 probe. Live launch/status/cleanup validation remains a bootstrap/release gate;
 ordinary PR CI requires no cluster credentials or live provisioning.
