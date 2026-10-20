@@ -78,3 +78,15 @@ def test_bom_wrong_slot_state_still_rejected(tmp_path):
     assert result.returncode != 0
     assert 'Runner state belongs to another slot' in result.stderr
     assert not (target / 'configured-args').exists()
+
+
+def test_capacity_fixture_is_manual_main_only():
+    import yaml
+    from pathlib import Path
+    workflow = yaml.safe_load((Path(__file__).parents[1] / '.github/workflows/ci-capacity-acceptance.yml').read_text())
+    # PyYAML's YAML1.1 parser treats the Actions 'on' key as True.
+    triggers = workflow.get('on', workflow.get(True))
+    assert set(triggers) == {'workflow_dispatch'}
+    assert workflow['jobs']['hold']['if'] == "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
+    assert workflow['jobs']['hold']['timeout-minutes'] == 7
+    assert not any('uses' in step for step in workflow['jobs']['hold']['steps'])

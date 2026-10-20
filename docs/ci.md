@@ -81,6 +81,24 @@ accepted only if the local job was assigned. That marker must depend on complete
 cleanup and must never represent test failure. WQS does not use that marker because
 its tests run directly inside the runner pod.
 
+## Bounded capacity acceptance
+
+The hold fixture is manual-only and runs from trusted `main`. It has no pull-request
+or label trigger: a PR must not be able to change the guard that protects a local
+runner. Dispatch the reviewed main workflow with:
+
+```bash
+gh workflow run ci-capacity-acceptance.yml --repo Wehden/wqs-quantum-sim --ref main
+```
+
+The two matrix jobs each hold a slot for five minutes, with a seven-minute execution
+timeout. Verify actual runner occupancy before testing capacity routing. For an
+assignment-race test, retain a genuinely observed idle snapshot briefly while the
+holds acquire both slots, then trigger ordinary CI and restore the publisher. Verify
+the child remains unassigned, cancellation reaches terminal state, and the complete
+hosted test suite passes. Never fabricate the snapshot. The fixture does not change
+runner reservations or deployment configuration.
+
 ## Two-slot runner deployment
 
 [`runner.example.yaml`](../tools/ci/runner.example.yaml) preserves the live
