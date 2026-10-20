@@ -11,8 +11,12 @@ docker run --rm --network none --read-only --cap-drop ALL \
     python3 -c "import numpy; assert numpy.__version__ == \"2.5.4\""
     python3 -c "import boto3, bech32, jsonschema, cryptography"
     test "$(age --version)" = v1.2.1
+    test "$(LANG=C age-plugin-yubikey --version)" = "age-plugin-yubikey 0.5.1"
     gh --version
     docker --version
     kubectl version --client=true
     bash -n /usr/local/bin/wqs-deployment-runner
   '
+docker run --rm -i --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges --entrypoint python3 "$image" \
+  < tools/ci/check-recipient-encryption.py
