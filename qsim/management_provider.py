@@ -184,6 +184,19 @@ class Management:
             raise HTTPException(422, 'invalid_identity_field')
         payload = {'operation': operation, 'request_id': request_id, **body.model_dump()}
         digest = hashlib.sha256(canonical(payload)).hexdigest()
+        # Persist and bind the intent before another request can observe lock
+        # contention; even a crash before lock acquisition has a lookup outcome.
+        with store.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            existing = db.execute('SELECT * FROM admin_commands WHERE id=?', (body.command_id,)).fetchone()
+            if existing and existing['payload_hash'] != digest:
+                raise HTTPException(409, 'command_payload_conflict')
+            if existing and existing['status'] in ('SUCCEEDED', 'FAILED'):
+                return {key: existing['id'] if key == 'command_id' else existing[key] for key in COMMAND_FIELDS}
+            if not existing:
+                now = time.time()
+                db.execute('INSERT INTO admin_commands(id,payload,payload_hash,app_instance_id,org_id,actor,operation,request_id,identity,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                           (body.command_id,canonical(payload).decode(),digest,body.app_instance_id,body.org_id,body.actor,operation,request_id,body.identity if hasattr(body,'identity') else None,'ACCEPTED',now,now))
         # Lock only one command; the kernel releases it after crashes. Durable
         # intent plus the native resumable approval cover post-effect crashes.
         directory = settings.DATA / '.admin-command-locks'
@@ -198,17 +211,11 @@ class Management:
                 if saved['payload_hash'] != digest:
                     raise HTTPException(409,'command_payload_conflict')
                 return existing
-            with store.connect() as db:
-                db.execute('BEGIN IMMEDIATE')
-                existing = db.execute('SELECT * FROM admin_commands WHERE id=?', (body.command_id,)).fetchone()
-                if existing and existing['payload_hash'] != digest:
-                    raise HTTPException(409, 'command_payload_conflict')
-                if existing and existing['status'] in ('SUCCEEDED', 'FAILED'):
-                    return {key: existing['id'] if key == 'command_id' else existing[key] for key in COMMAND_FIELDS}
-                if not existing:
-                    now = time.time()
-                    db.execute('INSERT INTO admin_commands(id,payload,payload_hash,app_instance_id,org_id,actor,operation,request_id,identity,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-                               (body.command_id,canonical(payload).decode(),digest,body.app_instance_id,body.org_id,body.actor,operation,request_id,body.identity if hasattr(body,'identity') else None,'ACCEPTED',now,now))
+            # A previous holder may have completed while this request acquired
+            # the lock. Recheck before resuming any owner effect.
+            existing = self.outcome(body.command_id)
+            if existing['status'] in ('SUCCEEDED', 'FAILED'):
+                return existing
             try:
                 if operation == 'invitation':
                     request_id = self.prepare_invitation(body)

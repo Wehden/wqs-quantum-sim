@@ -274,3 +274,56 @@ def test_stale_approving_request_is_terminal_conflict_not_retryable(rig):
         'identity':'pending','expected_revision':before['revision']})
     assert result.status_code==409
     assert result.json()['status']=='FAILED' and result.json()['error_code']=='stale_revision'
+
+
+def test_duplicate_during_lock_acquisition_has_durable_intent(rig, monkeypatch):
+    import fcntl
+    import threading
+    acquired, release = threading.Event(), threading.Event()
+    original = fcntl.flock
+    def pause_first_holder(lock, operation):
+        original(lock, operation)
+        if operation == fcntl.LOCK_EX | fcntl.LOCK_NB and not acquired.is_set():
+            acquired.set()
+            assert release.wait(5)
+    monkeypatch.setattr(fcntl, 'flock', pause_first_holder)
+    payload = invitation()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        first = pool.submit(rig.client.post, PREFIX+'/invitations', json=payload)
+        assert acquired.wait(5)
+        try:
+            duplicate = rig.client.post(PREFIX+'/invitations', json=payload)
+            assert duplicate.status_code == 202
+            assert duplicate.json()['status'] == 'ACCEPTED'
+            lookup = rig.client.get(PREFIX+'/commands/cmd-1')
+            assert lookup.status_code == 200
+            assert lookup.json() == duplicate.json()
+            conflict = rig.client.post(PREFIX+'/invitations', json=invitation(identity='different'))
+            assert conflict.status_code == 409
+            assert conflict.json()['detail'] == 'command_payload_conflict'
+            assert not rig.state['issued']
+        finally:
+            release.set()
+        assert first.result(timeout=5).json()['status'] == 'SUCCEEDED'
+    assert len(rig.state['issued']) == 1
+    assert rig.client.post(PREFIX+'/invitations', json=payload).json()['status'] == 'SUCCEEDED'
+    assert len(rig.state['issued']) == 1
+
+
+def test_crash_before_lock_acquisition_leaves_resumable_intent(rig, monkeypatch):
+    import fcntl
+    class Crash(BaseException):
+        pass
+    original = fcntl.flock
+    def crash(lock, operation):
+        raise Crash()
+    monkeypatch.setattr(fcntl, 'flock', crash)
+    manager = rig.app.state.management
+    body = Invitation(**invitation())
+    with pytest.raises(Crash):
+        manager.execute('invitation', body)
+    assert manager.outcome(body.command_id)['status'] == 'ACCEPTED'
+    assert not rig.state['issued']
+    monkeypatch.setattr(fcntl, 'flock', original)
+    assert manager.execute('invitation', body)['status'] == 'SUCCEEDED'
+    assert len(rig.state['issued']) == 1
