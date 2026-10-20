@@ -73,7 +73,7 @@ jobs:
         run: exec python3 tools/ci/local_attempt.py
       - name: Reconcile known child after interruption
         if: always()
-        timeout-minutes: 2
+        timeout-minutes: 3
         env:
           GH_TOKEN: ${{ github.token }}
           LOCAL_PARENT_RUN: ${{ github.run_id }}

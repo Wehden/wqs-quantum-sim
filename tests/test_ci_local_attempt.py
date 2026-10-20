@@ -183,5 +183,21 @@ def test_workflow_signal_and_cleanup_contract():
     assert next(s for s in steps if s.get('id')=='attempt')['run'].startswith('exec python3 ')
     cleanup_step=next(s for s in steps if '--cleanup' in s.get('run',''))
     assert cleanup_step['if']=='always()'
-    assert cleanup_step['timeout-minutes']==2
+    assert cleanup_step['timeout-minutes']==3
     assert '!cancelled()' in workflow['jobs']['local']['if']
+
+
+def test_terminal_job_refresh_finds_late_capacity_marker():
+    f=Fake(accepted=True,conclusion='success',marker=True)
+    inventories=0
+    def api(method,path,body=None):
+        nonlocal inventories
+        result=f(method,path,body)
+        if '/jobs?' in path:
+            inventories+=1
+            if inventories==1: result['jobs']=result['jobs'][:1]
+        return result
+    result=m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main')
+    assert inventories==2
+    assert result['lane']=='hosted'
+    assert result['outcome']=='capacity_unavailable'

@@ -58,7 +58,7 @@ It persists dispatch intent before POST and the child ID after discovery in
 `$RUNNER_TEMP/local-attempt.json`. A separate `always()` cleanup step reconciles
 that receipt, verifies the exact correlation and workflow identity, and cancels an
 active child even after the controller process is killed. Unknown dispatch discovery
-is bounded to 30 seconds; cancellation confirmation is bounded to 60 seconds.
+is bounded to 30 seconds; cancellation confirmation is bounded to 90 seconds.
 Unresolved or ambiguous outcomes fail closed. Loss of the entire hosted runner can
 still prevent cleanup; the child execution timeout applies after assignment. No ordinary-runner resource reservations change.
 

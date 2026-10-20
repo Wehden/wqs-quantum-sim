@@ -110,7 +110,7 @@ class Controller:
         except APIError as exc:
             if exc.status != 409:
                 raise
-        deadline = self.clock() + 60
+        deadline = self.clock() + 90
         while self.clock() < deadline:
             run = self.api('GET', f'/actions/runs/{run_id}')
             if run['status'] == 'completed':
@@ -169,6 +169,10 @@ class Controller:
                 execution_deadline = self.clock() + execution_timeout
             run = self.api('GET', f'/actions/runs/{run_id}')
             if run['status'] == 'completed':
+                # Terminal status can race the earlier jobs inventory. Read again
+                # before classifying capacity markers or accepted execution.
+                jobs = self.jobs(run_id)
+                accepted = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in jobs)
                 capacity = any(j['name'] == capacity_marker and j.get('conclusion') == 'success' for j in jobs)
                 if accepted and run['conclusion'] == 'success' and capacity:
                     return dict(lane='hosted', outcome='capacity_unavailable', child_run_id=run_id, reason='Child explicitly reported scheduling unavailable.')
