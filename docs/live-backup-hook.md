@@ -87,6 +87,9 @@ API reads; their values are never added to logs or public artifacts.
 The object-store account needs only conditional object creation and exact
 object/version reads in the dedicated private bucket, plus any required bucket
 location/versioning reads. Do not give it delete or bucket-administration rights.
+Bucket versioning must be enabled: the hook rejects missing, empty or `null`
+upload version IDs before readback, so a suspended/unversioned bucket cannot
+produce a successful creation result.
 Use a trusted TLS endpoint and verify an actual conditional PUT collision and
 exact version readback before installation. A compatibility probe is not an
 application backup. The existing MinIO administrative account is used only during

@@ -14,6 +14,13 @@ from .snapshot import SecretReader, read_private, require_parent_lock
 
 
 class RecordedStorage(S3Storage):
+    def put(self, ciphertext):
+        ref = super().put(ciphertext)
+        version = self.objects[ref][1]
+        require(isinstance(version, str) and version.strip() not in ('', 'null'),
+                'versioned object required for durable recovery locator')
+        return ref
+
     def readback(self, ref, destination):
         super().readback(ref, destination)
         with destination.open('rb') as stream:

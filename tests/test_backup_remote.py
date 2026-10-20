@@ -258,3 +258,19 @@ def test_live_cli_failure_does_not_print_private_diagnostics(tmp_path, monkeypat
     assert output.err == '' and 'sentinel' not in output.out
     assert json.loads(output.out) == {'evidence_type': 'creation_result', 'created': False,
                                     'backup_id': None, 'failure': 'unavailable'}
+
+
+@pytest.mark.parametrize('version', [None, '', ' ', 'null', False])
+def test_live_storage_refuses_unversioned_generation(tmp_path, version):
+    class Unversioned(FakeStore):
+        def put_object(self, **kwargs):
+            super().put_object(**kwargs)
+            return {} if version is None else {'VersionId': version}
+
+        def get_object(self, **kwargs):
+            pytest.fail('unversioned upload reached readback')
+    ciphertext = tmp_path / 'ciphertext'; ciphertext.write_bytes(b'synthetic storage test')
+    storage = RecordedStorage(Unversioned(), 'test-bucket', 'wqs', Budget())
+    with pytest.raises(ValueError, match='versioned object required'):
+        storage.put(ciphertext)
+    assert not hasattr(storage, 'receipt')
