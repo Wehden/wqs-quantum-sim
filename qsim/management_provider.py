@@ -228,8 +228,10 @@ class Management:
                     adminweb.request_action(request_id, operation, guard=guard)
             except HTTPException as error:
                 with store.connect() as db:
-                    row = db.execute('SELECT status FROM key_requests WHERE id=?',(request_id,)).fetchone()
-                    retryable = error.status_code >= 500 or (error.status_code == 409 and row and row['status'] == 'APPROVING')
+                    row = db.execute('SELECT status,identity FROM key_requests WHERE id=?',(request_id,)).fetchone()
+                    retryable = error.status_code >= 500 or (error.status_code == 409 and operation in ('invitation','approve')
+                        and error.detail != 'stale_revision' and row and row['status'] == 'APPROVING'
+                        and row['identity'] == body.identity)
                     code = error.detail if error.detail in ('stale_revision','identity_exists','email_pending','identity_reserved') else ('owner_temporarily_unavailable' if retryable else 'owner_conflict')
                     self.finish(db, body.command_id, 'RETRYABLE' if retryable else 'FAILED', code)
             except Exception:

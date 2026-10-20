@@ -264,3 +264,13 @@ def test_read_only_grant_capabilities_do_not_offer_commands(rig):
     assert caps['operations']==['identities','requests','command']
     assert rig.client.get(PREFIX+'/identities').status_code==200
     assert rig.client.post(PREFIX+'/invitations',json=invitation()).status_code==403
+
+
+def test_stale_approving_request_is_terminal_conflict_not_retryable(rig):
+    rid=pending();before=rig.client.get(PREFIX+'/requests/'+rid).json()
+    with store.connect() as db:db.execute("UPDATE key_requests SET status='APPROVING',identity='pending' WHERE id=?",(rid,))
+    result=rig.client.post(f'{PREFIX}/requests/{rid}/approve',json={
+        'command_id':'stale-approving','actor':'operator','app_instance_id':'wqs','org_id':'bootstrap',
+        'identity':'pending','expected_revision':before['revision']})
+    assert result.status_code==409
+    assert result.json()['status']=='FAILED' and result.json()['error_code']=='stale_revision'
