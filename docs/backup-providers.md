@@ -1,9 +1,9 @@
 # Backup provider implementation and installation gates
 
-These providers extend the capture-only adapter. They are source implementations,
-not installed production hooks. They do not enable CD, change admission, rotate
-credentials or grant recovery acceptance. The existing CD-facing capture command
-continues to return `verified=false` with a nonzero exit status.
+These providers implement the v2 creation pipeline in source. They are not
+installed production hooks and do not enable CD, change admission, or rotate
+credentials. The unconfigured creation entry point returns `created:false` and
+exits nonzero. Creation never restores a destination.
 
 ## Snapshot boundary
 
@@ -25,25 +25,25 @@ is sent and no key is changed.
 It also includes the holding deployment ledger, verified per-release receipts,
 previous/current immutable image references, an operator-supplied retention-policy
 reference and registry access configuration. The image inventory records recovery
-dependencies; isolated restore still has to prove retained images are retrievable.
+dependencies; the filesystem loader restores this inventory without pulling images.
 The source cursor binds the actual inventory and Secret versions. Hash validation
 before encryption detects changed staged files. Payload size is bounded by policy.
 
 ## Encryption and storage
 
-`AgeEncryption` accepts exactly the independently approved public recipient set.
+`AgeEncryption` accepts exactly the configured public recipient set.
 It validates canonical Bech32 encoding/checksum, padding, curve points, fingerprints
 and duplicate decoded keys. Native X25519 low-order and noncanonical encodings are
 rejected. Released YubiKey PIV recipients use compressed P-256 encoding as defined
 by [plugin 0.5.1](https://github.com/str4d/age-plugin-yubikey/blob/9329e31dd3d0819d5d7b739aef59e455e10fcfa1/src/p256.rs).
-These checks do not prove custody or authorize a recipient policy.
+Encryption needs only public recipients; direct restore selects either existing identity.
 
 The age executable must match an explicitly approved SHA-256. A hardware recipient
 also requires an explicitly pinned `age-plugin-yubikey` binary reporting version
 0.5.1. No plugin is downloaded or selected implicitly. The encryption subprocess
 receives no HOME, cloud credentials, agent sockets or private identity variables.
 Its owned process group is killed on failure or timeout, including a blocked plugin.
-Every approved recipient is passed to encryption of the complete payload.
+Every configured recipient is passed to encryption of the complete payload.
 
 `S3Storage` uses one bounded `PutObject` with `IfNoneMatch='*'`; it never falls back
 to an overwriting write or an unguarded multipart upload. Collision and ambiguous
@@ -62,7 +62,7 @@ path. No such credentials were provisioned by this change.
 
 ## Orchestration and limits
 
-`capture_new_set(snapshot, encryption, storage, private_work_dir)` shares a maximum
+`capture_new_set(snapshot, encryption, storage, private_work_dir, requested_id)` shares a maximum
 540-second budget, enforced by a process alarm inside the unchanged 600-second
 parent limit. It runs in the main thread of a dedicated capture process. It stages
 files inside a private temporary directory and cleans them on normal exceptions
@@ -78,18 +78,22 @@ transport. This PR does not mount volumes, change pod placement, add RBAC or wir
 the backup hook into production. It must not be installed by copying a configuration
 example and declaring bootstrap verified.
 
-## Contract and recovery blockers
+## Contract and configuration
 
-The pinned LaminarAuth v1 schema currently requires at least one result and at least
-one prior verified release receipt. Empty installations and first-CD captures fail
-closed. WQS reported this to LaminarAuth; no dummy artifact or fabricated receipt
-is created. A reviewed contract amendment is required before supporting those cases.
+The concrete snapshot emits the pinned v2 manifest, including empty result and
+receipt collections. Construct `Snapshot(..., cd_enabled=<actual boolean config>)`;
+the value records configuration, while this provider's held-lock/transaction checks
+establish source consistency. The configured hook passes its `WQS_BACKUP_SET_ID`
+as `requested_id`. The coordinator binds that ID before capture and returns exactly
+`{"evidence_type":"creation_result","created":true,"backup_id":"<requested_id>"}`
+only after full archive/native-format validation, encryption and storage readback.
+No independent recovery approval is required by v2.
 
-LaminarAuth owns the approved recipient/custody policy, encryption evidence and
-independent authenticated checkpoint/acceptance authority. Its acknowledgement of
-the integration request is not clearance. No authenticated verifier is configured
-by these providers. Current exact-set full restore and independent owner acceptance
-remain necessary before the adapter may ever authorize promotion.
+Explicit direct restore accepts either existing identity, decrypts, validates and
+loads its configured filesystem destination. It is a separate operation; storage
+creation does not invoke it. Live source placement, storage configuration and
+restore destinations still need operational configuration. No credentials or
+production restore are provisioned by this source change.
 
 ## Validation
 

@@ -21,7 +21,9 @@ from urllib.parse import quote
 from cryptography.fernet import Fernet
 
 from .capture import file_digest, regular_file
-from .metadata import canonical, digest, require, validate_record, verify_manifest
+from .metadata import canonical, digest, require, verify_manifest
+
+from .v2 import validate_record
 
 
 class SecretReader:
@@ -143,7 +145,9 @@ def require_parent_lock(fd, state):
 
 
 class Snapshot:
-    def __init__(self, data, state, registry, delivery_key, registry_access, context, retention_ref, budget, parent_lock_fd, volume, max_bytes=512 * 1024 * 1024):
+    def __init__(self, data, state, registry, delivery_key, registry_access, context, retention_ref, budget, parent_lock_fd, volume, max_bytes=512 * 1024 * 1024, *, cd_enabled):
+        require(type(cd_enabled) is bool, "boolean CD configuration required")
+        self.cd_enabled = cd_enabled
         self.data, self.state = Path(data), Path(state)
         self.registry, self.delivery_key = registry, delivery_key
         self.registry_access, self.context, self.retention_ref, self.budget = Path(registry_access), context, retention_ref, budget
@@ -168,7 +172,7 @@ class Snapshot:
         inventory = []
         total_bytes = 0
         deps = {'kind': 'wqs', 'pvc_identity': self.context['source']['storage'], 'parent_coordinated': True,
-                'ledger_state': 'holding', 'admission_held': True, 'cd_enabled': False, 'results': [], 'release_receipts': []}
+                'ledger_state': 'holding', 'admission_held': True, 'cd_enabled': self.cd_enabled, 'results': [], 'release_receipts': []}
 
         def add_stream(role, path, source):
             nonlocal total_bytes
@@ -261,7 +265,7 @@ class Snapshot:
         cursor = digest(canonical({'inventory': inventory, 'registry_version': list(registry_before[0]),
                                    'key_version': list(key_before[0])}))['sha256']
         context = {**self.context, 'boundary': {'method': 'wqs-sqlite-write-lock-v1', 'cursor': cursor, 'source_at': source_at}}
-        manifest = {'schema_id': 'backup-recovery-set-v1', 'contract_version': 1, 'canonical_profile': 'backup-json-v1',
+        manifest = {'schema_id': 'backup-recovery-set-v2', 'contract_version': 2, 'canonical_profile': 'backup-json-v1',
                     'record_id': 'manifest-' + context['set_id'], 'evidence_type': 'manifest', 'context': context,
                     'created_at': source_at, 'inventory': inventory, 'dependencies': deps}
         validate_record(manifest)

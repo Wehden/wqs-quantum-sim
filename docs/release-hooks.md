@@ -1,3 +1,7 @@
+> Recovery policy update: [v2 creation and direct load](backup-recovery-v2.md)
+> supersedes the independent recovery approval requirements below. V1 details
+> are historical; source implementation does not change live settings.
+
 # Release hooks and remaining backup dependencies
 
 ## Application acceptance

@@ -91,3 +91,17 @@ The v1 contract also blocks empty result/history collections; this was reported 
 LaminarAuth rather than filled with fabricated evidence. Gate 1 operational
 acceptance and gate 2 custody/authority clearance remain open. CD is disabled and
 credential rotation remains deferred. See docs/backup-providers.md for exact limits.
+
+## Recovery policy amendment: creation and direct load v2
+
+The authorized v2 policy supersedes independent checkpoint/authority, per-route
+proof, custody-mapping approval, staging restore, and owner-acceptance gates.
+See [the implementation contract](../../docs/backup-recovery-v2.md).
+
+- [ ] Merge reviewed v2 contract pin and WQS consumer changes.
+- [ ] Install actual v2 capture integration; creation must match the CD-requested set ID.
+- [ ] Configure an explicit native destination for operational recovery when requested.
+- [ ] Complete unrelated protocol, runtime-parity and application acceptance gates.
+
+Source tests use disposable destinations and existing test-created identities;
+no production restore, credential rotation, or bootstrap/CD change is implied.

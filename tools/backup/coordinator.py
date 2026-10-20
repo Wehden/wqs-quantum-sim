@@ -1,17 +1,20 @@
 """Bounded capture orchestration for an approved mounted-source environment.
 
-This returns capture evidence only. The caller still requires independent recovery
-acceptance, and the CD-facing entry point remains unavailable/fail-closed.
+Returns v2 creation results after encrypted storage readback. Direct restore is
+a separate explicit operation; this coordinator never loads a destination.
 """
 from pathlib import Path
 import tempfile
 
-from .capture import capture
+from .create import create
 from .metadata import require
 from .providers import Providers
 
 
-def capture_new_set(snapshot, encryption, storage, private_work_dir):
+def capture_new_set(snapshot, encryption, storage, private_work_dir, requested_id):
+    # The configured caller supplies the CD hook's WQS_BACKUP_SET_ID value.
+    require(isinstance(requested_id, str) and bool(requested_id), 'requested backup ID required')
+    snapshot.context = {**snapshot.context, 'set_id': requested_id}
     budget = snapshot.budget
     require(encryption.budget is budget and storage.budget is budget, 'shared deadline required')
     work = Path(private_work_dir)
@@ -20,4 +23,4 @@ def capture_new_set(snapshot, encryption, storage, private_work_dir):
     with budget.enforced(), tempfile.TemporaryDirectory(prefix='wqs-snapshot-', dir=work) as staging:
         manifest = snapshot.create(Path(staging))
         providers = Providers(snapshot, encryption, storage)
-        return capture(staging, manifest, manifest['context'], providers, work)
+        return create(staging, manifest, providers, work, requested_id)

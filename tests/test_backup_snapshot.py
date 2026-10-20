@@ -45,7 +45,8 @@ def source(tmp_path, monkeypatch):
     with store.connect() as db:
         db.execute("INSERT INTO jobs(id,owner,name,status,created,updated,request,callback_hash,cleaned) VALUES(?,?,?,?,?,?,?,?,?)", ('a'*32,'test','test','SUCCEEDED',1,1,'{}','test',1))
     (data / ('a'*32)).mkdir()
-    (data / ('a'*32) / 'result.npz').write_bytes(b'synthetic artifact')
+    import numpy as np
+    np.savez_compressed(data / ('a'*32) / 'result.npz', measurements=np.zeros((1, 1), dtype=np.uint8))
     (state / ('b'*40 + '.json')).write_text(json.dumps({'sha':'b'*40, 'status':'verified'}))
     ledger = {'sha': SHA, 'status': 'holding', 'images': {'api': 'registry.example.invalid/api@sha256:'+'a'*64},
               'previous': {'api': {'image': 'registry.example.invalid/api@sha256:'+'b'*64}}}
@@ -57,7 +58,7 @@ def source(tmp_path, monkeypatch):
     lock = (state / 'lock').open('w')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     snapshot = Snapshot(data, state, Reader(json.dumps(registry).encode()), Reader(key), access,
-                        context, 'synthetic-retention-policy', Budget(), lock.fileno(), Volume())
+                        context, 'synthetic-retention-policy', Budget(), lock.fileno(), Volume(), cd_enabled=True)
     yield snapshot, output
     lock.close()
 
@@ -65,6 +66,8 @@ def source(tmp_path, monkeypatch):
 def test_coherent_snapshot_and_matching_delivery_material(source):
     snapshot, output = source
     manifest = snapshot.create(output)
+    assert manifest['contract_version'] == 2
+    assert manifest['dependencies']['cd_enabled'] is True
     assert manifest['context']['boundary']['method'] == 'wqs-sqlite-write-lock-v1'
     assert len(manifest['context']['boundary']['cursor']) == 64
     assert (output / 'delivery-key').read_bytes() == snapshot.delivery_key.value
@@ -117,32 +120,57 @@ def test_requires_existing_parent_lock(source):
         snapshot.create(output)
 
 
-def test_initial_release_without_receipts_fails_closed(source):
+def test_initial_release_without_receipts_is_supported(source):
     snapshot, output = source
     for path in snapshot.state.glob('b*.json'):
         path.unlink()
-    with pytest.raises(ValueError, match='schema failure'):
-        snapshot.create(output)
+    assert snapshot.create(output)['dependencies']['release_receipts'] == []
 
 
-def test_capture_orchestration_encrypts_reads_back_and_cleans(source, tmp_path):
+@pytest.mark.parametrize('empty', [False, True])
+@pytest.mark.parametrize('cd_enabled', [False, True])
+def test_capture_orchestration_encrypts_reads_back_and_cleans(source, tmp_path, empty, cd_enabled):
     import shutil
     from tools.backup.coordinator import capture_new_set
     from tools.backup.providers import AgeEncryption, S3Storage
     from tools.backup.metadata import canonical, digest
-    from test_backup_providers import members, FakeStore
+    from test_backup_providers import FakeStore
+    from test_backup_restore import identities
+    from tools.backup.restore import restore
     snapshot, _ = source
-    approved = members()
+    snapshot.cd_enabled = cd_enabled
+    if empty:
+        with store.connect() as db:
+            db.execute('DELETE FROM jobs')
+        for path in snapshot.state.glob('b*.json'):
+            path.unlink()
+    age, keys, recipients = identities(tmp_path)
+    approved = sorted([{'key_id': str(i), 'type': 'age-x25519', 'value': value,
+                        'fingerprint': hashlib.sha256(value.encode()).hexdigest()}
+                       for i, value in enumerate(recipients)], key=lambda item: (item['type'], item['value']))
     snapshot.context['recipients'] = approved
     snapshot.context['recipients_digest'] = digest(canonical(approved))
     age = shutil.which('age')
     encryption = AgeEncryption(approved, age, hashlib.sha256(Path(age).read_bytes()).hexdigest(), snapshot.budget)
-    storage = S3Storage(FakeStore(), 'test-bucket', 'wqs', snapshot.budget)
+    retained = FakeStore()
+    storage = S3Storage(retained, 'test-bucket', 'wqs', snapshot.budget)
     work = tmp_path / 'private'
     work.mkdir(mode=0o700)
-    result = capture_new_set(snapshot, encryption, storage, work)
-    assert result['evidence_type'] == 'capture_readback' and 'verified' not in result
-    assert result['context']['scope']['release_sha'] == SHA
+    result = capture_new_set(snapshot, encryption, storage, work, 'requested-set')
+    assert result == {'evidence_type': 'creation_result', 'created': True, 'backup_id': 'requested-set'}
+    encrypted = tmp_path / 'retained.age'
+    encrypted.write_bytes(retained.value)
+    destinations = {name: str(tmp_path / 'restored' / path) for name, path in {
+        'data_dir': 'data', 'state_dir': 'state', 'registry_file': 'auth/registry.json',
+        'delivery_key_file': 'auth/delivery-key', 'image_inventory_file': 'images.json',
+        'registry_access_file': 'registry-access.json'}.items()}
+    restored = restore(encrypted, keys[0], age, encryption.sha, 'requested-set', destinations)
+    assert restored == {'evidence_type': 'final_result', 'verified': True, 'backup_id': 'requested-set'}
+    assert Path(destinations['data_dir'], 'jobs.sqlite3').is_file()
+    archived = json.loads(snapshot.expected)
+    assert archived['context']['scope']['release_sha'] == SHA
+    assert archived['dependencies']['cd_enabled'] is cd_enabled
+    assert bool(archived['dependencies']['results']) is not empty
     assert not list(work.iterdir())
 
 
