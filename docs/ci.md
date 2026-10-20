@@ -53,15 +53,20 @@ checkout SHA. PRs retain their synthetic merge SHA, verified against GitHub's cu
 and the parent's trusted head. Stale run API base metadata is not used as authority. The dispatched workflow head must match the parent's head.
 Changed branches fail closed. Child concurrency is separate from parent concurrency.
 Only the hosted controller receives `actions: write`; the local runner receives no
-Actions write permission. Signal or exception cleanup cancels a known child. An
-unresolved dispatch or unconfirmed cancellation fails instead of risking duplicate
-execution. A hard host failure can prevent cleanup; the child execution timeout still
-applies after assignment. No ordinary-runner resource reservations change.
+Actions write permission. The controller replaces the shell process so cancellation signals reach Python.
+It persists dispatch intent before POST and the child ID after discovery in
+`$RUNNER_TEMP/local-attempt.json`. A separate `always()` cleanup step reconciles
+that receipt, verifies the exact correlation and workflow identity, and cancels an
+active child even after the controller process is killed. Unknown dispatch discovery
+is bounded to 30 seconds; cancellation confirmation is bounded to 60 seconds.
+Unresolved or ambiguous outcomes fail closed. Loss of the entire hosted runner can
+still prevent cleanup; the child execution timeout applies after assignment. No ordinary-runner resource reservations change.
 
 `tools/ci/local_attempt.py` is a stdlib controller reusable by other repositories.
 It accepts `LOCAL_PARENT_RUN`, `LOCAL_PARENT_ATTEMPT`, `LOCAL_CHECKOUT_SHA`,
 `LOCAL_DISPATCH_REF`, `GITHUB_REPOSITORY` and `GH_TOKEN`. `--validate` validates a
-child using `GITHUB_SHA`; `--workflow`, `--job-name` and `--execution-timeout` select
+child using `GITHUB_SHA`; `--cleanup` reconciles the durable receipt without requiring
+the parent to remain active; `--workflow`, `--job-name` and `--execution-timeout` select
 the existing workflow, local job name and accepted execution bound. Outputs are
 `lane=local|hosted`, `outcome=success|failure|capacity_unavailable`, `child_run_id`
 and a safe reason. Consumers must gate success on outcome, not controller exit alone.

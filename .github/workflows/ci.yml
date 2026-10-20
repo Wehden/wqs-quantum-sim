@@ -70,7 +70,16 @@ jobs:
           LOCAL_PARENT_ATTEMPT: ${{ github.run_attempt }}
           LOCAL_CHECKOUT_SHA: ${{ github.sha }}
           LOCAL_DISPATCH_REF: ${{ github.head_ref || github.ref_name }}
-        run: python3 tools/ci/local_attempt.py
+        run: exec python3 tools/ci/local_attempt.py
+      - name: Reconcile known child after interruption
+        if: always()
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOCAL_PARENT_RUN: ${{ github.run_id }}
+          LOCAL_PARENT_ATTEMPT: ${{ github.run_attempt }}
+          LOCAL_CHECKOUT_SHA: ${{ github.sha }}
+        run: exec python3 tools/ci/local_attempt.py --cleanup
   validate-child:
     name: Validate internal local attempt
     if: github.event_name == 'workflow_dispatch' && inputs.local_parent_run != ''
