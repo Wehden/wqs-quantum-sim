@@ -78,6 +78,10 @@ local-enable variable false, drain the new slots, and scale only the new
 StatefulSet to zero. The separate restricted production runner, its credentials,
 and CD enablement are not part of this change.
 
+Ordinary local CI runs inside each runner container with limits of 6 CPUs and
+5 GiB memory. Scheduling requests remain 1 CPU and 1 GiB per slot. The separate
+production deployment runner is unchanged.
+
 ## Packaged release checks
 
 A separate required GitHub-hosted job runs `bash tools/ci/check-release.sh`.
