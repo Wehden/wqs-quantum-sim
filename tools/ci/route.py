@@ -29,6 +29,8 @@ def available(status, now):
 
 
 def choose(event, kind, repository, ref, enabled, status='', now=None):
+    if event.get('sender', {}).get('login') == 'dependabot[bot]':
+        return 'hosted', 'Dependabot runs use the hosted lane with their restricted token.'
     trusted = (kind == 'push' and ref == 'refs/heads/main') or (
         kind == 'pull_request' and event.get('pull_request', {}).get('head', {}).get('repo', {}).get('full_name') == repository
     ) or (kind == 'workflow_dispatch' and ref == 'refs/heads/main')
@@ -40,7 +42,7 @@ def choose(event, kind, repository, ref, enabled, status='', now=None):
         return 'hosted', 'Standpunkt CI is disabled by repository configuration.'
     if not available(status, time.time() if now is None else now):
         return 'hosted', 'No fresh, consistent idle capacity in the two-slot local CI pool.'
-    return 'local', 'A local CI slot is reported idle; GitHub-hosted CI retries if the local attempt fails.'
+    return 'local', 'A local CI slot is reported idle; GitHub-hosted CI is used only if local capacity is unavailable; accepted execution failures remain failures.'
 
 
 def main():

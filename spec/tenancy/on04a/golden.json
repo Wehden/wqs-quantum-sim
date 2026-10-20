@@ -1,0 +1,84 @@
+{
+  "description": "Synthetic contract examples; no production data or credential values.",
+  "capabilities": {
+    "contract_version": "wqs-welcome/1",
+    "app_instance_id": "app-a",
+    "org_id": "org-a",
+    "auth_mode": "api_tokens",
+    "read_only": true,
+    "welcome_eligibility": true,
+    "organization_enforcement": false,
+    "additional_organizations": false,
+    "first_use_tracking": false,
+    "operations": [
+      "capabilities",
+      "contacts",
+      "subject"
+    ],
+    "policy_revision": "mapping-v1",
+    "capability_revision": "0d4622f18f54e0e8afe111bc676a4c2356891d2afc52932e8c41347945ee637f"
+  },
+  "eligible_subject": {
+    "subject_id": "subject-a",
+    "membership_id": "member-a",
+    "app_instance_id": "app-a",
+    "org_id": "org-a",
+    "display_name": "Alice",
+    "recipient_email": "alice@example.test",
+    "eligible": true,
+    "reason": "eligible",
+    "revision": "r1.e07f047ab8d11da6b402f63254a112130d57ee6d95005efb3f8e1109f7bd4a88",
+    "first_use": "unknown",
+    "binding_kind": "operator_reviewed_legacy_mapping",
+    "key_delivery": {
+      "state": "SENT",
+      "smtp_accepted_at": 6.0
+    },
+    "observed_at": 1000,
+    "expires_at": 1030
+  },
+  "eligible_page": {
+    "contacts": [
+      {
+        "subject_id": "subject-a",
+        "membership_id": "member-a",
+        "app_instance_id": "app-a",
+        "org_id": "org-a",
+        "display_name": "Alice",
+        "recipient_email": "alice@example.test",
+        "eligible": true,
+        "reason": "eligible",
+        "revision": "r1.e07f047ab8d11da6b402f63254a112130d57ee6d95005efb3f8e1109f7bd4a88",
+        "first_use": "unknown",
+        "binding_kind": "operator_reviewed_legacy_mapping",
+        "key_delivery": {
+          "state": "SENT",
+          "smtp_accepted_at": 6.0
+        },
+        "observed_at": 1000,
+        "expires_at": 1030
+      }
+    ],
+    "next_cursor": null,
+    "snapshot_revision": "c095d5836967da7bd355af9962e56afc0a11d801de1e65f6f2b39a0099f835ee"
+  },
+  "revoked_subject": {
+    "subject_id": "subject-a",
+    "membership_id": "member-a",
+    "app_instance_id": "app-a",
+    "org_id": "org-a",
+    "display_name": "Alice",
+    "recipient_email": null,
+    "eligible": false,
+    "reason": "inactive_identity",
+    "revision": "r1.a64ffd4867361873f98201aaed8427f4c29486ead1b0534f2294e3ec9213084b",
+    "first_use": "unknown",
+    "binding_kind": "operator_reviewed_legacy_mapping",
+    "key_delivery": {
+      "state": "SENT",
+      "smtp_accepted_at": 6.0
+    },
+    "observed_at": 1000,
+    "expires_at": 1030
+  }
+}

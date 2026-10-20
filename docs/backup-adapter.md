@@ -4,8 +4,8 @@
 
 # WQS backup capture adapter
 
-Status: capture-only source implementation. No production providers or hook are
-installed. CD remains disabled; credential rotation is excluded.
+Status: capture-only source implementation. Concrete provider source is documented
+in [backup providers](backup-providers.md); no production providers or hook are installed. CD remains disabled; credential rotation is excluded.
 
 The adapter pins LaminarAuth's reviewed PR #29 merge,
 `6f4674e2ae02a6e9fe8ced33117ac5a17b77fc78`. Its
@@ -34,7 +34,7 @@ plaintext is created inside a private temporary directory and removed on ordinar
 success or exceptions. This is filesystem deletion, not secure erasure; the private
 working volume needs an approved encryption and crash-cleanup policy before use.
 
-No provider implementations are installed or selected by default. The synthetic
+Concrete providers are implemented separately, but none are installed or selected by default. The synthetic
 tests do not perform encryption, upload data, authenticate custody or establish
 snapshot consistency. Provider callbacks are trusted code, not a security sandbox.
 

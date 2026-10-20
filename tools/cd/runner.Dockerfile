@@ -5,7 +5,7 @@ FROM ghcr.io/actions/actions-runner@sha256:e5496277be5d09bc968b3d64911b74e219ac4
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends python3.12 python3.12-venv gh ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /usr/local/bin/uv
-RUN uv venv --python /usr/bin/python3.12 /opt/wqs-hooks && uv pip install --python /opt/wqs-hooks/bin/python numpy==2.5.4 jsonschema==4.26.0 cryptography==50.0.2
+RUN uv venv --python /usr/bin/python3.12 /opt/wqs-hooks && uv pip install --python /opt/wqs-hooks/bin/python numpy==2.5.4 jsonschema==4.26.0 cryptography==50.0.2 boto3==1.43.114 bech32==1.2.0
 COPY tools/ci/install-age.sh /tmp/install-age.sh
 RUN WQS_AGE_CACHE=/opt/wqs-age bash /tmp/install-age.sh && rm /tmp/install-age.sh
 ENV PATH="/opt/wqs-hooks/bin:/opt/wqs-age/age:${PATH}"

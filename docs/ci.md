@@ -18,7 +18,7 @@ unprivileged UID and no mounted host Docker socket or service-account token.
 Restrict its network access to DNS and public dependency/GitHub endpoints.
 Never enable `pull_request_target` execution of untrusted checkout code.
 
-## Capacity-aware routing and hosted retry
+## Capacity-aware routing and bounded assignment
 
 `WQS_LOCAL_CI_ENABLED=true` enables the pool. The trusted host publisher updates
 repository variable `CI_LOCAL_RUNNER_STATUS` every 30 seconds with this schema:
@@ -36,17 +36,68 @@ exclude the legacy `wqs-local` runner and the restricted `wqs-deploy` runner.
 The workflow has no inventory credential. The publisher's GitHub credential
 stays on its trusted host, outside the ordinary CI pods.
 
-Fork pull requests, non-main manual runs, and explicit `hosted_tests: true`
+Fork pull requests, Dependabot runs, non-main manual runs, and explicit `hosted_tests: true`
 dispatches stay hosted regardless of capacity. Set `WQS_LOCAL_CI_ENABLED=false`
-to bypass local CI. A failed local test or artifact step still retries the same
-suite on GitHub-hosted Ubuntu; cancellation does not trigger retry. Both attempts
-retain distinct artifacts. Require `CI result and path` in branch protection.
+to bypass local CI. Require `CI result and path` in branch protection.
 
-The snapshot is an admission hint, not a reservation: concurrent workflows can
-observe the same idle slot, or a runner can fail after routing. Such jobs can
-still queue; job execution timeouts do not start while queued. Disable local CI
-and start a new run if that race occurs. Missing publisher updates fail closed
-to hosted CI after the freshness window.
+The snapshot is an admission hint, not a reservation. A hosted controller dispatches
+an internal local attempt in the existing CI workflow and allows 120 seconds for
+runner assignment. On expiry it cancels the child and verifies terminal state before
+using hosted CI. An assignment racing cancellation fails without retry. Once a runner
+accepts the job, test, checkout, artifact, cancellation and execution-timeout failures
+remain failures; hosted success cannot conceal them. Local JUnit artifacts live on
+the linked child run. Release checks remain on the parent hosted run.
+
+The child rechecks the local-enable flag and validates its active same-repository
+parent, attempt, workflow and immutable checkout SHA. It requires GitHub Actions bot
+dispatch and triggering identities, the exact correlation title, and an assigned,
+active hosted parent controller. Direct manual child dispatches and human reruns
+cannot bypass normal routing. PRs retain their synthetic merge SHA, verified against GitHub's current PR merge ref
+and the parent's trusted head. Stale run API base metadata is not used as authority. The dispatched workflow head must match the parent's head.
+Changed branches fail closed. Child concurrency is separate from parent concurrency.
+Only the hosted controller receives `actions: write`; the local runner receives no
+Actions write permission. The controller replaces the shell process so cancellation signals reach Python.
+It persists dispatch intent before POST and the child ID after discovery in
+`$RUNNER_TEMP/local-attempt.json`. A separate `always()` cleanup step reconciles
+that receipt, verifies the exact correlation and workflow identity, and cancels an
+active child even after the controller process is killed. Unknown dispatch discovery
+is bounded to 30 seconds; cancellation confirmation is bounded to 90 seconds.
+Unresolved or ambiguous outcomes fail closed. Loss of the entire hosted runner can
+still prevent cleanup; the child execution timeout applies after assignment. No ordinary-runner resource reservations change.
+
+`tools/ci/local_attempt.py` is a stdlib controller reusable by other repositories.
+It accepts `LOCAL_PARENT_RUN`, `LOCAL_PARENT_ATTEMPT`, `LOCAL_CHECKOUT_SHA`,
+`LOCAL_DISPATCH_REF`, `GITHUB_REPOSITORY` and `GH_TOKEN`. `--validate` validates a
+child using `GITHUB_SHA`; `--cleanup` reconciles the durable receipt without requiring
+the parent to remain active; `--workflow`, `--job-name` and `--execution-timeout` select
+the existing workflow, local job name and accepted execution bound. Outputs are
+`lane=local|hosted`, `outcome=success|failure|capacity_unavailable`, `child_run_id`
+and a safe reason. Consumers must gate success on outcome, not controller exit alone.
+For runner-dispatched Kubernetes jobs, a successful child may explicitly signal
+scheduling failure with `--capacity-marker "Local capacity unavailable"` and a successful job of that
+name. The required marker must be terminal (success for capacity, skipped otherwise),
+and the local execution job must succeed. This is
+accepted only if the local job was assigned. That marker must depend on completed
+cleanup and must never represent test failure. WQS does not use that marker because
+its tests run directly inside the runner pod.
+
+## Bounded capacity acceptance
+
+The hold fixture is manual-only and runs from trusted `main`. It has no pull-request
+or label trigger: a PR must not be able to change the guard that protects a local
+runner. Dispatch the reviewed main workflow with:
+
+```bash
+gh workflow run ci-capacity-acceptance.yml --repo Wehden/wqs-quantum-sim --ref main
+```
+
+The two matrix jobs each hold a slot for five minutes, with a seven-minute execution
+timeout. Verify actual runner occupancy before testing capacity routing. For an
+assignment-race test, retain a genuinely observed idle snapshot briefly while the
+holds acquire both slots, then trigger ordinary CI and restore the publisher. Verify
+the child remains unassigned, cancellation reaches terminal state, and the complete
+hosted test suite passes. Never fabricate the snapshot. The fixture does not change
+runner reservations or deployment configuration.
 
 ## Two-slot runner deployment
 
