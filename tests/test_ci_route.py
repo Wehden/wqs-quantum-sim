@@ -22,6 +22,7 @@ def test_idle_slot_and_operator_override():
     {'busy': 2, 'idle': 0}, {'online': 0, 'busy': 0, 'idle': 0},
     {'observed_at': NOW - 121}, {'observed_at': NOW + 16},
     {'observed_at': float('nan')}, {'observed_at': True},
+    {'observed_at': 10**400}, {'observed_at': -(10**400)},
     {'capacity': 3}, {'capacity': True}, {'online': 3, 'busy': 2},
     {'busy': -1}, {'idle': True}, {'online': 1}, {'schema': 2}, {'schema': True},
 ])

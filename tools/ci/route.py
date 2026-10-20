@@ -24,7 +24,7 @@ def available(status, now):
             return False
         return (value['capacity'] == 2 and value['online'] <= 2
                 and value['busy'] + value['idle'] == value['online'] and value['idle'] > 0)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return False
 
 
