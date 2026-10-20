@@ -75,9 +75,10 @@ def test_fork_parent_rejected():
     assert not any(method == 'POST' for method, _ in f.calls)
 
 def test_pr_requires_exact_recorded_merge_parents():
-    f=Fake(); f.parent.update(event='pull_request', head_branch='topic', pull_requests=[{'head': {'repo': {'id':1}, 'sha':SHA}, 'base': {'sha':'b'*40}}])
+    f=Fake(); f.parent.update(event='pull_request', head_branch='topic', pull_requests=[{'number':7, 'head': {'repo': {'id':1}, 'sha':SHA}, 'base': {'sha':'b'*40}}])
     def api(method,path,body=None):
         if path.startswith('/git/commits/'): return {'parents':[{'sha':'b'*40},{'sha':SHA}]}
+        if path == '/git/ref/pull/7/merge': return {'object': {'sha':'c'*40}}
         return f(method,path,body)
     assert m.validate_parent(api,'1','1','c'*40)['event'] == 'pull_request'
     with pytest.raises(ValueError):
@@ -112,3 +113,28 @@ def test_unknown_child_never_falls_back():
         return f(method,path,body)
     with pytest.raises(ValueError,match='unresolved'):
         m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main',queue_timeout=4)
+
+@pytest.mark.parametrize('ref_sha,merge_head,allowed', [('c'*40,SHA,True), ('d'*40,SHA,False), ('c'*40,'e'*40,False)])
+def test_stale_api_base_requires_exact_merge_ref_and_trusted_head(ref_sha,merge_head,allowed):
+    f=Fake()
+    f.parent.update(event='pull_request',head_branch='topic',pull_requests=[{
+        'number':7,'head':{'repo':{'id':1},'sha':SHA},'base':{'sha':'b'*40}}])
+    def api(method,path,body=None):
+        if path.startswith('/git/commits/'):
+            return {'parents':[{'sha':'f'*40},{'sha':merge_head}]}
+        if path == '/git/ref/pull/7/merge': return {'object':{'sha':ref_sha}}
+        return f(method,path,body)
+    if allowed: assert m.validate_parent(api,'1','1','c'*40)['event']=='pull_request'
+    else:
+        with pytest.raises(ValueError,match='trusted PR merge'):
+            m.validate_parent(api,'1','1','c'*40)
+
+
+def test_accepted_polling_reduces_api_budget():
+    f=Fake(accepted=True)
+    sleeps=[]
+    def sleep(n):
+        sleeps.append(n); f.sleep(n)
+    result=m.Controller(f,lambda:f.now,sleep).run('1','1',SHA,'main',execution_timeout=16)
+    assert result['outcome']=='failure'
+    assert sleeps==[15,15]

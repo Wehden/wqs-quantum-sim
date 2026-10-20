@@ -49,8 +49,8 @@ remain failures; hosted success cannot conceal them. Local JUnit artifacts live 
 the linked child run. Release checks remain on the parent hosted run.
 
 The child validates its active same-repository parent, attempt, workflow and immutable
-checkout SHA. PRs retain their synthetic merge SHA, verified against the parent run's
-recorded base/head parents. The dispatched workflow head must match the parent's head.
+checkout SHA. PRs retain their synthetic merge SHA, verified against GitHub's current PR merge ref
+and the parent's trusted head. Stale run API base metadata is not used as authority. The dispatched workflow head must match the parent's head.
 Changed branches fail closed. Child concurrency is separate from parent concurrency.
 Only the hosted controller receives `actions: write`; the local runner receives no
 Actions write permission. Signal or exception cleanup cancels a known child. An

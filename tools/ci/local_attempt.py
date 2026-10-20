@@ -60,15 +60,24 @@ def validate_parent(api, parent_id, attempt, sha, workflow='ci.yml'):
         if parent.get('head_branch') != 'main' or sha != parent.get('head_sha'):
             raise ValueError('Untrusted parent ref')
     elif event == 'pull_request':
-        # PR lanes keep testing the immutable synthetic merge commit. Verify both
-        # recorded parents, rather than accepting any supplied same-repo SHA.
+        # The run API's base SHA can lag the synthetic merge actually checked out.
+        # Bind to GitHub's merge ref and the trusted head, never an arbitrary commit
+        # with plausible parents. A moving merge ref fails closed.
         prs = [p for p in parent.get('pull_requests', []) if
                p.get('head', {}).get('repo', {}).get('id') == parent['repository']['id']
-               and p.get('head', {}).get('sha') == parent.get('head_sha')]
+               and p.get('head', {}).get('sha') == parent.get('head_sha')
+               and type(p.get('number')) is int and p['number'] > 0]
         commit = api('GET', '/git/commits/' + sha)
         parents = [p.get('sha') for p in commit.get('parents', [])]
-        if not any(parents == [p['base']['sha'], p['head']['sha']] for p in prs):
-            raise ValueError('Checkout SHA is not the recorded trusted PR merge')
+        matched = False
+        if len(parents) == 2 and parents[1] == parent.get('head_sha'):
+            for pr in prs:
+                merge_ref = api('GET', f"/git/ref/pull/{pr['number']}/merge")
+                if merge_ref.get('object', {}).get('sha') == sha:
+                    matched = True
+                    break
+        if not matched:
+            raise ValueError('Checkout SHA is not the current trusted PR merge')
     else:
         raise ValueError('Untrusted parent event')
     return parent
@@ -164,7 +173,7 @@ class Controller:
                 raced = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in final_jobs)
                 return dict(lane='local' if raced else 'hosted', outcome='failure' if raced else 'capacity_unavailable',
                             child_run_id=run_id, reason='Assignment raced cancellation; no hosted retry.' if raced else 'Local assignment timed out; child cancellation confirmed.')
-            self.sleep(2)
+            self.sleep(15 if execution_deadline is not None else 2)
 
 
 def main():
