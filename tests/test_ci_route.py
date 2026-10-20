@@ -105,7 +105,7 @@ class WorkflowTrustBoundaryTests(unittest.TestCase):
         def evaluate(expression, event, repository, ref):
             expression = expression.replace("needs.route.outputs.lane", repr('local'))
             for key, value in [('github.event.pull_request.head.repo.full_name', repository),
-                               ('github.event_name', event), ('github.repository', 'Wehden/wqs-quantum-sim'),
+                               ('github.event_name', event), ('github.actor', 'human'), ('github.repository', 'Wehden/wqs-quantum-sim'),
                                ('github.ref', ref)]:
                 expression = expression.replace(key, repr(value))
             return eval(' '.join(expression.split()).replace('&&', ' and ').replace('||', ' or '), {'__builtins__': {}}, {})
@@ -124,3 +124,8 @@ class WorkflowTrustBoundaryTests(unittest.TestCase):
         self.assertIn('steps.choose.outputs.lane || steps.hosted.outputs.lane', workflow)
         self.assertIn('run: echo "lane=hosted" >> "$GITHUB_OUTPUT"', workflow)
 
+
+
+def test_dependabot_is_hosted_with_idle_capacity():
+    result = choose({'sender':{'login':'dependabot[bot]'},'pull_request':{'head':{'repo':{'full_name':'owner/repo'}}}}, 'pull_request', 'owner/repo', 'refs/pull/1/merge', 'true', json.dumps({'schema':1,'observed_at':1000,'capacity':2,'online':2,'busy':0,'idle':2}), 1000)
+    assert result[0] == 'hosted'

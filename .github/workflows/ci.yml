@@ -49,7 +49,7 @@ jobs:
     name: Bounded local assignment
     needs: route
     if: >-
-      needs.route.outputs.lane == 'local' &&
+      github.actor != 'dependabot[bot]' && needs.route.outputs.lane == 'local' &&
       ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-24.04
     timeout-minutes: 35

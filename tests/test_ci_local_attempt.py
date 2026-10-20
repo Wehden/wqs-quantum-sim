@@ -235,3 +235,24 @@ def test_child_requires_enabled_bot_dispatch_and_active_controller(fault):
     if not fault: m.authorize_child(api,f.parent,'1','1',SHA,'2','true')
     else:
         with pytest.raises(ValueError): m.authorize_child(api,f.parent,'1','1',SHA,'2','false' if fault=='disabled' else 'true')
+
+@pytest.mark.parametrize('assigned,terminal,cancel_accepted,job_failed,expected', [
+    (False,'failure',False,True,'failure'),
+    (True,'success',False,False,'success'),
+    (False,'cancelled',False,False,'failure'),
+    (False,'cancelled',True,True,'failure'),
+    (False,'cancelled',True,False,'capacity_unavailable'),
+])
+def test_deadline_cancel_preserves_terminal_outcome(assigned,terminal,cancel_accepted,job_failed,expected):
+    f=Fake(accepted=assigned)
+    def api(method,path,body=None):
+        if path.endswith('/cancel'):
+            f.cancelled=True; f.conclusion=terminal
+            if not cancel_accepted: raise m.APIError(409)
+            return {}
+        result=f(method,path,body)
+        if '/jobs?' in path and job_failed:
+            result['jobs'].append({'name':'Validate internal local attempt','conclusion':'failure'})
+        return result
+    result=m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main',queue_timeout=4,execution_timeout=4)
+    assert result['outcome']==expected

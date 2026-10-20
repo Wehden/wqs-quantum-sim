@@ -36,7 +36,7 @@ exclude the legacy `wqs-local` runner and the restricted `wqs-deploy` runner.
 The workflow has no inventory credential. The publisher's GitHub credential
 stays on its trusted host, outside the ordinary CI pods.
 
-Fork pull requests, non-main manual runs, and explicit `hosted_tests: true`
+Fork pull requests, Dependabot runs, non-main manual runs, and explicit `hosted_tests: true`
 dispatches stay hosted regardless of capacity. Set `WQS_LOCAL_CI_ENABLED=false`
 to bypass local CI. Require `CI result and path` in branch protection.
 

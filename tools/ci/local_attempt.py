@@ -105,16 +105,18 @@ class Controller:
         raise ValueError('Child job inventory exceeded bound')
 
     def cancel_and_confirm(self, run_id):
+        cancel_accepted = True
         try:
             self.api('POST', f'/actions/runs/{run_id}/cancel')
         except APIError as exc:
             if exc.status != 409:
                 raise
+            cancel_accepted = False
         deadline = self.clock() + 90
         while self.clock() < deadline:
             run = self.api('GET', f'/actions/runs/{run_id}')
             if run['status'] == 'completed':
-                return self.jobs(run_id)
+                return run, self.jobs(run_id), cancel_accepted
             self.sleep(2)
         raise ValueError('Child cancellation not confirmed; hosted fallback withheld')
 
@@ -172,26 +174,31 @@ class Controller:
                 # Terminal status can race the earlier jobs inventory. Read again
                 # before classifying capacity markers or accepted execution.
                 jobs = self.jobs(run_id)
-                accepted = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in jobs)
-                local_ok = any(j['name'] == job_name and j.get('status') == 'completed' and j.get('conclusion') == 'success' for j in jobs)
-                markers = [j for j in jobs if j['name'] == capacity_marker] if capacity_marker else []
-                marker_valid = not capacity_marker or (len(markers) == 1 and markers[0].get('status') == 'completed' and markers[0].get('conclusion') in ('success', 'skipped'))
-                capacity = bool(markers and markers[0].get('conclusion') == 'success')
-                if accepted and local_ok and marker_valid and run['conclusion'] == 'success' and capacity:
-                    return dict(lane='hosted', outcome='capacity_unavailable', child_run_id=run_id, reason='Child explicitly reported scheduling unavailable.')
-                passed = accepted and local_ok and marker_valid and run['conclusion'] == 'success'
-                return dict(lane='local', outcome='success' if passed else 'failure', child_run_id=run_id,
-                            reason='Local attempt passed.' if passed else 'Local execution or child validation failed; no hosted retry.')
-            if execution_deadline is not None and self.clock() >= execution_deadline:
-                self.cancel_and_confirm(run_id)
-                return dict(lane='local', outcome='failure', child_run_id=run_id, reason='Accepted local execution exceeded its bound; no hosted retry.')
-            if execution_deadline is None and self.clock() >= queue_deadline:
-                final_jobs = self.cancel_and_confirm(run_id)
-                # Assignment can race cancellation. If it did, never hide execution.
-                raced = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in final_jobs)
-                return dict(lane='local' if raced else 'hosted', outcome='failure' if raced else 'capacity_unavailable',
-                            child_run_id=run_id, reason='Assignment raced cancellation; no hosted retry.' if raced else 'Local assignment timed out; child cancellation confirmed.')
+                return self.classify(run_id, run, jobs, job_name, capacity_marker)
+            if ((execution_deadline is not None and self.clock() >= execution_deadline)
+                    or (execution_deadline is None and self.clock() >= queue_deadline)):
+                final_run, final_jobs, cancel_accepted = self.cancel_and_confirm(run_id)
+                # A terminal completion can race our cancellation POST. Preserve it.
+                if final_run['conclusion'] != 'cancelled':
+                    return self.classify(run_id, final_run, final_jobs, job_name, capacity_marker)
+                assigned = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in final_jobs)
+                failed_job = any(j.get('conclusion') in ('failure', 'timed_out', 'action_required', 'startup_failure') for j in final_jobs)
+                capacity = (execution_deadline is None and cancel_accepted and not assigned and not failed_job)
+                return dict(lane='hosted' if capacity else 'local', outcome='capacity_unavailable' if capacity else 'failure',
+                            child_run_id=run_id, reason='Local assignment timed out; controller cancellation confirmed.' if capacity else 'Local cancellation or execution failure; no hosted retry.')
             self.sleep(15 if execution_deadline is not None else 2)
+
+    def classify(self, run_id, run, jobs, job_name, capacity_marker):
+        accepted = any(j['name'] == job_name and (j.get('runner_id') or 0) > 0 for j in jobs)
+        local_ok = any(j['name'] == job_name and j.get('status') == 'completed' and j.get('conclusion') == 'success' for j in jobs)
+        markers = [j for j in jobs if j['name'] == capacity_marker] if capacity_marker else []
+        marker_valid = not capacity_marker or (len(markers) == 1 and markers[0].get('status') == 'completed' and markers[0].get('conclusion') in ('success', 'skipped'))
+        capacity = bool(markers and markers[0].get('conclusion') == 'success')
+        if accepted and local_ok and marker_valid and run['conclusion'] == 'success' and capacity:
+            return dict(lane='hosted', outcome='capacity_unavailable', child_run_id=run_id, reason='Child explicitly reported scheduling unavailable.')
+        passed = accepted and local_ok and marker_valid and run['conclusion'] == 'success'
+        return dict(lane='local', outcome='success' if passed else 'failure', child_run_id=run_id,
+                    reason='Local attempt passed.' if passed else 'Local execution or child validation failed; no hosted retry.')
 
 
 def authorize_child(api, parent, parent_id, attempt, sha, child_id, enabled, workflow='ci.yml'):
