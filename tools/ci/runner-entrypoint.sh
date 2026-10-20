@@ -7,7 +7,7 @@ cp -a --no-preserve=ownership /home/runner/. /runner/
 cd /runner
 if [[ -f .runner ]]; then
   # A slot must never reuse another runner's credential-bearing state.
-  python3 -c 'import json,os,sys; sys.exit(0 if json.load(open(".runner"))["agentName"] == os.environ["RUNNER_NAME"] else "Runner state belongs to another slot")'
+  python3 -c 'import json,os,sys; sys.exit(0 if json.load(open(".runner", encoding="utf-8-sig"))["agentName"] == os.environ["RUNNER_NAME"] else "Runner state belongs to another slot")'
 else
   : "${RUNNER_REPOSITORY:?}" "${RUNNER_REGISTRATION_TOKEN:?}"
   ./config.sh --unattended --url "$RUNNER_REPOSITORY" \

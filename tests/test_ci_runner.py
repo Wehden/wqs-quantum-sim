@@ -28,7 +28,7 @@ def test_stateful_slots_keep_credentials_and_privileges_separate():
     assert policy['spec']['podSelector'] == {}
 
 
-def run_entrypoint(tmp_path, name, cached_name=None):
+def run_entrypoint(tmp_path, name, cached_name=None, cached_encoding="utf-8"):
     source = tmp_path / 'source'
     target = tmp_path / 'target'
     source.mkdir(); target.mkdir()
@@ -37,7 +37,7 @@ def run_entrypoint(tmp_path, name, cached_name=None):
     for file in source.iterdir():
         file.chmod(0o755)
     if cached_name:
-        (target / '.runner').write_text(json.dumps({'agentName': cached_name}))
+        (target / '.runner').write_text(json.dumps({'agentName': cached_name}), encoding=cached_encoding)
     script = Path('tools/ci/runner-entrypoint.sh').read_text().replace('/home/runner/', str(source) + '/').replace('/runner', str(target))
     file = tmp_path / 'entrypoint.sh'; file.write_text(script)
     result = subprocess.run(['bash', str(file)], env={**os.environ, 'RUNNER_NAME': name,
@@ -62,4 +62,19 @@ def test_cached_slot_restarts_without_reregistration(tmp_path):
 def test_shared_or_wrong_slot_state_is_rejected(tmp_path):
     result, target = run_entrypoint(tmp_path, 'wqs-ci-1', 'wqs-ci-0')
     assert result.returncode != 0
+    assert not (target / 'configured-args').exists()
+
+
+def test_bom_cached_slot_restarts_without_reregistration(tmp_path):
+    result, target = run_entrypoint(tmp_path, 'wqs-ci-0', 'wqs-ci-0', 'utf-8-sig')
+    assert (target / '.runner').read_bytes().startswith(b'\xef\xbb\xbf')
+    assert result.returncode == 0, result.stderr
+    assert not (target / 'configured-args').exists()
+
+
+def test_bom_wrong_slot_state_still_rejected(tmp_path):
+    result, target = run_entrypoint(tmp_path, 'wqs-ci-1', 'wqs-ci-0', 'utf-8-sig')
+    assert (target / '.runner').read_bytes().startswith(b'\xef\xbb\xbf')
+    assert result.returncode != 0
+    assert 'Runner state belongs to another slot' in result.stderr
     assert not (target / 'configured-args').exists()
