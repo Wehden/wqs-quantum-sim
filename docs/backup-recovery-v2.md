@@ -24,8 +24,9 @@ Creation and restoration are different operations:
 There is no implicit restore during creation or CD. The default creation module
 has no production provider configuration and returns `created:false` with a
 nonzero exit. Installing a real capture coordinator remains operational work.
-The provider implementation in PR #27 is a separate source dependency; its v1
-snapshot manifest needs migration to v2 before use with this coordinator.
+The concrete snapshot/coordinator emits v2 manifests and returns creation results
+bound to the requested ID. It requires explicit CD configuration provenance and
+configured source, encryption and storage providers; see [provider setup](backup-providers.md).
 
 ## Explicit direct restore
 
