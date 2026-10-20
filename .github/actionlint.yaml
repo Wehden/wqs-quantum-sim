@@ -1,0 +1,5 @@
+self-hosted-runner:
+  labels:
+    - wqs-local
+    - wqs-ci-local
+    - wqs-deploy
