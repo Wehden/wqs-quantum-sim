@@ -1,4 +1,5 @@
 name: CI
+run-name: ${{ inputs.local_parent_run && format('ci-local-{0}-{1}-{2}', inputs.local_parent_run, inputs.local_parent_attempt, inputs.local_checkout_sha) || github.event.pull_request.title || github.event.head_commit.message || 'CI' }}
 on:
   pull_request:
   push:
@@ -9,13 +10,23 @@ on:
         description: Exercise GitHub-hosted setup and tests instead of Standpunkt
         type: boolean
         default: false
+      local_parent_run:
+        description: Internal local attempt parent run ID
+        type: string
+      local_parent_attempt:
+        description: Internal parent attempt
+        type: string
+      local_checkout_sha:
+        description: Internal immutable checkout SHA
+        type: string
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ inputs.local_parent_run && format('child-{0}-{1}', inputs.local_parent_run, inputs.local_parent_attempt) || github.ref }}
   cancel-in-progress: true
 jobs:
   route:
+    if: ${{ !inputs.local_parent_run }}
     name: Choose and explain CI path
     runs-on: ubuntu-24.04
     outputs:
@@ -34,14 +45,54 @@ jobs:
       - id: hosted
         if: ${{ !((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main')) }}
         run: echo "lane=hosted" >> "$GITHUB_OUTPUT"
-  local:
-    name: Standpunkt / Clifft + Google qsim + Aer / Python 3.12
+  attempt:
+    name: Bounded local assignment
     needs: route
     if: >-
       needs.route.outputs.lane == 'local' &&
       ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      lane: ${{ steps.attempt.outputs.lane }}
+      outcome: ${{ steps.attempt.outputs.outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOCAL_PARENT_RUN: ${{ github.run_id }}
+          LOCAL_PARENT_ATTEMPT: ${{ github.run_attempt }}
+          LOCAL_CHECKOUT_SHA: ${{ github.sha }}
+          LOCAL_DISPATCH_REF: ${{ github.head_ref || github.ref_name }}
+        run: python3 tools/ci/local_attempt.py
+  validate-child:
+    name: Validate internal local attempt
+    if: github.event_name == 'workflow_dispatch' && inputs.local_parent_run != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          LOCAL_PARENT_RUN: ${{ inputs.local_parent_run }}
+          LOCAL_PARENT_ATTEMPT: ${{ inputs.local_parent_attempt }}
+          LOCAL_CHECKOUT_SHA: ${{ inputs.local_checkout_sha }}
+        run: python3 tools/ci/local_attempt.py --validate
+  local:
+    name: Local execution
+    needs: validate-child
+    if: needs.validate-child.result == 'success'
     runs-on: [self-hosted, Linux, X64, wqs-ci-local]
-    continue-on-error: true
     outputs:
       tests: ${{ steps.tests.outcome }}
       artifact: ${{ steps.artifact.outcome }}
@@ -50,6 +101,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ inputs.local_checkout_sha }}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         if: runner.environment == 'github-hosted'
         with:
@@ -74,10 +126,10 @@ jobs:
           retention-days: 14
   hosted:
     name: GitHub-hosted / Clifft + Google qsim + Aer / Python 3.12
-    needs: [route, local]
+    needs: [route, attempt]
     if: >-
       always() && !cancelled() && needs.route.result == 'success' &&
-      (needs.route.outputs.lane == 'hosted' || needs.local.outputs.tests != 'success' || needs.local.outputs.artifact != 'success')
+      (needs.route.outputs.lane == 'hosted' || (needs.attempt.result == 'success' && needs.attempt.outputs.lane == 'hosted' && needs.attempt.outputs.outcome == 'capacity_unavailable'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -107,6 +159,7 @@ jobs:
           path: test-results/*.xml
           retention-days: 14
   worker-image:
+    if: ${{ !inputs.local_parent_run }}
     name: GitHub-hosted / API, controller and worker images
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -129,31 +182,33 @@ jobs:
           retention-days: 14
   result:
     name: CI result and path
-    needs: [route, local, hosted, worker-image]
-    if: always()
+    needs: [route, attempt, hosted, worker-image]
+    if: always() && !inputs.local_parent_run
     runs-on: ubuntu-24.04
     steps:
       - name: Report actual execution and gate the result
         env:
           ROUTE: ${{ needs.route.outputs.lane }}
           ROUTE_RESULT: ${{ needs.route.result }}
-          LOCAL_TESTS: ${{ needs.local.outputs.tests }}
-          LOCAL_ARTIFACT: ${{ needs.local.outputs.artifact }}
+          ATTEMPT_RESULT: ${{ needs.attempt.result }}
+          ATTEMPT_LANE: ${{ needs.attempt.outputs.lane }}
+          ATTEMPT_OUTCOME: ${{ needs.attempt.outputs.outcome }}
           IMAGE_RESULT: ${{ needs.worker-image.result }}
           HOSTED_RESULT: ${{ needs.hosted.result }}
         run: |
           python3 - <<'PY'
           import os
-          local_ok = os.environ['LOCAL_TESTS'] == 'success' and os.environ['LOCAL_ARTIFACT'] == 'success'
+          local_ok = os.environ['ATTEMPT_RESULT'] == 'success' and os.environ['ATTEMPT_OUTCOME'] == 'success'
+          capacity = os.environ['ATTEMPT_RESULT'] == 'success' and os.environ['ATTEMPT_LANE'] == 'hosted' and os.environ['ATTEMPT_OUTCOME'] == 'capacity_unavailable'
           if os.environ['ROUTE'] == 'local' and local_ok:
-              detail = 'Standpunkt: passed. GitHub-hosted test suite: skipped (fallback not needed).'
+              detail = 'Local execution passed; hosted tests skipped.'
               passed = os.environ['HOSTED_RESULT'] == 'skipped'
-          elif os.environ['ROUTE'] == 'local':
-              detail = 'Standpunkt: unsuccessful. GitHub-hosted retry: ' + os.environ['HOSTED_RESULT'] + '.'
+          elif os.environ['ROUTE'] == 'hosted' or capacity:
+              detail = 'Local capacity unavailable or hosted requested. Hosted tests: ' + os.environ['HOSTED_RESULT'] + '.'
               passed = os.environ['HOSTED_RESULT'] == 'success'
           else:
-              detail = 'Standpunkt: skipped by routing. GitHub-hosted test suite: ' + os.environ['HOSTED_RESULT'] + '.'
-              passed = os.environ['HOSTED_RESULT'] == 'success'
+              detail = 'Local execution or admission controller failed. No hosted retry.'
+              passed = False
           detail += ' Release images and deployment runner tools (GitHub-hosted): ' + os.environ['IMAGE_RESULT'] + '.'
           passed = passed and os.environ['IMAGE_RESULT'] == 'success'
           print(detail)
