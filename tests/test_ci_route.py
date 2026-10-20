@@ -1,22 +1,66 @@
+import json
+import pytest
 from tools.ci.route import choose
 
+NOW = 1000
+STATUS = dict(schema=1, observed_at=NOW, capacity=2, online=2, busy=1, idle=1)
 
-def test_standpunkt_default_and_operator_override():
-    assert choose({},'push','example/project','refs/heads/main','')[0]=='local'
-    assert choose({},'push','example/project','refs/heads/main','false')[0]=='hosted'
+
+def route(event=None, kind='push', ref='refs/heads/main', enabled='true', status=None):
+    return choose(event or {}, kind, 'example/project', ref, enabled,
+                  json.dumps(STATUS if status is None else status), now=NOW)[0]
+
+
+def test_idle_slot_and_operator_override():
+    assert route() == 'local'
+    assert route(enabled='false') == 'hosted'
+    assert route(enabled='') == 'hosted'
+    assert route(enabled='unexpected') == 'hosted'
+
+
+@pytest.mark.parametrize('change', [
+    {'busy': 2, 'idle': 0}, {'online': 0, 'busy': 0, 'idle': 0},
+    {'observed_at': NOW - 121}, {'observed_at': NOW + 16},
+    {'observed_at': float('nan')}, {'observed_at': True},
+    {'capacity': 3}, {'capacity': True}, {'online': 3, 'busy': 2},
+    {'busy': -1}, {'idle': True}, {'online': 1}, {'schema': 2}, {'schema': True},
+])
+def test_unavailable_or_inconsistent_evidence_is_hosted(change):
+    assert route(status=dict(STATUS, **change)) == 'hosted'
+
+
+@pytest.mark.parametrize('raw', ['', '{', 'null', '[]', '{}', '"text"'])
+def test_missing_malformed_evidence_is_hosted(raw):
+    assert choose({}, 'push', 'example/project', 'refs/heads/main', 'true', raw, now=NOW)[0] == 'hosted'
+
+
+def test_freshness_boundaries_and_one_online_slot():
+    assert route(status=dict(STATUS, observed_at=NOW-120)) == 'local'
+    assert route(status=dict(STATUS, observed_at=NOW+15)) == 'local'
+    assert route(status=dict(STATUS, online=1, busy=0, idle=1)) == 'local'
 
 
 def test_forks_never_select_private_runner():
-    event={'pull_request':{'head':{'repo':{'full_name':'fork/project'}}}}
-    assert choose(event,'pull_request','example/project','refs/pull/1/merge','true')[0]=='hosted'
-    event['pull_request']['head']['repo']['full_name']='example/project'
-    assert choose(event,'pull_request','example/project','refs/pull/1/merge','true')[0]=='local'
+    event = {'pull_request': {'head': {'repo': {'full_name': 'fork/project'}}}}
+    assert route(event, kind='pull_request', ref='refs/pull/1/merge') == 'hosted'
+    event['pull_request']['head']['repo']['full_name'] = 'example/project'
+    assert route(event, kind='pull_request', ref='refs/pull/1/merge') == 'local'
 
 
 def test_manual_and_unknown_events():
-    assert choose({},'workflow_dispatch','example/project','refs/heads/main','true')[0]=='local'
-    assert choose({},'workflow_dispatch','example/project','refs/heads/feature','true')[0]=='hosted'
-    assert choose({},'other','example/project','refs/heads/main','true')[0]=='hosted'
+    assert route(kind='workflow_dispatch') == 'local'
+    assert route({'inputs': {'hosted_tests': 'true'}}, kind='workflow_dispatch') == 'hosted'
+    assert route(kind='workflow_dispatch', ref='refs/heads/feature') == 'hosted'
+    assert route(kind='other') == 'hosted'
+
+
+def test_workflow_wires_status_and_new_pool_without_changing_image_lane():
+    from pathlib import Path
+    import yaml
+    jobs = yaml.safe_load(Path('.github/workflows/ci.yml').read_text())['jobs']
+    assert jobs['route']['steps'][1]['env']['CI_LOCAL_RUNNER_STATUS'] == '${{ vars.CI_LOCAL_RUNNER_STATUS }}'
+    assert jobs['local']['runs-on'] == ['self-hosted', 'Linux', 'X64', 'wqs-ci-local']
+    assert jobs['worker-image']['runs-on'] == 'ubuntu-24.04'
 
 
 def test_final_gate_reports_paths_and_never_masks_hosted_failure(tmp_path):

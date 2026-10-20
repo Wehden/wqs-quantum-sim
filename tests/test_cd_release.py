@@ -161,7 +161,8 @@ def test_bootstrap_and_ci_fail_before_mutation(tmp_path, services, monkeypatch):
 def test_manual_hosted_validation_preserves_default():
     from tools.ci.route import choose
     assert choose({'inputs': {'hosted_tests': 'true'}}, 'workflow_dispatch', 'test/repo', 'refs/heads/main', '')[0] == 'hosted'
-    assert choose({}, 'workflow_dispatch', 'test/repo', 'refs/heads/main', '')[0] == 'local'
+    assert choose({}, 'workflow_dispatch', 'test/repo', 'refs/heads/main', 'true',
+                  json.dumps(dict(schema=1, observed_at=1000, capacity=2, online=2, busy=0, idle=2)), now=1000)[0] == 'local'
 
 
 def test_version_requires_verified_record_and_never_retags(tmp_path, monkeypatch):

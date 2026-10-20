@@ -27,12 +27,13 @@ jobs:
       - id: choose
         env:
           LOCAL_ENABLED: ${{ vars.WQS_LOCAL_CI_ENABLED }}
+          CI_LOCAL_RUNNER_STATUS: ${{ vars.CI_LOCAL_RUNNER_STATUS }}
         run: python3 tools/ci/route.py
   local:
     name: Standpunkt / Clifft + Google qsim + Aer / Python 3.12
     needs: route
     if: needs.route.outputs.lane == 'local'
-    runs-on: [self-hosted, Linux, X64, wqs-local]
+    runs-on: [self-hosted, Linux, X64, wqs-ci-local]
     continue-on-error: true
     outputs:
       tests: ${{ steps.tests.outcome }}
