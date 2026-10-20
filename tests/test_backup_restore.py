@@ -175,7 +175,7 @@ def test_partial_load_failure_does_not_return_success(backup, tmp_path, monkeypa
         restore(encrypted, keys[0], age, hashlib.sha256(Path(age).read_bytes()).hexdigest(), None, destinations)
 
 
-def test_actual_creation_is_not_restore_evidence(backup, tmp_path):
+def test_actual_creation_is_not_restore_evidence(backup, tmp_path, monkeypatch):
     from tools.backup.create import create
     source, _, manifest, _ = backup
     age, _, recipients = identities(tmp_path)
@@ -201,7 +201,44 @@ def test_actual_creation_is_not_restore_evidence(backup, tmp_path):
             destination.write_bytes((tmp_path / 'retained.age').read_bytes())
     work = tmp_path / 'work'; work.mkdir()
     manifest['dependencies'].update(parent_coordinated=False, admission_held=False, cd_enabled=True)
-    result = create(source, manifest, LocalProviders(), work, manifest['context']['set_id'])
+    # Reject even a one-byte overflow before encryption/storage; the actual TAR
+    # includes headers and block padding beyond the inventory's payload sizes.
+    import importlib
+    restore_module = importlib.import_module('tools.backup.restore')
+    if manifest['dependencies']['results']:
+        import numpy as np
+        import zipfile
+        native_module = importlib.import_module('tools.backup.native_load')
+        path = manifest['dependencies']['results'][0]
+        compressed = io.BytesIO()
+        np.savez_compressed(compressed, measurements=np.zeros(4096, dtype=np.uint8))
+        value = compressed.getvalue()
+        (source / path).write_bytes(value)
+        next(e for e in manifest['inventory'] if e['path'] == path).update(digest(value))
+        with zipfile.ZipFile(io.BytesIO(value)) as zipped:
+            expanded = sum(m.file_size for m in zipped.infolist())
+        assert expanded > len(value)
+        with monkeypatch.context() as patch:
+            patch.setattr(native_module, 'MAX_NPZ_BYTES', expanded - 1)
+            with pytest.raises(ValueError, match='oversized NPZ'):
+                create(source, manifest, LocalProviders(), work, manifest['context']['set_id'])
+            assert not (tmp_path / 'retained.age').exists()
+    check_archive = tmp_path / 'size-check.tar'
+    root = os.open(source, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        payload(root, manifest, check_archive)
+    finally:
+        os.close(root)
+    size = check_archive.stat().st_size
+    assert size > sum(entry['size'] for entry in manifest['inventory'])
+    with monkeypatch.context() as patch:
+        patch.setattr(restore_module, 'MAX_BYTES', size - 1)
+        with pytest.raises(ValueError, match='archive exceeds size limit'):
+            create(source, manifest, LocalProviders(), work, manifest['context']['set_id'])
+        assert not (tmp_path / 'retained.age').exists()
+    with monkeypatch.context() as patch:
+        patch.setattr(restore_module, 'MAX_BYTES', size)
+        result = create(source, manifest, LocalProviders(), work, manifest['context']['set_id'])
     assert result == {'evidence_type': 'creation_result', 'created': True, 'backup_id': manifest['context']['set_id']}
     assert 'verified' not in result
     with pytest.raises(ValueError, match='unexpected backup'):

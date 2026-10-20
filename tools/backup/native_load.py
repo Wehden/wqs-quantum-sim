@@ -19,6 +19,9 @@ from cryptography.fernet import Fernet
 from .metadata import require
 
 
+MAX_NPZ_BYTES = 512 * 1024 * 1024
+
+
 def validate_wqs(manifest, files):
     deps = manifest['dependencies']
     require(deps['kind'] == 'wqs', 'not a WQS backup')
@@ -63,7 +66,7 @@ def validate_wqs(manifest, files):
             require(bool(members) and len({m.filename for m in members}) == len(members)
                     and all(re.fullmatch('[A-Za-z_][A-Za-z0-9_]*\\.npy', m.filename)
                             and not (m.flag_bits & 1) for m in members)
-                    and sum(m.file_size for m in members) <= 512 * 1024 * 1024,
+                    and sum(m.file_size for m in members) <= MAX_NPZ_BYTES,
                     'invalid or oversized NPZ members')
             for member in members:
                 with archive.open(member) as array:
