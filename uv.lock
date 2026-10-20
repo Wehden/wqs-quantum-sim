@@ -1525,6 +1525,7 @@ dependencies = [
 [package.optional-dependencies]
 backup = [
     { name = "jsonschema" },
+    { name = "numpy" },
 ]
 controller = [
     { name = "skypilot", extra = ["kubernetes"] },
@@ -1552,6 +1553,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.143.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "jsonschema", marker = "extra == 'backup'", specifier = "==4.26.0" },
+    { name = "numpy", marker = "extra == 'backup'", specifier = "==2.5.4" },
     { name = "numpy", marker = "extra == 'worker'", specifier = "==2.5.4" },
     { name = "ply", marker = "extra == 'worker'", specifier = "==3.11" },
     { name = "pyyaml", specifier = "==6.0.3" },
