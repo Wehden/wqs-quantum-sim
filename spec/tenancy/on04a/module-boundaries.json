@@ -1,0 +1,34 @@
+{
+  "version": "0.1.0",
+  "boundaries": [
+    {
+      "module": "qsim.welcome_provider",
+      "description": "Private read-only API; no application startup imports",
+      "allowed_imports_from": [
+        "qsim.welcome_evidence"
+      ],
+      "forbidden_imports_from": [
+        "qsim.adminweb",
+        "qsim.api",
+        "qsim.store",
+        "qsim.notifications",
+        "qsim.controller",
+        "qsim.worker"
+      ]
+    },
+    {
+      "module": "qsim.welcome_evidence",
+      "description": "Direct read-only SQLite and Kubernetes evidence; standard library and existing httpx permitted",
+      "allowed_imports_from": [],
+      "forbidden_imports_from": [
+        "qsim.adminweb",
+        "qsim.api",
+        "qsim.store",
+        "qsim.notifications",
+        "qsim.auth",
+        "qsim.controller",
+        "qsim.worker"
+      ]
+    }
+  ]
+}

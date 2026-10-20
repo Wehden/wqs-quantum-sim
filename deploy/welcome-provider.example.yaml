@@ -1,0 +1,135 @@
+# REVIEWABLE TEMPLATE ONLY. Requires separate ship approval and private inputs.
+# Replace namespace, PVC, image digest, network selectors and API-server CIDR.
+# Create the referenced private Secrets separately; no credential values here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wqs-welcome
+  namespace: example-wqs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wqs-welcome-registry-reader
+  namespace: example-wqs
+rules:
+  - apiGroups: ['']
+    resources: [secrets]
+    resourceNames: [example-users]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wqs-welcome-registry-reader
+  namespace: example-wqs
+subjects:
+  - kind: ServiceAccount
+    name: wqs-welcome
+    namespace: example-wqs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wqs-welcome-registry-reader
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wqs-welcome
+  namespace: example-wqs
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: wqs-welcome}
+  template:
+    metadata:
+      labels: {app: wqs-welcome}
+    spec:
+      serviceAccountName: wqs-welcome
+      # Add the existing data PVC's node placement in private configuration.
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: provider
+          image: example.invalid/wqs/api@sha256:REPLACE_WITH_TESTED_API_DIGEST
+          command: [python, -m, qsim.welcome_provider]
+          ports: [{name: https, containerPort: 8443}]
+          env:
+            - {name: QSIM_DATA, value: /data}
+            - {name: WQS_WELCOME_BINDING_FILE, value: /run/welcome/binding.json}
+            - {name: WQS_WELCOME_AUTH_FILE, value: /run/welcome/auth.json}
+            - {name: WQS_WELCOME_INTEGRITY_KEY_FILE, value: /run/welcome/integrity-key}
+            - {name: WQS_WELCOME_TLS_CERT_FILE, value: /run/welcome-tls/tls.crt}
+            - {name: WQS_WELCOME_TLS_KEY_FILE, value: /run/welcome-tls/tls.key}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: '1', memory: 512Mi}
+          volumeMounts:
+            - {name: data, mountPath: /data, readOnly: true}
+            - {name: config, mountPath: /run/welcome, readOnly: true}
+            - {name: tls, mountPath: /run/welcome-tls, readOnly: true}
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -m
+                - qsim.welcome_provider
+                - --check
+            timeoutSeconds: 20
+            periodSeconds: 60
+          livenessProbe:
+            tcpSocket: {port: https}
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: example-existing-data, readOnly: true}
+        - name: config
+          secret: {secretName: example-welcome-private, defaultMode: 288}
+        - name: tls
+          secret: {secretName: example-welcome-tls, defaultMode: 288}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wqs-welcome
+  namespace: example-wqs
+spec:
+  type: ClusterIP
+  selector: {app: wqs-welcome}
+  ports: [{name: https, port: 8443, targetPort: https}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wqs-welcome
+  namespace: example-wqs
+spec:
+  podSelector:
+    matchLabels: {app: wqs-welcome}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: example-central}
+          podSelector:
+            matchLabels: {app: example-central-console}
+      ports: [{protocol: TCP, port: 8443}]
+  egress:
+    # Placeholder documentation network; replace with actual API-server endpoint.
+    - to: [{ipBlock: {cidr: 192.0.2.1/32}}]
+      ports: [{protocol: TCP, port: 6443}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
