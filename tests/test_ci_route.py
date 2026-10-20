@@ -88,3 +88,38 @@ def test_final_gate_reports_paths_and_never_masks_hosted_failure(tmp_path):
         result=subprocess.run([sys.executable,'-c',script],env=env,capture_output=True,text=True)
         assert (result.returncode==0)==passed,result.stderr
         assert 'Standpunkt:' in report.read_text() and 'GitHub-hosted' in report.read_text()
+
+
+import unittest
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+
+class WorkflowTrustBoundaryTests(unittest.TestCase):
+    def test_fork_cannot_execute_checkout_router_or_force_local_lane(self):
+        import re
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        gate = re.search(r'- id: choose\n        if: (.*)', workflow)[1]
+        local = workflow.split('  local:', 1)[1].split('    runs-on:', 1)[0]
+        local_gate = re.search(r'    if: >-\n(.*)', local, re.S)[1].strip()
+        def evaluate(expression, event, repository, ref):
+            expression = expression.replace("needs.route.outputs.lane", repr('local'))
+            for key, value in [('github.event.pull_request.head.repo.full_name', repository),
+                               ('github.event_name', event), ('github.repository', 'Wehden/wqs-quantum-sim'),
+                               ('github.ref', ref)]:
+                expression = expression.replace(key, repr(value))
+            return eval(' '.join(expression.split()).replace('&&', ' and ').replace('||', ' or '), {'__builtins__': {}}, {})
+        for event, repository, ref, allowed in [
+            ('pull_request', 'fork/wqs-quantum-sim', 'refs/pull/7/merge', False),
+            ('pull_request', 'Wehden/wqs-quantum-sim', 'refs/pull/7/merge', True),
+            ('push', '', 'refs/heads/main', True),
+            ('workflow_dispatch', '', 'refs/heads/main', True),
+            ('workflow_dispatch', '', 'refs/heads/feature', False),
+            ('pull_request_target', 'Wehden/wqs-quantum-sim', 'refs/heads/main', False),
+        ]:
+            with self.subTest(event=event, repository=repository, ref=ref):
+                self.assertEqual(evaluate(gate, event, repository, ref), allowed)
+                # Even a forged router output cannot override the local job boundary.
+                self.assertEqual(evaluate(local_gate, event, repository, ref), allowed)
+        self.assertIn('steps.choose.outputs.lane || steps.hosted.outputs.lane', workflow)
+        self.assertIn('run: echo "lane=hosted" >> "$GITHUB_OUTPUT"', workflow)
+
