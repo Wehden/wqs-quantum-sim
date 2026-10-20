@@ -194,6 +194,31 @@ class Controller:
             self.sleep(15 if execution_deadline is not None else 2)
 
 
+def authorize_child(api, parent, parent_id, attempt, sha, child_id, enabled, workflow='ci.yml'):
+    if enabled != 'true':
+        raise ValueError('Local CI is disabled')
+    if not str(child_id).isdigit():
+        raise ValueError('Invalid child identity')
+    child = api('GET', '/actions/runs/' + str(child_id))
+    expected = f'ci-local-{parent_id}-{attempt}-{sha}'
+    def actions_bot(actor):
+        return actor.get('id') == 41898282 and actor.get('login') == 'github-actions[bot]'
+    if (child.get('event') != 'workflow_dispatch' or child.get('display_title') != expected
+            or not actions_bot(child.get('actor', {})) or not actions_bot(child.get('triggering_actor', {}))
+            or child.get('run_attempt') != 1 or child.get('head_sha') != parent['head_sha']
+            or child.get('repository', {}).get('id') != parent['repository']['id']
+            or child.get('head_repository', {}).get('id') != parent['repository']['id']
+            or not workflow_matches(child.get('path'), workflow)):
+        raise ValueError('Child was not dispatched by the trusted controller')
+    jobs = api('GET', f'/actions/runs/{parent_id}/attempts/{attempt}/jobs?per_page=100')['jobs']
+    controllers = [job for job in jobs if job.get('name') == 'Bounded local assignment']
+    if (len(jobs) >= 100 or len(controllers) != 1 or controllers[0].get('status') != 'in_progress'
+            or not controllers[0].get('runner_id')
+            or controllers[0].get('runner_group_name') != 'GitHub Actions'
+            or 'self-hosted' in controllers[0].get('labels', [])):
+        raise ValueError('Parent has no active hosted assignment controller')
+
+
 def cleanup(api, state_file, parent_id, attempt, sha, workflow='ci.yml'):
     path = Path(state_file)
     if not path.exists():
@@ -268,6 +293,7 @@ def main():
         return
     if args.validate:
         parent = validate_parent(api, *identity, args.workflow)
+        authorize_child(api, parent, *identity, os.environ['GITHUB_RUN_ID'], os.environ.get('LOCAL_ENABLED', ''), args.workflow)
         if os.environ['GITHUB_SHA'] != parent['head_sha']:
             raise ValueError('Child workflow SHA differs from parent head')
         with open(os.environ['GITHUB_OUTPUT'], 'a') as out:

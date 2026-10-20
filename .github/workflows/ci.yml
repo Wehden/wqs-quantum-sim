@@ -93,6 +93,7 @@ jobs:
           persist-credentials: false
       - env:
           GH_TOKEN: ${{ github.token }}
+          LOCAL_ENABLED: ${{ vars.WQS_LOCAL_CI_ENABLED }}
           LOCAL_PARENT_RUN: ${{ inputs.local_parent_run }}
           LOCAL_PARENT_ATTEMPT: ${{ inputs.local_parent_attempt }}
           LOCAL_CHECKOUT_SHA: ${{ inputs.local_checkout_sha }}

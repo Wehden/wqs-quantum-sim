@@ -215,3 +215,23 @@ def test_required_capacity_marker_and_local_success(marker_status,marker_conclus
         return result
     result=m.Controller(api,lambda:f.now,f.sleep).run('1','1',SHA,'main',capacity_marker='Local capacity unavailable')
     assert result['outcome']==expected
+
+
+@pytest.mark.parametrize('fault', ['', 'human_actor','human_rerun','wrong_controller','disabled','no_hosted_runner','wrong_correlation'])
+def test_child_requires_enabled_bot_dispatch_and_active_controller(fault):
+    f=Fake(); bot={'id':41898282,'login':'github-actions[bot]'}
+    child=dict(event='workflow_dispatch',display_title='ci-local-1-1-'+SHA,actor=bot,triggering_actor=bot,
+        run_attempt=1,head_sha=SHA,repository={'id':1},head_repository={'id':1},path='.github/workflows/ci.yml')
+    job=dict(name='Bounded local assignment',status='in_progress',runner_id=99,runner_group_name='GitHub Actions',labels=['ubuntu-24.04'])
+    if fault=='human_actor': child['actor']={'id':1,'login':'human'}
+    if fault=='human_rerun': child['triggering_actor']={'id':1,'login':'human'}
+    if fault=='wrong_controller': job['name']='Other job'
+    if fault=='no_hosted_runner': job['runner_group_name']='Default'
+    if fault=='wrong_correlation': child['display_title']='forged'
+    def api(method,path,body=None):
+        if path=='/actions/runs/2': return child
+        if '/attempts/1/jobs' in path: return {'jobs':[job]}
+        raise AssertionError(path)
+    if not fault: m.authorize_child(api,f.parent,'1','1',SHA,'2','true')
+    else:
+        with pytest.raises(ValueError): m.authorize_child(api,f.parent,'1','1',SHA,'2','false' if fault=='disabled' else 'true')

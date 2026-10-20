@@ -48,8 +48,11 @@ accepts the job, test, checkout, artifact, cancellation and execution-timeout fa
 remain failures; hosted success cannot conceal them. Local JUnit artifacts live on
 the linked child run. Release checks remain on the parent hosted run.
 
-The child validates its active same-repository parent, attempt, workflow and immutable
-checkout SHA. PRs retain their synthetic merge SHA, verified against GitHub's current PR merge ref
+The child rechecks the local-enable flag and validates its active same-repository
+parent, attempt, workflow and immutable checkout SHA. It requires GitHub Actions bot
+dispatch and triggering identities, the exact correlation title, and an assigned,
+active hosted parent controller. Direct manual child dispatches and human reruns
+cannot bypass normal routing. PRs retain their synthetic merge SHA, verified against GitHub's current PR merge ref
 and the parent's trusted head. Stale run API base metadata is not used as authority. The dispatched workflow head must match the parent's head.
 Changed branches fail closed. Child concurrency is separate from parent concurrency.
 Only the hosted controller receives `actions: write`; the local runner receives no
