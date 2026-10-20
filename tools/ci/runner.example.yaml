@@ -39,7 +39,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: owner
-          image: example.invalid/wqs/ci-runner@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          image: laminarflow:30500/wqs/ci-runner@sha256:2fecdc4f7cc21977a06cae181c5875403afdf65e152655df36be0b041aeca4d8
           command: [chown, '1001:1001', /runner]
           securityContext:
             runAsUser: 0
@@ -52,7 +52,7 @@ spec:
               mountPath: /runner
       containers:
         - name: runner
-          image: example.invalid/wqs/ci-runner@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          image: laminarflow:30500/wqs/ci-runner@sha256:2fecdc4f7cc21977a06cae181c5875403afdf65e152655df36be0b041aeca4d8
           env:
             - name: RUNNER_NAME
               valueFrom:
