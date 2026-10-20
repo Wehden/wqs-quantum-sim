@@ -37,6 +37,14 @@ class SecretReader:
                 base64.b64decode(value['data'][self.key], validate=True))
 
 
+def source_identity(kind, namespace, name, uid):
+    """Bounded contract ID binding the complete Kubernetes object identity."""
+    require(kind in ('pod', 'pvc'), 'unsupported source kind')
+    require(all(isinstance(value, str) and value for value in (namespace, name, uid)),
+            'complete source identity required')
+    return 'k8s-' + kind + ':' + digest(canonical([namespace, name, uid]))['sha256']
+
+
 class MountedVolume:
     """Bind the executing capture pod's mount to an independently expected PVC."""
     def __init__(self, namespace, pod, container, budget):
@@ -58,8 +66,8 @@ class MountedVolume:
         pvc_name = volume['persistentVolumeClaim']['claimName']
         pvc = self.get('pvc', pvc_name)
         require(pvc['status']['phase'] == 'Bound', 'source PVC not bound')
-        require(context['source']['storage'] == f"{self.namespace}/{pvc_name}@{pvc['metadata']['uid']}"
-                and context['source']['workload'] == f"{self.namespace}/{self.pod}@{pod['metadata']['uid']}", 'source identity mismatch')
+        require(context['source']['storage'] == source_identity('pvc', self.namespace, pvc_name, pvc['metadata']['uid'])
+                and context['source']['workload'] == source_identity('pod', self.namespace, self.pod, pod['metadata']['uid']), 'source identity mismatch')
         image = container['image']
         require(re.fullmatch(r'[^\s]+@sha256:[a-f0-9]{64}', image)
                 and context['source']['image_or_executable_digest'] == image.rsplit(':', 1)[1], 'source image mismatch')

@@ -101,3 +101,9 @@ no hardware recovery is claimed. S3 tests use SDK stubs and storage doubles, wit
 network writes. SQLite fixtures exercise snapshot integrity, mismatched delivery
 keys, in-flight operations, changed Secrets, lock ownership and current-volume
 identity. The runner-image smoke checks the installed encryption and Python tools.
+
+Source workload and storage IDs use `k8s-pod:<sha256>` and `k8s-pvc:<sha256>`.
+The digest covers the canonical JSON array `[namespace, name, uid]` using the
+contract canonicalizer. Configure expected IDs with `source_identity()`; the
+verifier recomputes them from the current Kubernetes objects. This binds the
+complete identity while respecting the contract ID character and length limits.

@@ -166,8 +166,8 @@ def test_wrong_current_volume_rejected(source):
         snapshot.create(output)
 
 
-def test_mount_verifier_binds_pod_pvc_image_and_revision(monkeypatch):
-    from tools.backup.snapshot import MountedVolume
+def test_mount_verifier_binds_pod_pvc_image_and_revision(monkeypatch, source):
+    from tools.backup.snapshot import MountedVolume, source_identity
     monkeypatch.setattr('tools.backup.snapshot.socket.gethostname', lambda: 'capture-pod')
     volume = MountedVolume('test', 'capture-pod', 'capture', Budget())
     pod = {'metadata': {'uid': 'pod-uid', 'annotations': {'wqsim-release-sha': SHA}},
@@ -176,9 +176,23 @@ def test_mount_verifier_binds_pod_pvc_image_and_revision(monkeypatch):
                     'volumes': [{'name': 'data', 'persistentVolumeClaim': {'claimName': 'application-data'}}]}}
     pvc = {'metadata': {'uid': 'pvc-uid'}, 'status': {'phase': 'Bound'}}
     volume.get = lambda kind, name: pod if kind == 'pod' else pvc
-    context = {'source': {'storage': 'test/application-data@pvc-uid', 'workload': 'test/capture-pod@pod-uid',
+    context = {'source': {'storage': source_identity('pvc', 'test', 'application-data', 'pvc-uid'),
+                          'workload': source_identity('pod', 'test', 'capture-pod', 'pod-uid'),
                           'revision': SHA, 'image_or_executable_digest': 'a'*64}}
     assert volume.verify(context, Path('/data'))
+    snapshot, output = source
+    snapshot.context['source'] = context['source']
+    snapshot.volume = volume
+    pod['spec']['containers'][0]['volumeMounts'][0]['mountPath'] = str(snapshot.data)
+    manifest = snapshot.create(output)  # Includes pinned schema and dependency validation.
+    assert manifest['dependencies']['pvc_identity'] == context['source']['storage']
+    import os
+    fd = os.open(output, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        assert snapshot.validate(fd, manifest)
+    finally:
+        os.close(fd)
+    pod['spec']['containers'][0]['volumeMounts'][0]['mountPath'] = '/data'
     pvc['metadata']['uid'] = 'replacement'
     with pytest.raises(ValueError, match='identity mismatch'):
         volume.verify(context, Path('/data'))
@@ -209,3 +223,13 @@ def test_post_storage_validation_rejects_live_mutation(source, change):
             snapshot.validate(fd, manifest)
     finally:
         os.close(fd)
+
+
+def test_source_identity_fits_contract_for_long_names():
+    from tools.backup.snapshot import source_identity
+    import re
+    identity = source_identity('pvc', 'n' * 63, 'v' * 253, 'u' * 36)
+    assert len(identity) <= 128
+    assert re.fullmatch('[A-Za-z0-9][A-Za-z0-9._:-]*', identity)
+    assert identity != source_identity('pvc', 'n' * 63, 'v' * 253, 'different-uid')
+    assert identity != source_identity('pod', 'n' * 63, 'v' * 253, 'u' * 36)
