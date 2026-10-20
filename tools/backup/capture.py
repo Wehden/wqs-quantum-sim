@@ -121,6 +121,12 @@ def capture(source, manifest, expected_context, providers, work_dir, *, now=None
             archive, encrypted, readback = (private / name for name in ('payload.tar', 'ciphertext.age', 'readback.age'))
             payload(root, manifest, archive)
             archive.chmod(0o600)
+            if manifest['contract_version'] == 2:
+                # Validate the actual TAR, including padding and native payload
+                # limits, with the same parser used by restore before uploading.
+                from .restore import MAX_BYTES, unpack
+                require(archive.stat().st_size <= MAX_BYTES, 'archive exceeds size limit')
+                unpack(archive.read_bytes(), context['set_id'], max_bytes=MAX_BYTES)
             providers.encrypt(archive, encrypted, members)
             require(encrypted.is_file() and not encrypted.is_symlink(), 'ciphertext unavailable')
             ciphertext = file_digest(encrypted)
