@@ -70,6 +70,14 @@ def init():
         for name, declaration in additions.items():
             if name not in columns:
                 db.execute(f'ALTER TABLE key_requests ADD COLUMN {name} {declaration}')
+        db.execute("""CREATE TABLE IF NOT EXISTS admin_commands (
+            id TEXT PRIMARY KEY, payload TEXT NOT NULL, payload_hash TEXT NOT NULL,
+            app_instance_id TEXT NOT NULL, org_id TEXT NOT NULL, actor TEXT NOT NULL,
+            operation TEXT NOT NULL, request_id TEXT, identity TEXT,
+            status TEXT NOT NULL, phase TEXT NOT NULL DEFAULT 'READY', error_code TEXT,
+            created_at REAL NOT NULL, updated_at REAL NOT NULL)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS admin_identity_reservations (
+            identity TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, command_id TEXT NOT NULL UNIQUE)""")
         db.execute("CREATE TABLE IF NOT EXISTS request_throttle (ip_hash TEXT NOT NULL, created REAL NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS notification_attempts (request_id TEXT NOT NULL, created REAL NOT NULL)")
         db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS key_requests_pending_email

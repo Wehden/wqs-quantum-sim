@@ -103,7 +103,7 @@ class Registry:
 registry=Registry()
 
 
-def approve_request(request_id, account):
+def approve_request(request_id, account, guard=None):
     if account in ADMIN_IDS:
         raise HTTPException(409,'Approval cannot create or rotate an operator identity')
     with store.connect() as db:
@@ -111,6 +111,11 @@ def approve_request(request_id, account):
         row=db.execute('SELECT * FROM key_requests WHERE id=?',(request_id,)).fetchone()
         if row is None:
             raise HTTPException(404,'Request not found')
+        if guard:
+            guard(db, row)
+        reserved=db.execute('SELECT request_id FROM admin_identity_reservations WHERE identity=?',(account,)).fetchone()
+        if reserved and reserved['request_id'] != request_id:
+            raise HTTPException(409,'Identity is reserved by another invitation')
         if row['status']=='APPROVED' and row['identity']==account:
             return {'status':'APPROVED','identity':account}
         if row['status']=='PENDING':
@@ -283,31 +288,45 @@ def approve(request_id:str,body:Approval,request:Request):
     mutation(request);return approve_request(request_id,body.identity)
 
 
+def request_action(request_id, action, guard=None):
+    with store.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row=db.execute('SELECT * FROM key_requests WHERE id=?',(request_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404,'Request not found')
+        if guard:
+            guard(db,row)
+        if action=='reject':
+            changed=db.execute("UPDATE key_requests SET status='REJECTED',reviewed=? WHERE id=? AND status='PENDING'",(time.time(),request_id)).rowcount
+            result={'status':'REJECTED'}
+        elif action=='notify':
+            changed=db.execute("UPDATE key_requests SET notification_state='RETRY',notification_attempts=0,notification_next=0 WHERE id=? AND status='PENDING' AND notification_state IN ('FAILED','RETRY')",(request_id,)).rowcount
+            result={'status':'RETRY'}
+        elif action=='retry-delivery':
+            changed=db.execute("UPDATE key_requests SET delivery_state='RETRY',delivery_attempts=0,delivery_next=0 WHERE id=? AND status='APPROVED' AND key_cipher IS NOT NULL AND delivery_state IN ('FAILED','RETRY','UNCERTAIN')",(request_id,)).rowcount
+            result={'status':'RETRY'}
+        else:
+            raise HTTPException(404,'Unknown action')
+        if not changed:
+            raise HTTPException(409,'Request action is not currently eligible')
+        if guard:
+            guard(db,None)  # Commit command success atomically with this DB-only effect.
+        return result
+
+
 @app.post('/requests/{request_id}/reject')
 def reject(request_id:str,request:Request):
-    mutation(request)
-    with store.connect() as db:
-        changed=db.execute("UPDATE key_requests SET status='REJECTED',reviewed=? WHERE id=? AND status='PENDING'",(time.time(),request_id)).rowcount
-    if not changed:raise HTTPException(409,'Only pending requests can be rejected')
-    return {'status':'REJECTED'}
+    mutation(request);return request_action(request_id,'reject')
 
 
 @app.post('/requests/{request_id}/notify')
 def retry_notice(request_id:str,request:Request):
-    mutation(request)
-    with store.connect() as db:
-        changed=db.execute("UPDATE key_requests SET notification_state='RETRY',notification_attempts=0,notification_next=0 WHERE id=? AND status='PENDING' AND notification_state IN ('FAILED','RETRY')",(request_id,)).rowcount
-    if not changed:raise HTTPException(409,'No failed pending notification to retry')
-    return {'status':'RETRY'}
+    mutation(request);return request_action(request_id,'notify')
 
 
 @app.post('/requests/{request_id}/retry-delivery')
 def retry_delivery(request_id:str,request:Request):
-    mutation(request)
-    with store.connect() as db:
-        changed=db.execute("UPDATE key_requests SET delivery_state='RETRY',delivery_attempts=0,delivery_next=0 WHERE id=? AND status='APPROVED' AND key_cipher IS NOT NULL AND delivery_state IN ('FAILED','RETRY','UNCERTAIN')",(request_id,)).rowcount
-    if not changed:raise HTTPException(409,'No failed approved delivery to retry')
-    return {'status':'RETRY'}
+    mutation(request);return request_action(request_id,'retry-delivery')
 
 
 @app.get('/')

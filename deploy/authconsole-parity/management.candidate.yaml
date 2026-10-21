@@ -1,0 +1,180 @@
+# CANDIDATE ONLY: reviewed image pin; separate approval required before apply.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wqs-management-provider
+  namespace: qsim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wqs-management-provider
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wqs-management-provider
+    spec:
+      containers:
+      - command:
+        - python
+        - -m
+        - qsim.management_provider
+        env:
+        - name: QSIM_DATA
+          value: /data
+        - name: WQS_ADMIN_BINDING_FILE
+          value: /run/welcome/binding.json
+        - name: WQS_ADMIN_AUTH_FILE
+          value: /run/welcome/auth.json
+        - name: WQS_ADMIN_INTEGRITY_KEY_FILE
+          value: /run/welcome/integrity-key
+        - name: WQS_ADMIN_TLS_CERT_FILE
+          value: /run/welcome-tls/tls.crt
+        - name: WQS_ADMIN_TLS_KEY_FILE
+          value: /run/welcome-tls/tls.key
+        - name: QSIM_TOKEN_FILE
+          value: /run/qsim-auth/users.json
+        - name: QSIM_ADMIN_SECRET_DIR
+          value: /run/qsim-admin
+        image: laminarflow:30500/qsim/admin-console@sha256:e8eeb14e4582bd401ef1615d56d30d2391a96fcfe1c91f0199e8e620b650f90b
+        livenessProbe:
+          periodSeconds: 30
+          tcpSocket:
+            port: https
+        name: provider
+        ports:
+        - containerPort: 8443
+          name: https
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -m
+            - qsim.management_provider
+            - --check
+          periodSeconds: 60
+          timeoutSeconds: 20
+        resources:
+          limits:
+            cpu: '1'
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /data
+          name: data
+          readOnly: false
+        - mountPath: /run/welcome
+          name: config
+          readOnly: true
+        - mountPath: /run/welcome-tls
+          name: tls
+          readOnly: true
+        - name: qsim-users
+          mountPath: /run/qsim-auth
+          readOnly: true
+        - name: qsim-admin
+          mountPath: /run/qsim-admin
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      nodeSelector:
+        kubernetes.io/hostname: laminarflow
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: qsim-admin
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: qsim-data-evac-20261016
+          readOnly: false
+      - name: config
+        secret:
+          defaultMode: 288
+          secretName: wqs-management-auth
+      - name: tls
+        secret:
+          defaultMode: 288
+          secretName: wqs-management-tls
+      - name: qsim-users
+        secret:
+          secretName: qsim-users
+          defaultMode: 288
+      - name: qsim-admin
+        secret:
+          secretName: qsim-admin
+          defaultMode: 288
+      - name: tmp
+        emptyDir:
+          sizeLimit: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wqs-management-provider
+  namespace: qsim
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    app: wqs-management-provider
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wqs-management-provider
+  namespace: qsim
+spec:
+  egress:
+  - ports:
+    - port: 6443
+      protocol: TCP
+    to:
+    - ipBlock:
+        cidr: 192.168.1.205/32
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: laminarauth
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: laminarauth-console
+    ports:
+    - port: 8443
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: wqs-management-provider
+  policyTypes:
+  - Ingress
+  - Egress

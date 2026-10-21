@@ -1,0 +1,17 @@
+[
+  {
+    "op": "test",
+    "path": "/spec/template/spec/containers/0/name",
+    "value": "admin"
+  },
+  {
+    "op": "test",
+    "path": "/spec/template/spec/containers/0/image",
+    "value": "laminarflow:30500/qsim/admin-console@sha256:3365b4a8e0ab15a6a8eff19b614546c29e8b7c9db8bd4ff73bbff8a7bc940ff2"
+  },
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/containers/0/image",
+    "value": "laminarflow:30500/qsim/admin-console@sha256:e8eeb14e4582bd401ef1615d56d30d2391a96fcfe1c91f0199e8e620b650f90b"
+  }
+]
