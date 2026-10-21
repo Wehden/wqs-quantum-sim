@@ -14,6 +14,8 @@ release parent's direct child:
 ```sh
 #!/bin/sh
 set -eu
+umask 077
+mkdir -p /backup-work/private
 exec python3 -m tools.backup.live --config /private/backup/config.json
 ```
 
@@ -65,8 +67,12 @@ remote deadline still bounds its lifetime. Force-kill or node loss may leave
 scratch files until the pod's ephemeral storage is discarded; no durable data
 volume is used for exporter scratch.
 
-Mount a private memory-backed `emptyDir` at `/backup-work` in the runner and
-configure its size/resources for the bounded archive and encryption/readback
+Mount a memory-backed `emptyDir` at `/backup-work` in the runner. Its root may
+be root-owned and group-accessible under the pod's `fsGroup`; do not chmod that
+mount root. The hook wrapper above creates a runner-owned `0700` child on every
+invocation, including after a pod restart. Configure `work_dir` as
+`/backup-work/private`. Existing insecure directories or symlinks remain rejected
+by the coordinator; `mkdir -p` does not relax those checks. Configure the mount's size/resources for the bounded archive and encryption/readback
 copies. The current backend accepts at most 512 MiB plaintext TAR and 512 MiB
 expanded members per NPZ. A failed or interrupted capture may leave encrypted
 objects, but never promotes based on a partial object or old receipt.

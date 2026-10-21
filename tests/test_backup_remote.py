@@ -223,7 +223,21 @@ def test_configured_hook_uses_real_pipeline_and_commits_locator(source, tmp_path
                        'fingerprint': hashlib.sha256(value.encode()).hexdigest()}
                       for i, value in enumerate(recipients)], key=lambda x: (x['type'], x['value']))
     public = tmp_path / 'recipients.json'; public.write_bytes(canonical(members))
-    work = tmp_path / 'private'; work.mkdir(mode=0o700)
+    # Execute the documented wrapper setup against an fsGroup-style mount.
+    mount = tmp_path / 'backup-work'; mount.mkdir(); mount.chmod(0o2770)
+    example = json.loads(Path('deploy/backup-hook.example.json').read_text())
+    assert example['work_dir'] == '/backup-work/private'
+    work = mount / 'private'
+    wrapper = Path('docs/live-backup-hook.md').read_text().split('```sh\n', 1)[1].split('```', 1)[0]
+    setup = wrapper.split('exec python3', 1)[0].replace('/backup-work', str(mount))
+    for restart in range(2):
+        subprocess.run(['sh', '-c', setup], check=True)
+        assert mount.stat().st_mode & 0o7777 == 0o2770
+        assert work.stat().st_mode & 0o777 == 0o700
+        assert work.stat().st_uid == os.getuid()
+        if restart == 0:
+            work.rmdir()  # emptyDir contents disappear on pod recreation
+    subprocess.run(['sh', '-c', setup], check=True)  # repeated invocation
     retained = FakeStore()
     monkeypatch.setattr(live, 'KubernetesSource', lambda *args: LocalExec(snapshot))
     monkeypatch.setattr(live, 'SecretReader', lambda namespace, name, key, budget:
@@ -237,6 +251,13 @@ def test_configured_hook_uses_real_pipeline_and_commits_locator(source, tmp_path
               'storage': {'endpoint': 'https://store.example.invalid', 'region': 'test', 'credential_file': '/private/store.json',
                           'bucket': 'test-bucket', 'prefix': 'backups'}, 'retention_ref': 'test-retention',
               'app_id': 'wqs', 'org_id': 'test'}
+    with pytest.raises(ValueError, match='private working directory permissions'):
+        live.configured_capture({**config, 'work_dir': str(mount)}, 'mount-root-refused')
+    work.chmod(0o750)
+    subprocess.run(['sh', '-c', setup], check=True)
+    with pytest.raises(ValueError, match='private working directory permissions'):
+        live.configured_capture(config, 'insecure-child-refused')
+    work.chmod(0o700)
     result = live.configured_capture(config, 'configured-set')
     assert result == {'evidence_type': 'creation_result', 'created': True, 'backup_id': 'configured-set'}
     locator = json.loads((snapshot.state / 'backup-locators/configured-set.json').read_text())
