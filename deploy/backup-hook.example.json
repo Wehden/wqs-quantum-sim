@@ -1,0 +1,25 @@
+{
+  "namespace": "wqs",
+  "deployment": "wqs-api",
+  "container": "api",
+  "data": "/data",
+  "registry_secret": {"name": "wqs-users", "key": "users.json"},
+  "delivery_secret": {"name": "wqs-admin", "key": "encryption-key"},
+  "state_dir": "/runner/release-state",
+  "registry_access": "/private/registry/config.json",
+  "work_dir": "/backup-work/private",
+  "cd_enabled": true,
+  "recipients_file": "/private/backup/recipients.json",
+  "age": {"path": "/opt/wqs-age/age/age", "sha256": "REPLACE_WITH_INSTALLED_BINARY_SHA256"},
+  "plugin": {"path": "/usr/local/bin/age-plugin-yubikey", "sha256": "REPLACE_WITH_INSTALLED_BINARY_SHA256"},
+  "storage": {
+    "endpoint": "https://objects.example.invalid",
+    "region": "us-east-1",
+    "credential_file": "/private/backup/credentials.json",
+    "bucket": "wqs-backups",
+    "prefix": "releases"
+  },
+  "retention_ref": "REPLACE_WITH_EXISTING_IMAGE_RETENTION_REFERENCE",
+  "app_id": "wqs",
+  "org_id": "example"
+}

@@ -1,0 +1,29 @@
+# Additional read-only identity checks for the existing deployment runner.
+# Replace the namespace, service account namespace and actual PVC name.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wqs-backup-source-identity
+  namespace: wqs
+rules:
+  - apiGroups: [apps]
+    resources: [replicasets]
+    verbs: [get]
+  - apiGroups: ['']
+    resources: [persistentvolumeclaims]
+    resourceNames: [wqs-data]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wqs-backup-source-identity
+  namespace: wqs
+subjects:
+  - kind: ServiceAccount
+    name: wqs-deployer
+    namespace: wqs-cd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wqs-backup-source-identity
