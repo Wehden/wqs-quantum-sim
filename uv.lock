@@ -365,17 +365,17 @@ wheels = [
 
 [[package]]
 name = "clifft"
-version = "0.11.0"
+version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/56/0e60abf3fbae343ccab875a0f63d9cbe9ee0d1ee9d93db83b683700c3609/clifft-0.11.0.tar.gz", hash = "sha256:3b175c3b4ca69d0ded7ee447368a30fc72f9b723181236be39a44deee139693e", size = 3099996, upload-time = "2026-09-30T20:05:34.594Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/3e/095caf77b3c6cfbcaff3ac6a510c9e06a92821ee81b24f3e552ea2331c54/clifft-0.12.0.tar.gz", hash = "sha256:a2141386202979bb42e097928c3301fc33117bae9da8cbf658c437446abf0dbc", size = 3739484, upload-time = "2026-10-13T15:39:23.737Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/e7/6a685b4caec5d9e1f9a03a6bcfcfe7d8ce602e5ab8337afe62ddfe019e41/clifft-0.11.0-cp312-abi3-macosx_14_0_arm64.whl", hash = "sha256:dd739e28b9816b915d50af2ee843ba511420b00e36ebc558858e01e80a2ee3a2", size = 672117, upload-time = "2026-09-30T20:05:27.742Z" },
-    { url = "https://files.pythonhosted.org/packages/06/95/b4b7af3d1eb1c40a2d999142c85e40d1f96bdc498605f5be9ef017cbee7e/clifft-0.11.0-cp312-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:2e05b4ec3fd87bc9ecc16d3389c6d5d1dc10c85224fbc1206fd8211e57ec1fab", size = 1041963, upload-time = "2026-09-30T20:05:30.101Z" },
-    { url = "https://files.pythonhosted.org/packages/74/1a/0846c8c2eb8bfb9b6e97d3da86b36d88e299e248a70395952278edcddc0d/clifft-0.11.0-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ea276628e8256f42f01c4611305790d8370d1b08aa2663ff578cb6bbb0129b9e", size = 1171114, upload-time = "2026-09-30T20:05:31.524Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/90/f8de7c3006116d36e8067189fb36b10a52a89453ce97ff0a1ad95d9cffae/clifft-0.11.0-cp312-abi3-win_amd64.whl", hash = "sha256:59d4a0272d976ca946df8dc4848b689f6236d75746bead084ccbe09831f71dc4", size = 859638, upload-time = "2026-09-30T20:05:33.05Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/72/73574e59231c08366e63cff9f279ff89e0cd209c1ca9057783207528ad5b/clifft-0.12.0-cp312-abi3-macosx_14_0_arm64.whl", hash = "sha256:9734352666d979bb8feb8c72e22abcab967c4291d4c2a33cab03aa33b757389d", size = 756175, upload-time = "2026-10-13T15:39:16.637Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/a5/32738e11e6361fb41b50d3e4e4b502dbedda7d746fa9bf267f7ee25b7b6e/clifft-0.12.0-cp312-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:925fd9d99008dfafe8bd937362043ab8fb91c509c1ebf6b8b7aa2175d9e7f313", size = 1141145, upload-time = "2026-10-13T15:39:18.176Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/af/26604b5a034ade96945b7f7336003d9f5fe054dd170930e20356e23add5d/clifft-0.12.0-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:19c322fd79fbaf83e4707578ae989c99234a4aecf3c0dd034063a92110f10176", size = 1286199, upload-time = "2026-10-13T15:39:19.635Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/fa/751828d3e20bad57be56b44e1f15e23c0dc8c641eedce4e0b4b6eaf3603a/clifft-0.12.0-cp312-abi3-win_amd64.whl", hash = "sha256:49edcca4933721eae5422b2876b786ab9813e713ef54740d73f5363dc4948145", size = 930833, upload-time = "2026-10-13T15:39:21.295Z" },
 ]
 
 [[package]]
@@ -508,7 +508,7 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.143.0"
+version = "0.149.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
@@ -518,9 +518,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/d7/6a8753ab6c1d432dc53703c3e1b92974a94531b7d047c32bbaae461ea844/fastapi-0.143.0.tar.gz", hash = "sha256:1acffe48206a80917cf7dac21992b5c44b25384e8902bf745c1fd9dabcf6c51f", size = 468391, upload-time = "2026-10-08T12:29:46.54Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/37/6e7ec4dbe12d9721902066ddb83dd9c6e7adb1cee81e094502c43024e4d1/fastapi-0.149.0.tar.gz", hash = "sha256:aba5779358d0c5233759ddcddd84fe7269d71f775fd754b653b608f770558a41", size = 483369, upload-time = "2026-10-19T17:22:29.495Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/f4/27e386913417ad32aae42bba48b0c0cce40e9ff2fba1a871ca2702c37324/fastapi-0.143.0-py3-none-any.whl", hash = "sha256:3e9395fd35276425b61b516a31fdd7c77fe2af83e41b4da22e30696fb1304c5d", size = 144665, upload-time = "2026-10-08T12:29:44.853Z" },
+    { url = "https://files.pythonhosted.org/packages/20/6c/78c324bd6725f69ebbac46e0d6a9a59744e108cececac4c1c8500c567512/fastapi-0.149.0-py3-none-any.whl", hash = "sha256:fc4a5cf7e14f607a48eb1ab98147e9140943e88ccd0c8791d72c0a89b1159a35", size = 145182, upload-time = "2026-10-19T17:22:27.753Z" },
 ]
 
 [[package]]
@@ -1499,7 +1499,7 @@ wheels = [
 
 [[package]]
 name = "qiskit"
-version = "2.5.2"
+version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dill" },
@@ -1509,15 +1509,15 @@ dependencies = [
     { name = "stevedore" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/b3/9e080540cf1dedc6ce36d9c346f0d1e17772fb646c09049b609271acf5a0/qiskit-2.5.2.tar.gz", hash = "sha256:cf05388c717392cff5d01be4ea9b45652c2709a5c697c174428d8863089b6247", size = 4261177, upload-time = "2026-08-13T19:08:14.183Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/e9/f42d181f2fab612a25401e38dced5665393f141228c8eac412685e8aba8d/qiskit-2.6.0.tar.gz", hash = "sha256:84060e4ce0b8bc89cec90b68541d9eac754ea19fdc4b71d060e020b5896124aa", size = 4473343, upload-time = "2026-10-16T13:33:48.064Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/66/92681da23c4f4502fabe16cb23c7c98d141ae1e25a2f14fdd8e351ae8ef8/qiskit-2.5.2-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:4aa7ddb0d9c1cd14298bf2fdd242646a5e0eaeebdebd2f31d5d2a018c75fa744", size = 9349327, upload-time = "2026-08-13T19:08:56.878Z" },
-    { url = "https://files.pythonhosted.org/packages/60/c4/26f9f63a6954b69778b7401822e7855ed62194c959562e4ad3645e5ebfca/qiskit-2.5.2-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:c559ee1e2a92b5ded6a130f1fd8dc4bea19a5b35e99d39180889746f12550666", size = 8740831, upload-time = "2026-08-13T19:08:04.199Z" },
-    { url = "https://files.pythonhosted.org/packages/43/42/0eb83d0eefd6a1d3752db43839c327c39d67b2ef060b2b1da8fcd3424dc5/qiskit-2.5.2-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:2835e38af67932e592562c7b1b6b7fadd015bd1101a1320e2c5051de12508428", size = 9035471, upload-time = "2026-08-13T19:08:06.86Z" },
-    { url = "https://files.pythonhosted.org/packages/e0/37/b09591e2386b0c4773d2c405ace6e89552366fc798df7f3ee72b46b26603/qiskit-2.5.2-cp310-abi3-manylinux_2_28_ppc64le.whl", hash = "sha256:d7940da5ea03d638bace6f9cc47bb892502c85a9c05eebe1cbe3c0e693586109", size = 9954423, upload-time = "2026-08-13T19:08:59.707Z" },
-    { url = "https://files.pythonhosted.org/packages/ed/92/404d085301365d79a06a1ae34b4292e35a510a22a32ec0b5a8e8ee1d87dd/qiskit-2.5.2-cp310-abi3-manylinux_2_28_s390x.whl", hash = "sha256:c2eab89804161dd927d25d521c6c43af1bcd17042e6b02124166d6d07a9c9cb1", size = 11160496, upload-time = "2026-08-13T19:09:02.586Z" },
-    { url = "https://files.pythonhosted.org/packages/c4/32/1e411db90b68a6096275186e7fc57ea16d99355fc3b498182845dd5419ff/qiskit-2.5.2-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:28fcb983e565b8f027a13ef43cda7aaeb1f1a6caf9df07408708abcf7bc0b59d", size = 9753072, upload-time = "2026-08-13T19:08:09.439Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/b4/61872b4ba4319c685615123739b25a3c42abc0f057c4a4889f7b3cad8c7b/qiskit-2.5.2-cp310-abi3-win_amd64.whl", hash = "sha256:d436cd45db22ea0132be815930d7c90343774756da9620dee68714968966f65e", size = 9451684, upload-time = "2026-08-13T19:08:11.872Z" },
+    { url = "https://files.pythonhosted.org/packages/69/cb/48bb89b9ad2bf1721a3a8d317c23bb4c3d3c3bef4bb2558382d74421651f/qiskit-2.6.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:4eb86dadc58c3db9af760fc0f71ddcdf1c696fd877599f4e36760292609c6bc9", size = 9648522, upload-time = "2026-10-16T13:39:22.576Z" },
+    { url = "https://files.pythonhosted.org/packages/14/8b/07bf91d34dca0d76fb9379eb1a2d33b1b0426beed5739d59905fdc35fdbe/qiskit-2.6.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:ccfcbb1d8d61726b8555da604591133aa53402b708343ec23ca7b2887b38b807", size = 9035200, upload-time = "2026-10-16T13:33:39.496Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/e4/771e235e34e0fd68079983584901659417eff809dcca9bc649081412a718/qiskit-2.6.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:7f0a63d7f0b4e77bb4e7c8e714f138d2ebdc86b720922e00b4c1c08e3ffc1b7c", size = 9355278, upload-time = "2026-10-16T13:33:41.776Z" },
+    { url = "https://files.pythonhosted.org/packages/48/8c/724c96553b8ca7cec3a7a0cf41aaf4f24803beea566450dbcd082b8ee76f/qiskit-2.6.0-cp310-abi3-manylinux_2_28_ppc64le.whl", hash = "sha256:5403b678e36aef635cca329e5c9fe145a21a96d5cf6837190ea0d22c2f8c983e", size = 10265435, upload-time = "2026-10-16T13:39:24.674Z" },
+    { url = "https://files.pythonhosted.org/packages/84/a7/6503b42af44a0450dc705ed1b803ac8a5e83225027da89b8041f0bbea64b/qiskit-2.6.0-cp310-abi3-manylinux_2_28_s390x.whl", hash = "sha256:d06ffd4ec279bc30ab4fcd348c1422e2f269884e6e24768f8f1a12af307e7c20", size = 11907900, upload-time = "2026-10-16T13:39:26.931Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/c1/875a9e5f374d6a3f006dfe761f670d6ea652ced7eca812d4ad51dcbed959/qiskit-2.6.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:7808e29c9190317b2e41b87a4d5c1cea63f3805ef1b76b3ce6c4f728224936b1", size = 10082602, upload-time = "2026-10-16T13:33:43.967Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/c0/b0e33b5b6d78c6830049dfe7ada1ec05d6df84e303c0036109915ed2e14a/qiskit-2.6.0-cp310-abi3-win_amd64.whl", hash = "sha256:e0fea4dd20715aaa319ac5177ee75efad5ed37d19d9e6d82affdc9243029a271", size = 9755184, upload-time = "2026-10-16T13:33:46.055Z" },
 ]
 
 [[package]]
@@ -1598,16 +1598,16 @@ dev = [
 requires-dist = [
     { name = "bech32", marker = "extra == 'backup'", specifier = "==1.2.0" },
     { name = "boto3", marker = "extra == 'backup'", specifier = "==1.43.114" },
-    { name = "clifft", marker = "extra == 'worker'", specifier = "==0.11.0" },
+    { name = "clifft", marker = "extra == 'worker'", specifier = "==0.12.0" },
     { name = "cryptography", specifier = "==50.0.2" },
-    { name = "fastapi", specifier = "==0.143.0" },
+    { name = "fastapi", specifier = "==0.149.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "jsonschema", marker = "extra == 'backup'", specifier = "==4.26.0" },
     { name = "numpy", marker = "extra == 'backup'", specifier = "==2.5.4" },
     { name = "numpy", marker = "extra == 'worker'", specifier = "==2.5.4" },
     { name = "ply", marker = "extra == 'worker'", specifier = "==3.11" },
     { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "qiskit", marker = "extra == 'worker'", specifier = "==2.5.2" },
+    { name = "qiskit", marker = "extra == 'worker'", specifier = "==2.6.0" },
     { name = "qiskit-aer", marker = "extra == 'worker'", specifier = "==0.17.2" },
     { name = "qiskit-qasm3-import", marker = "extra == 'worker'", specifier = "==0.6.0" },
     { name = "qsimcirq", marker = "extra == 'worker'", specifier = "==0.22.1" },
