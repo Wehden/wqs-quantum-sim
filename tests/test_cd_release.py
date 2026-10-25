@@ -168,6 +168,70 @@ def test_bootstrap_and_ci_fail_before_mutation(tmp_path, services, monkeypatch):
     assert deploy.calls == []
 
 
+@pytest.mark.parametrize('value', [False, None, 'false', 'true', 0, 1, {}, []])
+def test_bootstrap_requires_explicit_boolean_acknowledgement(tmp_path, value):
+    cfg = config(tmp_path)
+    cfg['bootstrap_verified'] = value
+    with pytest.raises(release.BootstrapUnverified):
+        release.validate_config(cfg)
+
+
+@pytest.mark.parametrize('action', ['preflight', 'deploy'])
+def test_cli_bootstrap_failure_is_actionable_and_sanitized(tmp_path, monkeypatch, action):
+    cfg = config(tmp_path)
+    cfg['bootstrap_verified'] = False
+    cfg['registry'] = 'private-inventory-do-not-publish'
+    source = tmp_path / 'private.json'
+    source.write_text(json.dumps(cfg))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(tmp_path / 'summary'))
+    monkeypatch.setattr('sys.argv', ['release.py', action, '--sha', SHA, '--run-id', '123', '--config', str(source)])
+    monkeypatch.setattr(release, 'run', lambda *a, **kw: pytest.fail('preflight must not run external commands'))
+    monkeypatch.setattr(release, 'github', lambda *a: pytest.fail('bootstrap must fail before GitHub calls'))
+    with pytest.raises(SystemExit, match='CD blocked: bootstrap_verified') as error:
+        release.main()
+    assert error.value.code != 0
+    receipt = json.loads((tmp_path / 'release-receipt.json').read_text())
+    assert receipt == {'schema': 1, 'sha': SHA, 'ci_run': '123', 'status': 'blocked',
+                       'stage': action, 'reason': 'bootstrap_unverified'}
+    assert 'WQS_CD_ENABLED' in (tmp_path / 'summary').read_text()
+    assert not (tmp_path / 'state').exists()
+    assert 'private-inventory' not in str(error.value) + (tmp_path / 'summary').read_text() + json.dumps(receipt)
+
+
+def test_cli_preflight_validates_without_deployment(tmp_path, monkeypatch):
+    source = tmp_path / 'private.json'
+    source.write_text(json.dumps(config(tmp_path)))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr('sys.argv', ['release.py', 'preflight', '--config', str(source)])
+    monkeypatch.setattr(release.Deployer, 'deploy', lambda *a: pytest.fail('preflight must not deploy'))
+    release.main()
+    assert not (tmp_path / 'state').exists()
+
+
+def test_cli_unexpected_preflight_error_does_not_expose_details(tmp_path, monkeypatch):
+    source = tmp_path / 'private.json'
+    source.write_text('secret malformed configuration')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr('sys.argv', ['release.py', 'preflight', '--config', str(source)])
+    with pytest.raises(SystemExit, match='Release failed: JSONDecodeError') as error:
+        release.main()
+    receipt = json.loads((tmp_path / 'release-receipt.json').read_text())
+    assert receipt['status'] == 'failed' and receipt['reason'] == 'release_failed'
+    assert 'secret' not in str(error.value) + json.dumps(receipt)
+
+
+def test_workflow_preflight_precedes_artifact_download():
+    import yaml
+    workflow = yaml.safe_load((Path(__file__).resolve().parents[1] / '.github/workflows/cd.yml').read_text())
+    steps = workflow['jobs']['deploy']['steps']
+    preflight = next(i for i, step in enumerate(steps) if 'release.py preflight' in step.get('run', ''))
+    download = next(i for i, step in enumerate(steps) if step.get('uses', '').startswith('actions/download-artifact@'))
+    assert preflight < download
+    assert 'rm -f release-receipt.json' in steps[preflight]['run']
+    assert next(step for step in steps if step.get('name') == 'Retain sanitized receipt')['if'] == 'always()'
+
+
 def test_manual_hosted_validation_preserves_default():
     from tools.ci.route import choose
     assert choose({'inputs': {'hosted_tests': 'true'}}, 'workflow_dispatch', 'test/repo', 'refs/heads/main', '')[0] == 'hosted'

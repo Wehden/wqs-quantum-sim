@@ -44,6 +44,15 @@ this PR is merged. First:
    runner. Mark `bootstrap_verified` only after the above evidence is recorded,
    then enable CD. The next successful main push CI qualifies for promotion.
 
+The deployment runner validates private configuration before downloading image
+archives. `bootstrap_verified` must be the JSON boolean `true`; strings and
+numbers are rejected. An unverified bootstrap fails CD with an explicit job
+summary and a sanitized `release-receipt.json` containing
+`status: blocked` and `reason: bootstrap_unverified`. It does not publish images
+or change admission. Complete the recorded bootstrap and first-release acceptance
+before changing this acknowledgement; rerunning CD with it still false cannot
+deploy. Keep `WQS_CD_ENABLED` disabled while bootstrap is incomplete.
+
 The implementation PR does not install a runner, enable CD, mutate production,
 or submit live simulation jobs. Those bootstrap actions remain explicit rollout
 work. Do not create a second deployment writer alongside an existing operator

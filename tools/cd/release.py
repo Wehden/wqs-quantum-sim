@@ -18,6 +18,10 @@ TARGETS = ('api', 'controller', 'worker')
 ROLES = {'api': 'api', 'admin': 'api', 'controller': 'controller', 'observer': 'controller'}
 
 
+class BootstrapUnverified(ValueError):
+    """A public, non-sensitive activation failure."""
+
+
 def run(args, timeout=120, env=None):
     return subprocess.run(args, check=True, capture_output=True, text=True, timeout=timeout, env=env).stdout.strip()
 
@@ -160,8 +164,8 @@ def acceptance_token(config):
 
 
 def validate_config(config):
-    if not config.get('bootstrap_verified'):
-        raise ValueError('Bootstrap verification required')
+    if config.get('bootstrap_verified') is not True:
+        raise BootstrapUnverified('Bootstrap verification required')
     acceptance_token(config)
     for field in ('namespace', 'registry', 'state_dir', 'smoke_owner'):
         if not isinstance(config.get(field), str) or not config[field]:
@@ -425,7 +429,7 @@ def publish_version(config, sha, version):
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['gate', 'deploy', 'record'])
+    parser.add_argument('action', choices=['gate', 'preflight', 'deploy', 'record'])
     parser.add_argument('--sha')
     parser.add_argument('--version')
     parser.add_argument('--run-id')
@@ -442,11 +446,30 @@ def main():
             if args.action == 'record':
                 publish_version(config, args.sha, args.version)
                 return
+            if args.action == 'preflight':
+                validate_config(config)
+                return
             receipt = Deployer(config).deploy(args.artifacts, args.sha, args.run_id)
             # Public receipt intentionally excludes private image names and inventory.
             Path('release-receipt.json').write_text(json.dumps({k: receipt[k] for k in ('schema', 'sha', 'ci_run', 'status')}) + '\n')
     except Exception as error:
         # Subprocess output, URLs and config can contain credentials.
+        if args.action in ('preflight', 'deploy'):
+            blocked = isinstance(error, BootstrapUnverified)
+            receipt = {'schema': 1, 'sha': args.sha if re.fullmatch('[0-9a-f]{40}', args.sha or '') else None,
+                       'ci_run': args.run_id if re.fullmatch('[0-9]+', args.run_id or '') else None,
+                       'status': 'blocked' if blocked else 'failed', 'stage': args.action,
+                       'reason': 'bootstrap_unverified' if blocked else 'release_failed'}
+            write_record(Path('release-receipt.json'), receipt)
+            if blocked:
+                message = ('CD blocked: bootstrap_verified must be the JSON boolean true. '
+                           'Complete and record the bootstrap checks in docs/releases.md before enabling CD. '
+                           'Keep WQS_CD_ENABLED disabled until then. No deployment was attempted.')
+                summary = os.environ.get('GITHUB_STEP_SUMMARY')
+                if summary:
+                    with open(summary, 'a') as out:
+                        out.write(message + '\n')
+                raise SystemExit(message) from None
         raise SystemExit('Release failed: ' + type(error).__name__ + '; inspect private state') from None
 
 
