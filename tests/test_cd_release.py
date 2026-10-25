@@ -11,7 +11,7 @@ SHA = 'a' * 40
 
 def event(**changes):
     job = {'head_repository': {'full_name': release.REPOSITORY}, 'event': 'push', 'head_branch': 'main',
-           'name': 'CI', 'conclusion': 'success', 'head_sha': SHA}
+           'name': 'Merge pull request: tested change', 'path': '.github/workflows/ci.yml', 'conclusion': 'success', 'head_sha': SHA}
     job.update(changes)
     return {'repository': {'full_name': release.REPOSITORY}, 'workflow_run': job}
 
@@ -56,10 +56,20 @@ def test_main_gate_rejects_untrusted_and_failed_events(monkeypatch):
     monkeypatch.setattr(release, 'current', lambda sha: True)
     assert release.gate(event()) == SHA
     for change in ({'event': 'pull_request'}, {'head_branch': 'feature'}, {'conclusion': 'failure'},
-                   {'head_repository': {'full_name': 'fork/repo'}}, {'head_sha': 'main'}, {'name': 'Other'}):
+                   {'head_repository': {'full_name': 'fork/repo'}}, {'head_sha': 'main'}, {'name': 'CI', 'path': '.github/workflows/other.yml'},
+                   {'name': 'CI', 'path': None}):
         assert release.gate(event(**change)) == ''
     monkeypatch.setattr(release, 'current', lambda sha: False)
     assert release.gate(event()) == ''
+
+
+@pytest.mark.parametrize('title', ['CI', 'Merge pull request #33\n\nBackup hook', 'ci-local-attempt'])
+def test_main_gate_uses_workflow_path_instead_of_display_title(monkeypatch, title):
+    monkeypatch.setattr(release, 'current', lambda sha: True)
+    assert release.gate(event(name=title)) == SHA
+    # Display-title changes never relax event, repository or branch checks.
+    assert release.gate(event(name=title, event='workflow_dispatch')) == ''
+    assert release.gate(event(name=title, path='.github/workflows/cd.yml')) == ''
 
 
 def test_bundle_rejects_changed_archive_and_source(tmp_path):

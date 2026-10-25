@@ -53,7 +53,8 @@ def eligible(event):
     return (event.get('repository', {}).get('full_name', '').lower() == REPOSITORY.lower()
         and job.get('head_repository', {}).get('full_name', '').lower() == REPOSITORY.lower()
         and job.get('event') == 'push' and job.get('head_branch') == 'main'
-        and job.get('name') == 'CI' and job.get('conclusion') == 'success'
+        # GitHub's run-name is a display title, not the workflow identity.
+        and job.get('path') == '.github/workflows/ci.yml' and job.get('conclusion') == 'success'
         and re.fullmatch('[0-9a-f]{40}', job.get('head_sha', '')) is not None)
 
 

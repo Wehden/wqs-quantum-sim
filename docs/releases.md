@@ -52,7 +52,8 @@ process: application image ownership must be assigned to this workflow first.
 ## Eligibility and artifact identity
 
 Only successful CI **push** runs for the same repository's current main SHA are
-eligible. PR, fork, manual test and failed runs cannot deploy. Recheck current
+eligible. The run must come from `.github/workflows/ci.yml`; its dynamic display
+title does not identify the workflow. PR, fork, manual test and failed runs cannot deploy. Recheck current
 main before mutation; once mutation starts, finish or hold that pinned release.
 The workflow serializes production deployments and does not cancel a rollout
 when a newer merge arrives. A local file lock also rejects concurrent operators.
