@@ -23,7 +23,7 @@ SEED = 42
 
 
 def test_probe_dependency_versions():
-    assert version('clifft') == '0.11.0'
+    assert version('clifft') == '0.12.0'
     assert version('qsimcirq') == '0.22.1'
     assert version('cirq-core') == '1.7.0'
 

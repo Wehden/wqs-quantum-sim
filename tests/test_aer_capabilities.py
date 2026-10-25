@@ -34,8 +34,8 @@ def test_aer_native_condition_capability(name, language, body, expected):
 
 
 def test_combined_native_pins():
-    expected = {"clifft": "0.11.0", "qsimcirq": "0.22.1", "cirq-core": "1.7.0",
-                "qiskit": "2.5.2", "qiskit-aer": "0.17.2", "qiskit-qasm3-import": "0.6.0"}
+    expected = {"clifft": "0.12.0", "qsimcirq": "0.22.1", "cirq-core": "1.7.0",
+                "qiskit": "2.6.0", "qiskit-aer": "0.17.2", "qiskit-qasm3-import": "0.6.0"}
     assert {name: version(name) for name in expected} == expected
 
 
@@ -44,3 +44,11 @@ def test_api_capability_import_does_not_load_aer():
     import sys
     subprocess.run([sys.executable, "-c", "import sys; import qsim.models; "
                     "assert not any(n.split('.')[0] in {'qiskit', 'qiskit_aer', 'qiskit_qasm3_import'} for n in sys.modules)"], check=True)
+
+
+def test_public_capability_versions_match_installed_worker():
+    from qsim.api import capabilities, me
+    actual = capabilities(user='version-probe')['engines']
+    assert actual['clifft']['version'] == version('clifft')
+    assert me(user='version-probe')['engine'] == 'Clifft ' + version('clifft')
+    assert actual['aer']['importer']['version'] == version('qiskit')

@@ -9,8 +9,8 @@ invitation authentication, and worker pool.
 
 | Engine | Input | Operation |
 | --- | --- | --- |
-| Clifft 0.11.0 | Stim with supported Clifft extensions | Measurement sampling |
-| Clifft 0.11.0 | Unitary OpenQASM 2 | Selected basis probabilities |
+| Clifft 0.12.0 | Stim with supported Clifft extensions | Measurement sampling |
+| Clifft 0.12.0 | Unitary OpenQASM 2 | Selected basis probabilities |
 | Google qsim 0.22.1 | Legacy unitary OpenQASM 2 through Cirq | Selected basis probabilities |
 | Google qsim 0.22.1 | OpenQASM 2 with classical measurements | Sampling |
 | Google qsim 0.22.1 | Tested OpenQASM 3 subset through Cirq 1.7.0 | Sampling or selected basis probabilities |
@@ -61,7 +61,7 @@ and must be configured for your installation.
 
 ## Classical conditions with Qiskit Aer
 
-Select `"engine": "aer"` and `"operation": "sample"` on `/api/jobs/qasm2` or `/api/jobs/qasm3`. Check `/api/capabilities` first. Aer 0.17.2 runs CPU statevector simulation in double precision, imported by Qiskit 2.5.2 and QASM3 importer 0.6.0. This is an explicit engine choice; requests never switch simulators automatically.
+Select `"engine": "aer"` and `"operation": "sample"` on `/api/jobs/qasm2` or `/api/jobs/qasm3`. Check `/api/capabilities` first. Aer 0.17.2 runs CPU statevector simulation in double precision, imported by Qiskit 2.6.0 and QASM3 importer 0.6.0. This is an explicit engine choice; requests never switch simulators automatically.
 
 QASM2 accepts whole-register equality to an in-range integer followed by one standard gate statement, including register broadcast. QASM3 accepts a scalar bit compared with `true`/`false`, or a whole bit array compared with an in-range integer, followed by flat `if`/`else` blocks. Those blocks may contain standard gates, measurements and reset. Use `if(c==true)` for a scalar QASM3 bit; the selected importer does not accept `if(c==1)` for that type.
 

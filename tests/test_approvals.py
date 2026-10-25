@@ -50,7 +50,7 @@ def test_public_request_boundary(clients):
     text=public.get('/').text.lower()
     for private in ('skypilot','admin.example.invalid','private-node','namespace','qsimconsole','internal/'):
         assert private not in text
-    assert public.get('/api/me',headers={'Authorization':'Bearer owner-key'}).json()=={'id':'owner','engine':'Clifft 0.11.0'}
+    assert public.get('/api/me',headers={'Authorization':'Bearer owner-key'}).json()=={'id':'owner','engine':'Clifft 0.12.0'}
 
 def test_admin_network_session_and_csrf(clients):
     public,admin=clients;request(public);rid=row()['id']
