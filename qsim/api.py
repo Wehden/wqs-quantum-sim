@@ -94,7 +94,7 @@ def request_key(body: KeyRequest, request: Request):
 
 @app.get("/api/me")
 def me(user=Depends(identity)):
-    return {"id": user, "engine": "Clifft 0.11.0"}
+    return {"id": user, "engine": "Clifft 0.12.0"}
 
 
 @app.get("/api/jobs")
@@ -195,7 +195,7 @@ def capabilities(user=Depends(identity)):
     formats = {'qasm2': qasm_operations}
     if qasm3_operations:
         formats['qasm3'] = qasm3_operations
-    result = {'engines':{'clifft':{'version':'0.11.0','default':True},
+    result = {'engines':{'clifft':{'version':'0.12.0','default':True},
                        'qsim':{'version':'0.22.1','input_formats':formats,'max_qubits':26,'device':'CPU','precision':'single',
                                'importer': {'name': 'cirq', 'version': '1.7.0'},
                                'sampling': {'enabled': sampling, 'result_schema': 'qasm-samples/1' if sampling else None,
@@ -222,7 +222,7 @@ def capabilities(user=Depends(identity)):
             'version': '0.17.2', 'default': False,
             'input_formats': {fmt: list(ops) for fmt, ops in SUPPORTED_COMBINATIONS['aer'].items()},
             'max_qubits': 26, 'device': 'CPU', 'method': 'statevector', 'precision': 'double',
-            'importer': {'name': 'qiskit', 'version': '2.5.2', 'qasm3_importer_version': '0.6.0'},
+            'importer': {'name': 'qiskit', 'version': '2.6.0', 'qasm3_importer_version': '0.6.0'},
             'sampling': {'enabled': True, 'result_schema': 'qasm-samples/1',
                          'classical_registers': True, 'measurement': True,
                          'mid_circuit_measurement': True, 'reset': True,
