@@ -7,7 +7,7 @@ Guide updated: 2026-10-14. Check `GET /api/capabilities` on your installation be
 
 ## Scope and credentials
 
-wqsim runs independent Clifft 0.11.0, Google qsim 0.22.1 and Qiskit Aer 0.17.2 CPU simulation jobs. The caller manages call sequences, batches, dependencies, and quantum state between requests. Submitting a job does not create a persistent quantum session.
+wqsim runs independent Clifft 0.12.0, Google qsim 0.22.1 and Qiskit Aer 0.17.2 CPU simulation jobs. The caller manages call sequences, batches, dependencies, and quantum state between requests. Submitting a job does not create a persistent quantum session.
 
 Use an API key supplied by the user or their secret store:
 
@@ -255,7 +255,7 @@ Envelope errors reject submission with HTTP 422. Circuit parsing, binding and na
 
 ## Classical conditions with Qiskit Aer
 
-Select `"engine": "aer"` and `"operation": "sample"` on `/api/jobs/qasm2` or `/api/jobs/qasm3`. Check `/api/capabilities` first. Aer 0.17.2 runs CPU statevector simulation in double precision, imported by Qiskit 2.5.2 and QASM3 importer 0.6.0. This is an explicit engine choice; requests never switch simulators automatically.
+Select `"engine": "aer"` and `"operation": "sample"` on `/api/jobs/qasm2` or `/api/jobs/qasm3`. Check `/api/capabilities` first. Aer 0.17.2 runs CPU statevector simulation in double precision, imported by Qiskit 2.6.0 and QASM3 importer 0.6.0. This is an explicit engine choice; requests never switch simulators automatically.
 
 QASM2 accepts whole-register equality to an in-range integer followed by one standard gate statement, including register broadcast. QASM3 accepts a scalar bit compared with `true`/`false`, or a whole bit array compared with an in-range integer, followed by flat `if`/`else` blocks. Those blocks may contain standard gates, measurements and reset. Use `if(c==true)` for a scalar QASM3 bit; the selected importer does not accept `if(c==1)` for that type.
 
