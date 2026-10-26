@@ -26,14 +26,5 @@ ENV PATH=/opt/discovery/bin:/usr/local/bin:/usr/bin:/bin \
 USER 1001:1001
 ENTRYPOINT ["/opt/discovery/bin/python", "/opt/probe_gpu.py"]
 
-FROM numerical AS serverless
-USER root
-RUN uv pip install --python /opt/discovery/bin/python runpod==1.12.0 \
- && uv pip check --python /opt/discovery/bin/python \
- && uv pip freeze --python /opt/discovery/bin/python > /opt/serverless-packages.txt
-COPY tests/fixtures/physics/gpu/serverless_handler.py /opt/serverless_handler.py
-USER 1001:1001
-ENTRYPOINT ["/opt/discovery/bin/python", "/opt/serverless_handler.py"]
-
-# The ordinary image remains a command-line probe, without the SDK installed.
+# SkyPilot schedules this command-line probe; no alternate provider transport.
 FROM numerical AS probe

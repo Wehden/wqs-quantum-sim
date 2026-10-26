@@ -1,12 +1,12 @@
-# GPU discovery: candidate fixture and pending allocation
+# GPU discovery: initialization boundary under investigation
 
-Status: TASK-005 is **incomplete**, checked on 2026-10-26 after the Lindblad and scqubits CPU references passed. GPU suitability remains unknown. No GPU capability, worker image or resource-policy change is enabled by this report.
+Status: TASK-005 is **incomplete**, checked on 2026-10-26 after the Lindblad and scqubits CPU references passed. A real allocated GPU failed CUDA initialization under the current 3 GiB address-space limit; the SkyPilot initialization sweep is complete, while the proposed larger numerical discovery profile awaits owner approval. Solver suitability and speedup remain unknown. No GPU capability, production worker image or resource-policy change is enabled by this report.
 
 ## Candidate paths
 
 - scqubits 4.3.1 has native `esys_cupy_dense` and `esys_cupy_sparse` methods. Dense diagonalization constructs the Hamiltonian on the host, transfers it to CuPy, computes the full eigensystem and copies selected results back. The [upstream diagonalization guide](https://scqubits.readthedocs.io/en/latest/guide/settings/ipynb/custom_diagonalization.html) describes these methods. The CPU fixtures and native-source hash are in [scqubits.md](scqubits.md). A device-free import is insufficient to establish benefit or correctness.
 - QuTiP's CuPy plugin was inspected at upstream commit `bd471ca0581fcd9a84e613775092bca418d0b66a`, version `0.1.0.dev0`, BSD-3-Clause. Its [installation instructions and CPU-conversion warning](https://github.com/qutip/qutip-cupy/blob/bd471ca0581fcd9a84e613775092bca418d0b66a/README.md) state that it is unreleased and that missing specializations can fall back to CPU. No eigensolver or matrix-exponential specialization is registered in the inspected `__init__.py`. GPU matrix storage therefore does not establish native GPU spectrum, propagator or ODE execution. Solver coverage needs operation-specific execution and transfer/fallback evidence.
-- CuPy CUDA 12.x package candidate metadata reports `cupy-cuda12x==14.2.0`; it is an uninstalled discovery candidate, not a combined-worker pin. Compatibility with NumPy 2.5.4, QuTiP 5.3.1, the plugin revision and the allocated device's driver must be verified together. No CUDA runtime, plugin or driver execution version is claimed here.
+- CuPy CUDA 12.x package candidate metadata reports `cupy-cuda12x==14.2.0`; it is now installed in the tested disposable fixture, not a combined-worker pin. Compatibility with NumPy 2.5.4, QuTiP 5.3.1, the plugin revision and the allocated device's driver must be verified together. Pinned candidate runtime/plugin versions appear below; successful GPU numerical execution is not established.
 - JoSIM has no established native GPU path in the source examined by its discovery lane. It remains CPU for this design.
 
 ## Placement attempt and observations
@@ -29,7 +29,7 @@ SKYPILOT_CONFIG="$PRIVATE_SKY_CONFIG" sky launch \
 SKYPILOT_CONFIG="$PRIVATE_SKY_CONFIG" sky status "$OWNED_DISCOVERY_CLUSTER"
 ```
 
-The locally installed SkyPilot implementation was examined at its reported source revision `b1431e52d97c22e9bb8fa8b67f162543754ddaf5`. In `sky/provision/kubernetes/utils.py`, `_gpu_resource_key_helper` scans supported resource keys in AMD-then-NVIDIA order and returns the first present key; `CUSTOM_GPU_RESOURCE_KEY` can override the choice in the executing process. The observed mixed-vendor cluster and inventory output are consistent with that mechanism. The initial WQS check did not inspect the remote environment. Laminar subsequently confirmed that the existing API server had no NVIDIA override; its managed correction is [Laminar PR #170](https://github.com/Wehden/laminar/pull/170), commit `720fb5f0122649964627ac6d7cda6998dce61030`. It awaits the owner's manual merge before installation and controlled restart. Several NVIDIA nodes also lack the SkyPilot-recognized accelerator label. Neither fact is resolved by changing a simulation CPU or memory request.
+The locally installed SkyPilot implementation was examined at its reported source revision `b1431e52d97c22e9bb8fa8b67f162543754ddaf5`. In `sky/provision/kubernetes/utils.py`, `_gpu_resource_key_helper` scans supported resource keys in AMD-then-NVIDIA order and returns the first present key; `CUSTOM_GPU_RESOURCE_KEY` can override the choice in the executing process. The observed mixed-vendor cluster and inventory output are consistent with that mechanism. The initial WQS check did not inspect the remote environment. Laminar subsequently confirmed that the existing API server had no NVIDIA override; its managed correction is [Laminar PR #170](https://github.com/Wehden/laminar/pull/170), commit `720fb5f0122649964627ac6d7cda6998dce61030`. It was merged on 2026-10-26 and Laminar applied the managed NVIDIA override and controlled API-server restart. Existing local cards still have consumers; no local test allocation was taken from them. Several NVIDIA nodes also lack the SkyPilot-recognized accelerator label. Neither fact is resolved by changing a simulation CPU or memory request.
 
 On 2026-10-26 the owner authorized Laminar to fix placement while preserving existing GPU workloads and credentials. Laminar prepared the managed fix and a non-preempting client profile. Physical occupancy checks found existing consumers on every inspected NVIDIA card; a free logical reservation or free VRAM is not an exclusive spare allocation. The labeled RTX5080 is occupied, and WQS must not preempt its consumer. Placement configuration and physical capacity are therefore separate gates. No node labels, server overrides, running consumers, production configuration or existing credentials were changed by WQS discovery. Private logs remain outside this repository; they must be sanitized before sharing.
 
@@ -41,7 +41,7 @@ For each candidate cell, run at least three fresh-process cold trials and three 
 
 Test initialization and execution under the current sanitized-child environment, 3 GiB address-space and 12 MiB file limits first. Device visibility must follow the scheduler's allocation. A CUDA virtual-address failure needs a measured, bounded replacement policy and the required design review; do not remove the limit to make a benchmark pass. GPU equivalence, seed behavior, useful speedup, native operation coverage and limit compatibility are all **unmeasured** here.
 
-The disposable fixture and CPU references below are now tested. Actual GPU execution still needs an allocation; device-free checks are not GPU acceptance. TASK-005 must resume on the corrected SkyPilot placement path. TASK-006 cannot mark the GPU discovery gate complete from this report, nor conclude that GPUs are unhelpful.
+The disposable fixture and CPU references below are now tested. A later owner-authorized serverless allocation reached CUDA initialization and failed as recorded below. Device-free checks and completed transport requests are not GPU acceptance. TASK-005 still needs initialization-boundary evidence and successful numerical execution. TASK-006 cannot mark the GPU discovery gate complete from this report, nor conclude that GPUs are unhelpful.
 
 
 ## Disposable candidate fixture, 2026-10-26
@@ -58,7 +58,7 @@ docker run --rm --cpus 2 --memory 4g --memory-swap 4g \
   wqs-physics-gpu-discovery:local --backend cpu --suite
 ```
 
-The suite starts three fresh sanitized children per predeclared cell. Each performs its first operation plus three warm repeats, giving 12 fresh children and 48 numerical checks. Every child sets the existing 3 GiB address-space and 12 MiB file limits before native imports. CPU references use the same physical inputs, float64/complex128 and output representation as the candidate GPU cells. CPU spectrum references are independent SciPy eigensystems. Transmon comparisons check energies, residuals and eigenspace projectors; Rabi uses the analytic population. The benchmark source has no option to disable or raise these limits.
+The suite starts three fresh sanitized children per predeclared cell. Each performs its first operation plus three warm repeats, giving 12 fresh children and 48 numerical checks. Every child sets the existing 3 GiB address-space and 12 MiB file limits before native imports. CPU references use the same physical inputs, float64/complex128 and output representation as the candidate GPU cells. CPU spectrum references are independent SciPy eigensystems. Transmon comparisons check energies, residuals and eigenspace projectors; Rabi uses the analytic population. Numerical cases have no option to disable or raise these limits; the separate initialization-only profiles below cannot execute a solver.
 
 All **12 CPU children and 48 checks passed** with two CPUs, 4 GiB memory and no additional swap. No existing tests or assertions changed. These measurements are on the local discovery host; CPU/GPU speedups must use measurements on the same eventual allocated worker.
 
@@ -75,28 +75,42 @@ A device-free negative test reached `cuda_initialization` under the unchanged li
 
 The GPU probe selects scqubits' actual `esys_cupy_dense`, counts calls receiving CuPy device arrays, synchronizes its native eigensolver and records host-to-device timing separately. The QuTiP spectrum cell counts host conversions because the candidate plugin lacks an eigensolver specialization. The Rabi cell counts device-backed matrix operations and host conversions; a mixed execution path must remain labeled as such. Receipts record actual device/runtime/driver, CuPy allocator usage and device free memory. These fields are populated only after real initialization. Allocator-resident bytes are not a complete VRAM peak: driver/context, solver workspace and device-wide consumers require separate allocation-scoped observation, without inspecting or perturbing unrelated workloads.
 
-## Owner-authorized serverless test transport
+## Historical direct transport, withdrawn
 
-On 2026-10-26 the owner selected a temporary Runpod serverless GPU for discovery while the local NVIDIA placement correction and device availability remain separate infrastructure work. This is a test-only execution transport. Production WQS placement remains the approved SkyPilot architecture. No existing GPU consumers, deployment credentials or recovery keys are changed.
+An earlier direct Runpod Serverless test bypassed the required SkyPilot scheduler. That transport is withdrawn from the plan, and its handler/SDK Docker target were removed from the proposed source. The retained private receipts show 12 CPU children / 48 checks passed, while all 12 GPU children failed at CUDA initialization under 3 GiB AS. Those receipts do not establish accepted scheduling or production GPU capability. The existing idle endpoint is retained as requested and receives no further direct submissions. No direct provider operation is an approved fallback.
 
-The Dockerfile's `serverless` target derives from public `python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2`, without the private CI runner base. It pins uv 0.11.6 and Runpod SDK 1.12.0, whose current release metadata was checked against PyPI. Numerical/CUDA/plugin pins are shared with the ordinary `probe` target. The SDK imports only in the transport process, outside the numerical child's unchanged limits.
+## SkyPilot Runpod discovery, 2026-10-26
 
-`serverless_handler.py` accepts only `backend: cpu|gpu` plus one of the four fixed cases, or `suite: true`. It rejects unknown fields and combinations before starting a child. The executable and script paths are fixed. Its child environment contains only the runtime path, scheduler-provided CUDA/NVIDIA visibility and fixed thread/cache settings; Runpod tokens and other credential environment variables are excluded. The handler returns child status and bounded diagnostic receipts, so operators must inspect the numerical return code rather than treating a completed transport request as successful physics.
+All subsequent GPU probes and lifecycle operations use the existing SkyPilot API server. Its installed 0.13.0 Runpod provider provisions short-lived Pods. The repeatable fixture is `tests/fixtures/physics/gpu/skypilot.yaml`; invoke it from the repository root with private existing API configuration and a unique test-owned cluster name. It requests one RTX4090, at least four CPUs and 16 GB host memory, and a 40 GB disposable disk. No new public application ingress or credentials are created. Use `--down` and explicitly run `sky down` on the owned cluster if provisioning/setup fails.
 
-```bash
-docker build --platform linux/amd64 --target serverless \
-  -f tests/fixtures/physics/gpu/Dockerfile \
-  -t wqs-physics-gpu-serverless:local .
-docker run --rm --cpus 2 --memory 4g --memory-swap 4g \
-  wqs-physics-gpu-serverless:local \
-  --test_input '{"input":{"backend":"cpu","case":"transmon61"}}'
-```
+The first RTX3090 attempt exhausted the provider's catalog regions without capacity. SkyPilot subsequently allocated an RTX4090 in EU-RO-1. The catalog price was $0.89/hour; this is a catalog estimate, not an account billing receipt. The owner-approved total test budget remains $25. No local GPU consumer was displaced. The observed device reports NVIDIA GeForce RTX 4090, driver 595.91.07 and 24,564 MiB VRAM.
 
-Transport harness checks rejected nine invalid requests before subprocess execution, verified the fixed executable/argument vector, and confirmed that synthetic Runpod/AWS credentials were absent from the child's environment. Registry publication, endpoint creation, GPU allocation and cleanup belong to the authorized coordinator; source preparation does not establish that any such action or hardware test has succeeded.
+SkyPilot's default `runpod/base:1.0.2-ubuntu2204` image was used for this trial, with numerical dependencies installed into a separate virtual environment. The observed Python installation was 3.12.15. The checked-in fixture pins 3.12.13 for repeatability; it has not yet been rerun at that patch version. NumPy 2.5.4, SciPy 1.18.1, QuTiP 5.3.1 and scqubits 4.3.1 are checked at runtime. CuPy is 14.2.0, CUDA wheels are 12.9.2 and the QuTiP-CuPy source is pinned to `bd471ca0581fcd9a84e613775092bca418d0b66a`. This mutable-base setup is a discovery environment, not an immutable production worker receipt.
 
+The exact executed probe SHA256 is `20826a6b28152e6d29eb04beddba9d77cf03f563d65882b79499d4887e6d018e`. The first scheduled request failed on a copied file's permissions before native imports. After a fixed chmod, SkyPilot scheduled a second request on the same owned allocation. Each numerical child runs as a dedicated nonroot user with sanitized environment and unchanged 3 GiB AS / 12 MiB file limits. The containing Runpod allocation is not a verified 2-CPU/4-GiB CPU profile: observed affinity includes 48 logical CPUs and the cgroup-v2 diagnostic files were unavailable. Native-library thread counts are fixed to one. Do not use these results as a CPU-profile acceptance claim.
 
-The public-base serverless image built and passed dependency checks as local image ID `sha256:e5c6a501b954288c888ac5dcf4806fd0dbaeb42ddf492e620a567b8619173966` (6,030,087,030 bytes). An actual SDK 1.12.0 `--test_input` CPU request returned numerical child code 0 and four passing Transmon D61 checks under the unchanged child limits, in a two-CPU/4 GiB container. SDK tests for an arbitrary case/path and an extra `code` field were rejected with exit 1. The public image creates a dedicated nonroot UID 1001 with its own home when the base does not already supply that UID; this fixes QuTiP's home-directory lookup without forwarding the operator's home or credentials.
+### Initialization-only diagnostic
 
-Probe source SHA256 is `32a4e27768b014b478e14f3d60e927cda4ce1ca5e5735fdf780ea475d19ab90e`; handler SHA256 is `0dfddacbcc1911ddd1c605a38a1f10bc1c77f14952fbe1f791cc5c1be9a9f149`. Algorithm timing now explicitly excludes independently computed CPU-reference time; the receipt retains reference-inclusive trial time under a separate name. The earlier CI-base image and timing table document that earlier measured artifact, while this public image is the transport-ready candidate. Neither image has established GPU initialization or performance.
+The fixed `cuda_init` case runs fresh children with AS limits 3, 8, 16 and 64 GiB. Larger profiles apply only to initialization, never a numerical solver. File limits and child sanitization remain active. There is no unlimited profile or arbitrary caller-selected limit.
 
-The public-image command-line suite additionally passed all 12 fresh children / 48 numerical checks with the unchanged child limits. That packaging regression run did not impose the outer two-CPU/4 GiB container quota and is not used for profile performance claims; the SDK single-case check above and earlier constrained CPU measurements retain their stated outer limits.
+| AS bound GiB | Native result | Process virtual size after init / at failure | Resident memory |
+| --- | --- | --- | --- |
+| 3 | `cudaErrorMemoryAllocation` during initialization | 2,678,412 KiB at failure | 433,184 KiB at failure; peak 502,640 KiB |
+| 8 | Initialized | 4,584,112 KiB | 506,768 KiB |
+| 16 | Initialized | 6,682,288 KiB | 507,020 KiB |
+| 64 | Initialized | 6,683,320 KiB | 506,896 KiB |
+
+The assigned device had only 1 MiB used before initialization. Fresh controlled children differ by their fixed AS profile: initialization succeeds at 8 GiB and fails at 3 GiB on this device/runtime. The observations support an address-space constraint, not physical GPU exhaustion. Successful initialization does not establish numerical correctness, runtime coverage, solver workspace or acceleration benefit. No numerical child has been granted a larger AS limit.
+
+### Numerical and lifecycle receipt
+
+The second SkyPilot job finished with native failures correctly propagated to overall `FAILED` status. All 12 CPU children / 48 numerical checks passed on the same assigned worker. All 12 GPU children failed at `cuda_initialization` under the unchanged 3 GiB AS bound, before any simulator operation. The initialization sweep itself returned failure because its 3 GiB case failed; its three larger initialization-only cases passed. No solver used a larger limit and no speedup is claimed.
+
+SkyPilot teardown completed immediately after recording the complete run. A subsequent SkyPilot status readback confirms no owned discovery cluster remains. A separate fixed 8 GiB numerical discovery profile is proposed in [decisions.md](../decisions.md); it requires owner approval before use. CPU and production policies remain unchanged. TASK-005 and G1 remain open until actual numerical GPU coverage and isolation decisions are reviewed.
+
+| CPU cell on assigned worker | Median first operation s | Median warm operation s | Maximum numerical error | Peak RSS KiB |
+| --- | ---: | ---: | ---: | ---: |
+| transmon61 | 0.000679 | 0.000455 | 9.5e-14 | 253680 |
+| transmon511 | 0.023590 | 0.018329 | 4.4e-12 | 278772 |
+| rabi2 | 0.007546 | 0.006747 | 7.49e-09 | 254332 |
+| spectrum256 | 0.009142 | 0.008429 | 2.84e-14 | 259516 |
