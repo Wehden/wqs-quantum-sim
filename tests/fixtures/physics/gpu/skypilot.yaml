@@ -29,21 +29,22 @@ setup: |
   ln -sf "$PUBLIC_PYTHON" /opt/wqs-discovery/bin/python
 run: |
   set -uo pipefail
-  chmod 644 /opt/wqs-probe-gpu.py
+  # SkyPilot file mounts may traverse the operator home; copy for the nonroot child.
+  install -m 644 /opt/wqs-probe-gpu.py /opt/wqs-probe-gpu-exec.py
   failed=0
   mkdir -p /tmp/wqs-discovery-receipts
-  sha256sum /opt/wqs-probe-gpu.py
+  sha256sum /opt/wqs-probe-gpu-exec.py
   nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
   for mode in init cpu gpu; do
     case "$mode" in
-      init) args="--backend gpu --case cuda_init";;
+      init) args="--backend gpu --case cuda_init --init-profile 8";;
       cpu) args="--backend cpu --suite";;
-      gpu) args="--backend gpu --suite";;
+      gpu) args="--backend gpu --suite --gpu-discovery-8g";;
     esac
     echo "WQS_PROBE_BEGIN $mode"
-    runuser -u wqs-discovery -- env PATH=/opt/wqs-discovery/bin:/usr/local/bin:/usr/bin:/bin OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 CUPY_CACHE_DIR=/tmp/wqs-cupy-cache /opt/wqs-discovery/bin/python /opt/wqs-probe-gpu.py $args
+    runuser -u wqs-discovery -- env PATH=/opt/wqs-discovery/bin:/usr/local/bin:/usr/bin:/bin OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 CUPY_CACHE_DIR=/tmp/wqs-cupy-cache /opt/wqs-discovery/bin/python /opt/wqs-probe-gpu-exec.py $args
     code=$?
-  echo "WQS_PROBE_EXIT $mode $code"
-  if [ "$code" -ne 0 ]; then failed=1; fi
+    echo "WQS_PROBE_EXIT $mode $code"
+    if [ "$code" -ne 0 ]; then failed=1; fi
   done
   exit "$failed"

@@ -1,6 +1,6 @@
 # G1 decisions for owner review
 
-Status: **draft, not approved and not a runtime contract freeze**. Prepared on 2026-10-26 from the approved requirements/design and the discovery increment in PR #38. All three CPU backends remain required. GPU hardware results and the resulting isolation recommendation must be completed before this document is presented as a closed G1 packet. No production backend or resource policy is enabled by these proposals.
+Status: **draft, not approved and not a runtime contract freeze**. Prepared on 2026-10-26 from the approved requirements/design and the discovery increment in PR #38. All three CPU backends remain required. GPU hardware discovery is complete for the declared cases; the remaining native-work policy and internal contract artifacts must be completed before a closed G1 packet. No production backend or resource policy is enabled by these proposals.
 
 ## Decisions supported by CPU discovery
 
@@ -42,7 +42,7 @@ A conservative complete NPZ bound is `B = numeric_bytes + 4*metadata_characters 
 
 TASK-008 must verify NumPy's actual header/ZIP framing and worst-case Unicode/summary escaping, charge simultaneous serialization copies, and reject any emitted object exceeding its planned bound. If the measured encoder violates the formula, admission remains closed until the formula or encoding is corrected. Existing circuit archives, summaries and canonical bytes remain unchanged.
 
-## GPU decision: awaiting bounded hardware diagnosis
+## GPU decision: declared-case discovery complete
 
 All GPU work must be scheduled through the existing SkyPilot API server. The direct Runpod Serverless test transport was withdrawn after the owner clarified this requirement. Its retained historical receipts cannot close scheduler acceptance. The test budget is $25 total; SkyPilot owns allocation and automatic teardown. Existing local GPU consumers and credentials remain outside its scope.
 
@@ -50,12 +50,14 @@ The SkyPilot-scheduled cloud CPU suite passed all 12 fresh children / 48 checks.
 
 The SkyPilot RTX4090 diagnostic now initializes at 8/16/64 GiB AS and fails at 3 GiB. At 8 GiB, virtual size is about 4.37 GiB while RSS is about 495 MiB. The assigned card had 1 MiB in use before initialization. These controlled results establish an AS-bound incompatibility on the tested configuration; they do not establish solver coverage. See the [exact GPU receipt](discovery/gpu.md).
 
-**Owner decision needed before further numerical discovery:** approve one fixed discovery-only GPU profile with 8 GiB AS, retaining the 12 MiB file limit, nonroot sanitized fresh children, fixed synthetic cases and one SkyPilot-scheduled GPU. Keep CPU numerical children at 3 GiB AS. Keep production worker policy unchanged. Record actual host RSS/VRAM, precision, native coverage and cold/warm CPU comparisons; failure at 8 GiB remains a failure and does not authorize another increase. The existing $25 total budget and SkyPilot teardown still apply. This changes the isolation assumption in TASK-005 and therefore needs explicit owner approval before numerical execution at the larger limit.
+**Owner approved on 2026-10-26:** one fixed discovery-only GPU profile with 8 GiB AS, retaining the 12 MiB file limit, nonroot sanitized fresh children, fixed synthetic cases and one SkyPilot-scheduled GPU. Keep CPU numerical children at 3 GiB AS. Keep production worker policy unchanged. Record actual host RSS/VRAM, precision, native coverage and cold/warm CPU comparisons; failure at 8 GiB remains a failure and does not authorize another increase. The existing $25 total budget and SkyPilot teardown still apply. The approved TASK-005 amendment is recorded in tasks.md. Numerical execution at this larger limit is discovery only and does not approve a production profile.
 
-A production GPU execution profile remains a separate later G1 decision supported by actual native measurements. Do not remove the AS limit, accept an unbounded override, or treat QuTiP's CuPy storage / CPU fallback as GPU solver support. JoSIM remains CPU absent a supported native implementation.
+The approved numerical run passed all 48 GPU-candidate comparisons, alongside 48 CPU comparisons. scqubits GPU eigensolvers executed real kernels but were slower at D61/D511; tested QuTiP Rabi/spectrum paths used host fallback. Recommend CPU defaults and no advertised Lindblad GPU solver support from these paths. Preserve scqubits GPU diagonalization as a candidate for larger measured problems and later acceptance. See the exact cold/warm timings, precision, native coverage and memory caveats in the [GPU report](discovery/gpu.md).
+
+A production GPU execution profile remains a separate later G1 decision supported by combined-worker memory and larger-workload crossover measurements. Do not remove the AS limit, accept an unbounded override, or treat QuTiP's CuPy storage / CPU fallback as GPU solver support. JoSIM remains CPU absent a supported native implementation.
 
 For production, queue when a compatible GPU placement is unavailable. CPU fallback is permissible only if an explicit server policy admits the same request under CPU bounds, preserves precision/solver semantics and records the actual backend. Worker reuse must match the exact image, profile, device/precision compatibility and policy version, with restart-safe durable ownership. Clients cannot select raw resources or native backend names.
 
 ## G1 closeout conditions
 
-This draft cannot close G1 until the hardware diagnosis/measurements and native work policy are recorded. Then publish the proposed internal interface and module-boundary JSON documents, reconcile design/requirements with the owner's material choices, and verify traceability to PHY-001 through PHY-020. G2 still requires actual all-three CPU integration, security/resource boundaries and combined-image acceptance; G3 requires native GPU evidence for every advertised operation. Existing backup gates, owner merges and credentials remain unchanged.
+This draft cannot close G1 until the native work policy is resolved and the remaining internal contracts are recorded. The declared-case hardware measurements are now recorded. Then publish the proposed internal interface and module-boundary JSON documents, reconcile design/requirements with the owner's material choices, and verify traceability to PHY-001 through PHY-020. G2 still requires actual all-three CPU integration, security/resource boundaries and combined-image acceptance; G3 requires native GPU evidence for every advertised operation. Existing backup gates, owner merges and credentials remain unchanged.

@@ -757,7 +757,7 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-002 | [Constrained CPU reference complete](discovery/lindblad.md). Pulse/work ceilings, final per-operation bounds and shape decisions remain explicit G1 inputs. |
 | TASK-003 | [CPU discovery complete](discovery/scqubits.md): all four classes, 16 operator pairs, 12 execution fixtures and four dimension refusals. |
 | TASK-004 | [Native discovery complete](discovery/josim.md): real SFQ physics, safe-subset prototype and deterministic native seed checks. Distribution/license closure belongs to dependency/image tasks. |
-| TASK-005 | [In progress](discovery/gpu.md): Laminar NVIDIA placement correction applied. Runpod discovery is being scheduled through SkyPilot only; numerical GPU acceptance remains open. |
+| TASK-005 | [Declared-case discovery complete](discovery/gpu.md): SkyPilot RTX4090 run passed 48 CPU and 48 GPU-candidate comparisons under approved separate bounds. Native scqubits kernels were slower at measured sizes; tested QuTiP paths fell back to CPU. Production GPU acceptance remains gated. |
 | TASK-006 | Draft decision record in progress; G1 remains open and no runtime contract is frozen. |
 | TASK-007 onward | Not started. Runtime integration and production activation remain gated by G1. |
 
@@ -823,3 +823,7 @@ Runtime rollback uses the existing controlled drain/hold runbook and compatible 
 - **PHY-020:** TASK-005, TASK-006, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033, TASK-034.
 
 Approval requested: the owner accepts this task graph, budgets, write leases and evidence gates before implementation. Discovery may resolve implementation choices inside the approved design; material changes to scope, scientific semantics or isolation return for review. The approved endpoint/lifecycle architecture remains the basis for all three backends.
+
+### Owner-approved bounded GPU numerical discovery, 2026-10-26
+
+After reviewing the SkyPilot RTX4090 initialization sweep, the owner approved the fixed 8 GiB AS profile for numerical GPU discovery. Only the synthetic GPU cases may use the explicit `--gpu-discovery-8g` flag. CPU cases remain at 3 GiB AS; initialization-only profile flags cannot raise a numerical case. The 12 MiB file limit, nonroot sanitized fresh children, one SkyPilot-scheduled GPU, $25 total test budget and SkyPilot cleanup remain required. An 8 GiB failure does not authorize a further increase. Production policy is unchanged.

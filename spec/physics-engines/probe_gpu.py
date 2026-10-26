@@ -39,7 +39,11 @@ def main():
     parser.add_argument('--case', choices=CASES + ('cuda_init',))
     parser.add_argument('--init-profile', type=int, choices=INIT_PROFILES_GIB)
     parser.add_argument('--suite', action='store_true')
+    parser.add_argument('--gpu-discovery-8g', action='store_true',
+                        help='owner-approved fixed numerical discovery profile; never production')
     args = parser.parse_args()
+    if args.gpu_discovery_8g and (args.backend != 'gpu' or args.case == 'cuda_init'):
+        parser.error('8 GiB discovery profile requires a GPU numerical case or suite')
     if args.init_profile is not None and args.case != 'cuda_init':
         parser.error('initialization profiles are diagnostic-only')
     if args.case == 'cuda_init' and args.backend != 'gpu':
@@ -57,6 +61,8 @@ def main():
         for case, trial, profile in cells:
             started = time.perf_counter()
             command = [sys.executable, __file__, '--backend', args.backend, '--case', case]
+            if args.gpu_discovery_8g:
+                command += ['--gpu-discovery-8g']
             if profile is not None:
                 command += ['--init-profile', str(profile)]
             child = subprocess.run(command,
@@ -71,7 +77,8 @@ def main():
         return int(bool(failures))
     if args.case is None:
         parser.error('--case is required without --suite')
-    address_limit = (args.init_profile if args.case == 'cuda_init' else 3) * 1024**3
+    numerical_gib = 8 if args.gpu_discovery_8g else 3
+    address_limit = (args.init_profile if args.case == 'cuda_init' else numerical_gib) * 1024**3
     resource.setrlimit(resource.RLIMIT_AS, (address_limit, address_limit))
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     started = time.perf_counter()
@@ -79,6 +86,7 @@ def main():
     receipt = {'case': args.case, 'backend': args.backend,
                'address_space_bytes': address_limit, 'file_limit_bytes': 12 * 1024**2,
                'diagnostic_only': args.case == 'cuda_init',
+               'gpu_discovery_8g': args.gpu_discovery_8g,
                'process_before_import': process_snapshot()}
     try:
         import numpy as np

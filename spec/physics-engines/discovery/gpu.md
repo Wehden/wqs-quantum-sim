@@ -1,6 +1,6 @@
 # GPU discovery: initialization boundary under investigation
 
-Status: TASK-005 is **incomplete**, checked on 2026-10-26 after the Lindblad and scqubits CPU references passed. A real allocated GPU failed CUDA initialization under the current 3 GiB address-space limit; the SkyPilot initialization sweep is complete, while the proposed larger numerical discovery profile awaits owner approval. Solver suitability and speedup remain unknown. No GPU capability, production worker image or resource-policy change is enabled by this report.
+Status: TASK-005 discovery is **complete for the declared cases**, checked on 2026-10-26. SkyPilot scheduled an RTX4090, and the owner-approved 8 GiB AS discovery profile passed all fixed numerical comparisons. scqubits used native GPU eigensolver kernels without a speedup at the measured sizes; the tested QuTiP paths fell back to the host. G1 contract decisions remain open. No production GPU capability, worker image or resource-policy change is enabled by this report.
 
 ## Candidate paths
 
@@ -41,7 +41,7 @@ For each candidate cell, run at least three fresh-process cold trials and three 
 
 Test initialization and execution under the current sanitized-child environment, 3 GiB address-space and 12 MiB file limits first. Device visibility must follow the scheduler's allocation. A CUDA virtual-address failure needs a measured, bounded replacement policy and the required design review; do not remove the limit to make a benchmark pass. GPU equivalence, seed behavior, useful speedup, native operation coverage and limit compatibility are all **unmeasured** here.
 
-The disposable fixture and CPU references below are now tested. A later owner-authorized serverless allocation reached CUDA initialization and failed as recorded below. Device-free checks and completed transport requests are not GPU acceptance. TASK-005 still needs initialization-boundary evidence and successful numerical execution. TASK-006 cannot mark the GPU discovery gate complete from this report, nor conclude that GPUs are unhelpful.
+The disposable fixture and CPU references below are tested. The final SkyPilot-scheduled 8 GiB numerical discovery receipt appears at the end of this report. Historical initialization failures remain relevant to isolation; device-free checks and completed transport requests alone are not GPU acceptance. The measured sizes do not establish the performance crossover for larger problems.
 
 
 ## Disposable candidate fixture, 2026-10-26
@@ -114,3 +114,29 @@ SkyPilot teardown completed immediately after recording the complete run. A subs
 | transmon511 | 0.023590 | 0.018329 | 4.4e-12 | 278772 |
 | rabi2 | 0.007546 | 0.006747 | 7.49e-09 | 254332 |
 | spectrum256 | 0.009142 | 0.008429 | 2.84e-14 | 259516 |
+
+
+## Approved 8 GiB numerical discovery, 2026-10-26
+
+The owner explicitly approved a fixed 8 GiB AS profile for synthetic GPU numerical discovery. The `--gpu-discovery-8g` flag is accepted only for GPU numerical cases/suites, propagated to fresh children and recorded in receipts. It rejects CPU or initialization-only use. The numerical default remains 3 GiB, and initialization-profile flags still cannot raise a numerical case. File limits remain 12 MiB. No arbitrary/unlimited setting or production profile was added.
+
+The checked-in SkyPilot fixture was rerun with Python 3.12.13 and the same pinned numerical/CUDA dependencies on one RTX4090 in EU-RO-1. The executed probe SHA256 is `ae9557b57d8bc03449e9448a1d3d459dd26a0b5eaaf6a7af0230e0e5660175d4`. SkyPilot file mounts can traverse the operator home, so the fixture now copies the mounted script to a dedicated readable execution path for the nonroot child. The first scheduled job exposed that traversal error before numerical imports; a second SkyPilot job on the same allocation ran the corrected fixed command.
+
+The initialization case passed at 8 GiB. All **12 CPU children / 48 comparisons** passed at 3 GiB; all **12 GPU-candidate children / 48 comparisons** passed at 8 GiB. SkyPilot reported the corrected job **SUCCEEDED**. Every cell had three fresh processes and one first operation plus three warm repeats per process. GPU comparisons also timed the corresponding CPU operation in the same process before the candidate operation. Numerical error checks, dimensions, precision and output representation were unchanged.
+
+| Cell | GPU candidate first operation s | GPU candidate warm s | Same-repeat CPU warm s | Native GPU work proven | Maximum numerical error |
+| --- | ---: | ---: | ---: | --- | ---: |
+| transmon61 | 0.097619 | 0.001309 | 0.000178 | Yes | 9.77e-15 |
+| transmon511 | 0.117245 | 0.013605 | 0.006543 | Yes | 2.13e-14 |
+| rabi2 | 0.093807 | 0.012238 | 0.002682 | No; host fallback observed | 7.49e-09 |
+| spectrum256 | 0.006451 | 0.004812 | 0.004451 | No; host fallback observed | 2.84e-14 |
+
+Both Transmon cells called CuPy's GPU `eigh` once per repeat with device arrays. Warm candidate operations were approximately 7.34x slower at D61 and 2.08x slower at D511 than their same-repeat CPU operations. This includes adapter/transfer/synchronization overhead. First-operation timings include lazy native setup; process/import/context costs are separate. Median full fresh-process durations were 3.414/3.916/3.457/3.226 seconds for the four cells in table order, including reference and repeated operations. These are observations for this hardware and pinned configuration, not routing thresholds for larger problems.
+
+The Rabi cell recorded **zero traced GPU matrix multiplications and 884 device-to-host conversions per repeat**. The spectrum cell recorded a host conversion per operation. Both agreed numerically, but neither establishes GPU solver execution. CuPy-backed storage alone must not be advertised as Lindblad GPU support. JoSIM remains CPU; no supported native GPU path was found in its source discovery.
+
+Maximum observed process RSS across GPU cases was **697,132 KiB**. Largest post-operation CuPy pool reservation was **14,115,328 bytes**; minimum observed free device memory was **24,781,783,040 of 25,252,724,736 bytes**. These are post-operation snapshots/pool reservations, not a complete peak VRAM measurement or a hard limit on native library workspaces. The containing Runpod allocation is not proof of a 2-CPU/4-GiB cgroup profile; this trial observed 32 logical CPUs in affinity and unavailable cgroup-v2 limit files. Native thread counts stayed one.
+
+SkyPilot teardown completed and status readback confirmed the owned 8 GiB discovery cluster no longer exists. Private logs, structured receipts and the owned-resource ledger were retained outside the source checkout. Existing local GPU workloads and credentials were unchanged. The earlier native Serverless endpoint remains outside the accepted execution path and receives no direct requests. The $25 total testing budget remains in force.
+
+**Discovery recommendation for G1:** retain CPU as the default for these measured operations. Keep scqubits GPU diagonalization as a demonstrated candidate for later, larger-size crossover and combined-image acceptance. Do not advertise the tested QuTiP storage/fallback paths as GPU solvers. Production GPU profiles, host-memory guarantees, worst-case VRAM accounting and any larger admitted dimensions require their own evidence and owner-approved material changes.
