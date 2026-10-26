@@ -21,15 +21,17 @@ flowchart TD
   G --> H[009-016 Lindblad models and solvers]
   G --> I[017-019 scqubits models and export]
   G --> J[020-021 JoSIM validation and execution]
-  H --> K[022-025 CPU integration and lifecycle]
+  H --> K[022 worker and 023 image]
   I --> K
   J --> K
-  K --> L[026-029 GPU placement, packaging and execution proof]
-  K --> M[030 CI]
-  L --> M
-  M --> N[031 acceptance and 032 documentation]
-  N --> O[033 combined audit]
-  O --> P[034 controlled release]
+  K --> L[026 durable profiles and pure policy]
+  L --> M[024 API and 025 integration safety]
+  M --> N[027-029 GPU compatibility and proof]
+  M --> O[030 CI]
+  N --> O
+  O --> P[031 acceptance and 032 documentation]
+  P --> Q[033 combined audit]
+  Q --> R[034 controlled release]
 ```
 
 The per-task dependency lists below are authoritative. Discovery for the three backends can run in parallel. After contract freeze, backend lanes have disjoint files; scqubits export waits for the actual Lindblad static solver. Shared worker/API, dependency lock, image packaging and CD edits are serialized. All three CPU backends are required. GPU discovery is required; GPU execution is enabled only for useful, correct, supported operation/backend cells. JoSIM remains CPU unless a supported native GPU path is established.
@@ -493,12 +495,12 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ### TASK-024: Integrate additive API routes, schemas and capabilities
 
 - **Goal:** Integrate additive API routes, schemas and capabilities.
-- **Dependencies:** TASK-001, TASK-009, TASK-017, TASK-020, TASK-023.
+- **Dependencies:** TASK-001, TASK-009, TASK-017, TASK-020, TASK-023, TASK-026.
 - **Requirements:** PHY-001, PHY-002, PHY-003, PHY-004, PHY-014, PHY-016, PHY-017, PHY-018.
 - **Recommended Mode:** executor.
 - **Risk:** High: general-route validation and canonical defaults can invalidate durable retries.
 - **Files/areas:** `qsim/api.py`, `qsim/physics_submission.py`, `tests/test_physics_api.py`, `tests/test_physics_compatibility_baseline.py`, `tests/test_physics_schemas.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
-- **Steps:** Add explicit routes for lindblad/scqubits/josim and generic format dispatch into the same enqueue path, keeping legacy Submission unchanged. Normalize explicit/generic requests identically. Serve generated versioned schemas and add metadata to the existing engine-name mapping without native imports. Preserve old error locations/messages and optional generic-route Idempotency-Key semantics. Keep new admission/capabilities behind a narrow server-controlled activation gate until release acceptance covers them; callers cannot toggle it.
+- **Steps:** Add explicit routes for lindblad/scqubits/josim and generic format dispatch into the same enqueue path, keeping legacy Submission unchanged. Normalize explicit/generic requests identically. Replay matching owner/idempotency reservations before current admission policy, then atomically recheck on enqueue. Persist the resolved dispatch context separately from canonical identity; TASK-026 installs its nullable storage and pure settings resolver first. Serve generated versioned schemas and add metadata to the existing engine-name mapping without native imports. Preserve old error locations/messages and optional generic-route Idempotency-Key semantics. Keep new admission/capabilities behind a narrow server-controlled activation gate until release acceptance covers them; callers cannot toggle it.
 - **Verification:** Run uv run --frozen --extra worker --extra controller --extra backup pytest -q tests/test_physics_api.py tests/test_physics_schemas.py tests/test_physics_compatibility_baseline.py tests/test_service.py tests/test_transactions.py. Verify equivalent-route replay, 409 body conflict, owner isolation, 422 pointers/no job, 413 byte rejection, disabled capability behavior and native-import-free API startup.
 - **Rollback / Backout:** Turn off only the new engine activation gate; retain existing jobs/results, canonical hashes and schema history.
 - **Change budget:** max_files=5, max_new_symbols=10, interface_policy=extend-only.
@@ -758,7 +760,7 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-003 | [CPU discovery complete](discovery/scqubits.md): all four classes, 16 operator pairs, 12 execution fixtures and four dimension refusals. |
 | TASK-004 | [Native discovery complete](discovery/josim.md): real SFQ physics, safe-subset prototype and deterministic native seed checks. Distribution/license closure belongs to dependency/image tasks. |
 | TASK-005 | [Declared-case discovery complete](discovery/gpu.md): SkyPilot RTX4090 run passed 48 CPU and 48 GPU-candidate comparisons under approved separate bounds. Native scqubits kernels were slower at measured sizes; tested QuTiP paths fell back to CPU. Production GPU acceptance remains gated. |
-| TASK-006 | Draft decision record in progress; G1 remains open and no runtime contract is frozen. |
+| TASK-006 | Complete G1 proposal: decisions, export/import artifacts, work-accounting proof and traceability prepared for owner review. G1 approval pending; runtime contracts not yet approved. |
 | TASK-007 onward | Not started. Runtime integration and production activation remain gated by G1. |
 
 The initial discovery PR combines the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
@@ -827,3 +829,9 @@ Approval requested: the owner accepts this task graph, budgets, write leases and
 ### Owner-approved bounded GPU numerical discovery, 2026-10-26
 
 After reviewing the SkyPilot RTX4090 initialization sweep, the owner approved the fixed 8 GiB AS profile for numerical GPU discovery. Only the synthetic GPU cases may use the explicit `--gpu-discovery-8g` flag. CPU cases remain at 3 GiB AS; initialization-only profile flags cannot raise a numerical case. The 12 MiB file limit, nonroot sanitized fresh children, one SkyPilot-scheduled GPU, $25 total test budget and SkyPilot cleanup remain required. An 8 GiB failure does not authorize a further increase. Production policy is unchanged.
+
+### Complete G1 packet prepared for review, 2026-10-26
+
+The packet now records source-pinned vern7 per-call bounds and cumulative job accounting without a new job-wide cutoff; strict internal exports/import boundaries; explicit result/model/profile contracts; all-three CPU scope and the measured GPU matrix. The CPU-only wrapper prototype and its bounded exhaustion/MC-repeat checks passed in a 2-CPU/4-GiB container. No runtime implementation, dependency lock, deployment, credential or GPU resource was changed by this packet pass. Owner approval remains required before TASK-007 onward. Native certificate/pulse/license and combined-image tests remain mandatory G2/G3 acceptance, not unresolved design choices.
+
+The proposed G1 sequencing amendment makes TASK-024 depend on TASK-026, so the existing settings/store lease installs pure profile resolution and nullable profile metadata before API admission begins writing it. There is no cycle: TASK-026 depends on 005/006/023, not 024. File/write budgets are unchanged. Owner approval of the G1 packet accepts this ordering amendment before execution.
