@@ -108,6 +108,8 @@ The second SkyPilot job finished with native failures correctly propagated to ov
 
 SkyPilot teardown completed immediately after recording the complete run. A subsequent SkyPilot status readback confirms no owned discovery cluster remains. A separate fixed 8 GiB numerical discovery profile is proposed in [decisions.md](../decisions.md); it requires owner approval before use. CPU and production policies remain unchanged. TASK-005 and G1 remain open until actual numerical GPU coverage and isolation decisions are reviewed.
 
+Historical CPU trial timings above include validation and are not operation-only comparisons. The corrected operation-only table is the authoritative performance evidence.
+
 | CPU cell on assigned worker | Median first operation s | Median warm operation s | Maximum numerical error | Peak RSS KiB |
 | --- | ---: | ---: | ---: | ---: |
 | transmon61 | 0.000679 | 0.000455 | 9.5e-14 | 253680 |
@@ -124,14 +126,7 @@ The checked-in SkyPilot fixture was rerun with Python 3.12.13 and the same pinne
 
 The initialization case passed at 8 GiB. All **12 CPU children / 48 comparisons** passed at 3 GiB; all **12 GPU-candidate children / 48 comparisons** passed at 8 GiB. SkyPilot reported the corrected job **SUCCEEDED**. Every cell had three fresh processes and one first operation plus three warm repeats per process. GPU comparisons also timed the corresponding CPU operation in the same process before the candidate operation. Numerical error checks, dimensions, precision and output representation were unchanged.
 
-| Cell | GPU candidate first operation s | GPU candidate warm s | Same-repeat CPU warm s | Native GPU work proven | Maximum numerical error |
-| --- | ---: | ---: | ---: | --- | ---: |
-| transmon61 | 0.097619 | 0.001309 | 0.000178 | Yes | 9.77e-15 |
-| transmon511 | 0.117245 | 0.013605 | 0.006543 | Yes | 2.13e-14 |
-| rabi2 | 0.093807 | 0.012238 | 0.002682 | No; host fallback observed | 7.49e-09 |
-| spectrum256 | 0.006451 | 0.004812 | 0.004451 | No; host fallback observed | 2.84e-14 |
-
-Both Transmon cells called CuPy's GPU `eigh` once per repeat with device arrays. Warm candidate operations were approximately 7.34x slower at D61 and 2.08x slower at D511 than their same-repeat CPU operations. This includes adapter/transfer/synchronization overhead. First-operation timings include lazy native setup; process/import/context costs are separate. Median full fresh-process durations were 3.414/3.916/3.457/3.226 seconds for the four cells in table order, including reference and repeated operations. These are observations for this hardware and pinned configuration, not routing thresholds for larger problems.
+The original timing table and 7.34x/2.08x slowdown claims are withdrawn. Review P2 correctly identified that the candidate timer included CPU correctness checks while its same-worker CPU comparator did not. The numerical correctness/coverage receipts remain valid, but those timing ratios cannot support placement decisions. Use only the corrected receipt below.
 
 The Rabi cell recorded **zero traced GPU matrix multiplications and 884 device-to-host conversions per repeat**. The spectrum cell recorded a host conversion per operation. Both agreed numerically, but neither establishes GPU solver execution. CuPy-backed storage alone must not be advertised as Lindblad GPU support. JoSIM remains CPU; no supported native GPU path was found in its source discovery.
 
@@ -140,3 +135,23 @@ Maximum observed process RSS across GPU cases was **697,132 KiB**. Largest post-
 SkyPilot teardown completed and status readback confirmed the owned 8 GiB discovery cluster no longer exists. Private logs, structured receipts and the owned-resource ledger were retained outside the source checkout. Existing local GPU workloads and credentials were unchanged. The earlier native Serverless endpoint remains outside the accepted execution path and receives no direct requests. The $25 total testing budget remains in force.
 
 **Discovery recommendation for G1:** retain CPU as the default for these measured operations. Keep scqubits GPU diagonalization as a demonstrated candidate for later, larger-size crossover and combined-image acceptance. Do not advertise the tested QuTiP storage/fallback paths as GPU solvers. Production GPU profiles, host-memory guarantees, worst-case VRAM accounting and any larger admitted dimensions require their own evidence and owner-approved material changes.
+
+
+## Corrected timing receipt, 2026-10-26
+
+The P2 correction stops and synchronizes the candidate operation timer **before** eigenvalue/residual/projector or analytic correctness validation in every branch. The comparator stops after its corresponding native operation. Assertions, tolerance checks and NPZ size checks are unchanged; `correctness_seconds` records validation separately. `trial_including_reference_seconds` still includes correctness for honest complete-trial diagnostics. Instrumented GPU calls retain their small measurement/bookkeeping overhead, which is not claimed as pure kernel latency.
+
+The fixed synthetic suite was rerun through the existing SkyPilot Runpod provider on one RTX4090, with Python 3.12.13, the same pinned libraries, driver 595.91.07, numerical CPU 3 GiB AS / GPU 8 GiB AS and 12 MiB file limits. The executed source SHA256 is `4b2a3d0bfab0448738316b7d379b610a8936b6b14f7ab96f063afa16f35ccd41`. Initialization and all **24 fresh children / 96 comparisons** passed; three fresh processes and four repeats per cell remain unchanged. SkyPilot reported **SUCCEEDED**. No direct provider call or existing GPU workload was used.
+
+| Cell | First candidate operation s | Warm candidate operation s | Same-repeat warm CPU operation s | CPU / candidate warm | Cold native-path proxy CPU / candidate s |
+| --- | ---: | ---: | ---: | ---: | --- |
+| transmon61 | 0.220972 | 0.001667 | 0.000332 | 0.199 | 4.867386 / 6.408501 |
+| transmon511 | 0.243440 | 0.013132 | 0.010241 | 0.780 | 5.502394 / 6.030001 |
+| rabi2 | 0.185196 | 0.019724 | 0.004483 | 0.227 | 5.766382 / 5.952475 |
+| spectrum256 | 0.014441 | 0.006867 | 0.006891 | 1.004 | 5.834760 / 5.852728 |
+
+The corrected Transmon candidate operations were approximately **5.02x / 1.28x slower** at D61/D511 in this run. These replace the invalid earlier ratios and are observations on one allocated hardware/configuration, not a general crossover threshold. scqubits native GPU eigensolver calls remain verified; QuTiP Rabi still recorded zero traced GPU matrix multiplies / 884 host conversions per repeat, and spectrum converted to the host.
+
+The cold native-path proxy is `imports_context_seconds + first operation_seconds`, excluding independent reference solves and correctness work from both paths. It is a labeled computation/setup proxy, **not end-to-end service latency**. Full fresh-process trial durations include extra comparator/reference operations and must not be used as a matched service comparison. A warm SkyPilot worker still starts a fresh isolated numerical child per request, so repeated operations within one probe do not prove a warm device context across WQS jobs. The initial CPU-default recommendation follows the absence of demonstrated useful benefit at these measured sizes; larger workloads or other maintained native backends are not ruled out.
+
+The corrected allocation is terminated through SkyPilot after receipt collection, with status readback retained privately. No production profile, caller resource override, new simulation timeout or global job cap was introduced. Existing credentials and local GPU consumers remain unchanged.

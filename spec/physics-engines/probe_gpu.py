@@ -210,6 +210,10 @@ def main():
                     kernel = calls[0]
                     transfer = sum(transfers)
                     native_gpu = True
+                if cp is not None:
+                    cp.cuda.Stream.null.synchronize()
+                operation_finished = time.perf_counter()
+                stage = 'correctness_check'
                 error = float(np.max(np.abs(actual - values[:6])))
                 residual = float(np.linalg.norm(h @ basis - basis * actual))
                 projector_error = float(np.linalg.norm(basis @ basis.conj().T - vectors[:, :6] @ vectors[:, :6].conj().T))
@@ -234,6 +238,10 @@ def main():
                     receipt['spectrum_host_conversions'] = len(conversions)
                 else:
                     actual = obj.eigenenergies()
+                if cp is not None:
+                    cp.cuda.Stream.null.synchronize()
+                operation_finished = time.perf_counter()
+                stage = 'correctness_check'
                 error = float(np.max(np.abs(actual - values)))
                 assert error < 1e-9
                 arrays = (actual,)
@@ -267,15 +275,18 @@ def main():
                     receipt.setdefault('rabi_gpu_matmuls', []).append(len(gpu_matmuls))
                     receipt.setdefault('rabi_host_conversions', []).append(len(host_conversions))
                     native_gpu = bool(gpu_matmuls)
+                if cp is not None:
+                    cp.cuda.Stream.null.synchronize()
+                operation_finished = time.perf_counter()
+                stage = 'correctness_check'
                 actual = result.expect[0]
                 error = float(np.max(np.abs(actual - np.sin(.01*np.pi*times)**2)))
                 assert error < 1e-4
                 arrays = (np.asarray(actual),)
                 # Kernel calls establish GPU work; host conversions still
                 # expose mixed execution rather than a GPU-only integrator.
-            if cp is not None:
-                cp.cuda.Stream.null.synchronize()
-            finished = time.perf_counter()
+            finished = operation_finished
+            correctness_finished = time.perf_counter()
             output = io.BytesIO()
             np.savez(output, **{f'array_{i}': array for i, array in enumerate(arrays)})
             assert len(output.getvalue()) < 6*1024**2
@@ -290,7 +301,8 @@ def main():
                       'other_operation_seconds': finished-native-kernel-transfer,
                       'native_gpu_proven': native_gpu,
                       'algorithm_seconds': constructed-wall+finished-native,
-                      'trial_including_reference_seconds': finished-wall,
+                      'trial_including_reference_seconds': correctness_finished-wall,
+                      'correctness_seconds': correctness_finished-finished,
                       'npz_bytes': len(output.getvalue()),
                       'rss_kib': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}
             if cp is not None:
