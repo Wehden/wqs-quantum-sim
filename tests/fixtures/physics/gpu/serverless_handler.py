@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 
-CASES = ('transmon61', 'transmon511', 'rabi2', 'spectrum256')
+CASES = ('transmon61', 'transmon511', 'rabi2', 'spectrum256', 'cuda_init')
 
 
 def handler(job):
@@ -12,6 +12,8 @@ def handler(job):
         return {'error': 'input must contain only backend and case or suite'}
     if request.get('backend') not in ('cpu', 'gpu'):
         return {'error': 'backend must be cpu or gpu'}
+    if request.get('case') == 'cuda_init' and request['backend'] != 'gpu':
+        return {'error': 'cuda_init requires backend gpu'}
     if 'suite' in request:
         if request['suite'] is not True or 'case' in request:
             return {'error': 'suite must be true and excludes case'}
