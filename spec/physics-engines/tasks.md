@@ -124,17 +124,18 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - **Requirements:** PHY-005, PHY-011, PHY-019, PHY-020.
 - **Recommended Mode:** test-engineer.
 - **Risk:** High: a GPU matrix backend does not prove solver coverage, numerical equivalence or safe resource limits.
-- **Files/areas:** `spec/physics-engines/probe_gpu.py`, `spec/physics-engines/discovery/gpu.md`, `tests/fixtures/physics/gpu/Dockerfile`. Proposed new filenames may be adjusted only with a recorded lease amendment.
+- **Files/areas:** `spec/physics-engines/probe_gpu.py`, `spec/physics-engines/discovery/gpu.md`, `tests/fixtures/physics/gpu/Dockerfile`, `tests/fixtures/physics/gpu/serverless_handler.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
 - **Steps:** Probe maintained QuTiP and scqubits GPU options on an addressable NVIDIA allocation through SkyPilot. Start with CuPy candidates; add JAX only if evidence warrants it. Record exact CUDA/runtime/plugin versions, supported operations, float64/complex128 behavior, VRAM use, transfer/context/compilation cost and cold/warm end-to-end latency. Test CUDA initialization under the current RLIMIT_AS and file limits, trusted device visibility and sanitized child environment. Do not remove limits to make a benchmark pass. JoSIM stays CPU unless native supported acceleration is demonstrated.
 - **Verification:** For predeclared small and larger representative problems, compare analytic/CPU answers and identical output semantics, including repeated seeds where meaningful. Measure CPU baseline, host memory and GPU VRAM and repeat cold/warm runs at least three times. Record scheduling/setup separately. Use no public-PR cluster credentials, new public ingress or production user work. If no supported useful path exists, record that outcome without claiming GPU execution.
 - **Rollback / Backout:** Delete only the benchmark allocation/image tags owned by the probe through SkyPilot; retain evidence. CPU paths and existing cluster configuration are unchanged.
-- **Change budget:** max_files=3, max_new_symbols=0, interface_policy=none.
+- **Change budget:** max_files=4, max_new_symbols=0, interface_policy=none.
 - **write_lease:**
 
 ```text
 ^spec/physics\-engines/probe_gpu\.py$
 ^spec/physics\-engines/discovery/gpu\.md$
 ^tests/fixtures/physics/gpu/Dockerfile$
+^tests/fixtures/physics/gpu/serverless_handler\.py$
 ```
 
 ### TASK-006: Freeze implementation contracts and evidence decisions
@@ -739,6 +740,10 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - [ ] The exact current-main release passes fresh real backup gates and all required native/application acceptance before general admission reopens. Existing credentials and recovery keys remain unchanged.
 
 ## Execution Notes (tooling, environment, checkpoints)
+
+### Discovery amendment, 2026-10-26
+
+The owner authorized Laminar to fix NVIDIA placement while preserving existing GPU workloads and credentials, then explicitly selected a temporary Runpod serverless GPU for discovery because all inspected local cards have consumers. TASK-005 now also leases the fixed serverless handler above, increasing its file budget from three to four. This replaces only the discovery transport: the production SkyPilot launcher, queue and worker architecture remain unchanged. A Runpod result does not establish Kubernetes placement or production GPU worker acceptance. Use only fixed synthetic cases, one flex worker at most, zero minimum workers, no persistent volume and the agreed test budget of at most $5. Preserve the current numerical child limits for the first hardware probe; any proposed isolation amendment remains a G1 owner-review item.
 
 ### Initial execution receipt
 
