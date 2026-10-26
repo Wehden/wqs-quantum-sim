@@ -136,7 +136,7 @@ def test_frozen_capability_mapping_and_dependency_versions(client):
     from importlib.metadata import version
     capabilities = client.get('/api/capabilities', headers=auth()).json()
     assert isinstance(capabilities['engines'], dict)
-    assert set(capabilities['engines']) == {'clifft', 'qsim', 'aer'}
+    assert {'clifft', 'qsim', 'aer'} <= set(capabilities['engines'])
     assert capabilities['engines']['clifft'] == {'version': '0.12.0', 'default': True}
     assert version('clifft') == '0.12.0'
     assert version('qiskit') == capabilities['engines']['aer']['importer']['version'] == '2.6.0'

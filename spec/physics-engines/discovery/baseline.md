@@ -10,7 +10,7 @@ Status: TASK-001 complete. Captured against main `83ffac2ebc55423cc804b623423373
 - The full 18-cell engine/format/operation matrix freezes current generic admission. All nine unsupported combinations return the sanitized 422 detail envelope and create neither a job nor an idempotency reservation. Circuit parsing remains a worker responsibility; API admission alone does not prove valid circuit execution.
 - All nine admitted cells also execute their actual native worker subprocess. Fixed one-qubit X circuits produce deterministic samples of one, or basis probabilities `[0, 1]` within absolute tolerance `1e-6`. Results retain `status`, `summary` and base64 `artifact`; NPZ loading uses `allow_pickle=False`. Clifft sampling retains `measurements`, `detectors`, `observables`, `exp_vals`; QASM sampling retains `classical_memory` with uint8 shape `(1000, 1)` and schema `qasm-samples/1`; probabilities retain `bitstrings` and `probabilities`.
 - Public job fields remain `id`, `name`, `status`, `created`, `updated`, `error`, `summary`. Location/replay headers, schema reload and exact 409/410/503 errors are exercised. During a durable maintenance hold, the original owner can replay an existing request; another owner cannot use that reservation to bypass admission. A retained reservation for a deleted job returns 410 and creates no replacement work.
-- Capability `engines` remains a mapping. Installed Clifft `0.12.0` and Qiskit `2.6.0` match the public metadata. The capability matrix, client-managed sequences/batches/state and complete-result SSE behavior are frozen.
+- Capability `engines` remains a mapping. Existing engine entries must remain present; additive engine entries are allowed. Installed Clifft `0.12.0` and Qiskit `2.6.0` match the public metadata. The capability matrix, client-managed sequences/batches/state and complete-result SSE behavior are frozen.
 
 Existing focused tests also retain coverage for concurrent owner-scoped retries, historical pre-engine/pre-binding hashes and dedicated-route replay, SSE ordering/resume, release holds and actual callback/result round trips. These assertions supplement those tests rather than replace or weaken them.
 
@@ -43,6 +43,8 @@ tar --exclude=.git --exclude=.venv --exclude=var --exclude=test-results -cf - . 
 ```
 
 Result: **96 passed, 1 warning in 10.24 seconds**. Existing focused baseline: 67 passing cases. Newly passing baseline cases: 29. Regressions: none. Unchanged failures: none. Flaky/environment failures: none in this run. The one warning is FastAPI/Starlette's existing TestClient `httpx` deprecation; no test was skipped or weakened. The known host native-library static-TLS issue was avoided by executing the prescribed pinned CI environment, without a product workaround.
+
+The coordinator also ran the complete `tools/ci/check.sh` against dependency commit `9c27fb1` in the same pinned image: **803 passed, 6 subtests passed, 10 warnings**, plus **3 console tests passed**. This broad run predates the final additive-engine assertion adjustment; the final revision also requires its own PR CI result.
 
 This receipt verifies current CPU engine compatibility. It does not establish any new physics backend, GPU suitability, cluster capacity, release acceptance or deployment readiness.
 

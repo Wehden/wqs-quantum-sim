@@ -8,9 +8,9 @@ The FluxxedUp proposal describes three device-level backends, rather than an exe
 | --- | --- | --- |
 | Context and requirements | [requirements.md](requirements.md) | Approved on 2026-10-25 |
 | Design | [design.md](design.md) | Approved on 2026-10-25 |
-| Capability discovery | [evidence.md](evidence.md), [probe_lindblad.py](probe_lindblad.py) | Lindblad checks passed; scqubits, JoSIM and CPU/GPU worker-budget discovery pending |
+| Capability discovery | [baseline](discovery/baseline.md), [Lindblad](discovery/lindblad.md), [scqubits](discovery/scqubits.md), [JoSIM](discovery/josim.md), [GPU](discovery/gpu.md) | Current compatibility and all-three constrained CPU references pass; GPU allocation and final contract decisions remain open |
 | Tasks | [tasks.md](tasks.md) | Approved on 2026-10-25 |
-| Implementation | Feature PRs | Baseline and discovery in progress; runtime integration pending |
+| Implementation | Feature PRs | Baseline and discovery probes implemented; runtime integration waits for G1 |
 | Release | Existing guarded CD and live acceptance | Not started |
 
 Specifications stay local for review until implementation, following the established WQS spec workflow. Implementation uses PRs, automatic review, at most two review rounds unless the owner grants an exception, and owner merges. CI defaults to Standpunkt with hosted fallback. Existing backup/bootstrap gates and credentials remain in place.
