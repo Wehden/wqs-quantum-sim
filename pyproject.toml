@@ -3,7 +3,7 @@ name = "qsim"
 version = "0.1.0"
 description = "Authenticated Clifft simulation service orchestrated by SkyPilot"
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi==0.149.0", "uvicorn==0.35.0", "httpx==0.28.1", "pyyaml==6.0.3", "cryptography==50.0.2"]
+dependencies = ["fastapi==0.149.0", "uvicorn==0.35.0", "httpx==0.28.1", "pyyaml==6.0.3", "cryptography==50.0.2", "numpy==2.5.4"]
 
 [project.optional-dependencies]
 backup = [
@@ -20,6 +20,9 @@ worker = [
     "qiskit==2.6.0",
     "qiskit-aer==0.17.2",
     "qiskit-qasm3-import==0.6.0",
+    "qutip==5.3.1; sys_platform == 'linux'",
+    "scqubits==4.3.1; sys_platform == 'linux'",
+    "scipy==1.18.1; sys_platform == 'linux'",
 ]
 controller = ["skypilot[kubernetes]==0.14.0"]
 
@@ -29,3 +32,7 @@ dev = ["pytest==9.1.1", "jsonschema==4.26.0"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.uv]
+# Keep all platforms, while isolating Linux-only physics dependency forks.
+environments = ["sys_platform == 'linux'", "sys_platform != 'linux'"]
