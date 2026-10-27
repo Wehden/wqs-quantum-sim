@@ -1,6 +1,6 @@
 # G1 decisions for owner review
 
-Status: **complete G1 proposal for owner review, not approved for runtime implementation**. Prepared on 2026-10-26 from approved requirements/design, merged PR #38 and the GPU discovery increment in PR #39. All three CPU backends remain required. This packet resolves the implementation choices, including work accounting, internal interfaces and placement identity. Approval freezes these proposed contracts; G2/G3/G4 still require implementation and acceptance evidence. No production backend or resource policy is enabled by this document.
+Status: **G1 approved by the owner on 2026-10-26; runtime implementation authorized in task dependency order**. Prepared on 2026-10-26 from approved requirements/design, merged PR #38 and the GPU discovery increment in PR #39. All three CPU backends remain required. This packet resolves the implementation choices, including work accounting, internal interfaces and placement identity. The approval freezes these contracts; G2/G3/G4 still require implementation and acceptance evidence. No production backend or resource policy is enabled by this document.
 
 Review together: [requirements](requirements.md), [integration design](design.md), [public module exports](interfaces.json), [import boundaries](module-boundaries.json), [task plan](tasks.md) and the linked discovery receipts. The JSON files describe planned Python exports/import permissions, not deployed HTTP schemas.
 
