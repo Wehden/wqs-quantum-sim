@@ -8,7 +8,7 @@ The FluxxedUp proposal describes three device-level backends, rather than an exe
 | --- | --- | --- |
 | Context and requirements | [requirements.md](requirements.md) | Approved on 2026-10-25 |
 | Design | [design.md](design.md) | Approved on 2026-10-25 |
-| Capability discovery | [baseline](discovery/baseline.md), [Lindblad](discovery/lindblad.md), [scqubits](discovery/scqubits.md), [JoSIM](discovery/josim.md), [GPU](discovery/gpu.md) | Current compatibility and all-three constrained CPU references pass; GPU allocation and final contract decisions remain open |
+| Capability discovery | [baseline](discovery/baseline.md), [Lindblad](discovery/lindblad.md), [scqubits](discovery/scqubits.md), [JoSIM](discovery/josim.md), [GPU](discovery/gpu.md) | Current compatibility and all-three constrained CPU references pass; declared-case GPU discovery is complete through SkyPilot. Final G1 contract decisions remain open |
 | Tasks | [tasks.md](tasks.md) | Approved on 2026-10-25 |
 | Implementation | Feature PRs | Baseline and discovery probes implemented; runtime integration waits for G1 |
 | Release | Existing guarded CD and live acceptance | Not started |
