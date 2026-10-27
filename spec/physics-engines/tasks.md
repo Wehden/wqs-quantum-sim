@@ -286,7 +286,7 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - **Recommended Mode:** executor.
 - **Risk:** High: density/ket output and retained-state memory must match the requested solver.
 - **Files/areas:** `qsim/lindblad_adapter.py`, `tests/test_lindblad_evolve.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
-- **Steps:** Implement evolve for SE and ME with the native builder, bounded fixed solver options and named expectations. Implement none/final/all retained-state choices with the approved representation and output estimator. Return arrays and bounded provenance through physics_results. Keep runtime nonconvergence distinct from invalid requests.
+- **Steps:** Implement evolve for SE and ME with the native builder, bounded fixed solver options and named expectations. Implement `store_states=none/final/all` retained-state choices with the G1-12 representation and output estimator, including the explicit `state_times` axis and no hidden full history for final-only output. Return arrays and bounded provenance through physics_results. Keep runtime nonconvergence distinct from invalid requests.
 - **Verification:** Run uv run --frozen --extra worker --extra controller --extra backup pytest -q tests/test_lindblad_evolve.py. Rabi absolute error <=1e-4, T1 relative error <=1e-4 and ringdown relative error <=1e-3; test complex expectations, nonzero first time, trace preservation, output ordering and preallocation failure.
 - **Rollback / Backout:** Remove the unadvertised execution branch; existing engine paths remain unchanged.
 - **Change budget:** max_files=2, max_new_symbols=8, interface_policy=extend-only.
