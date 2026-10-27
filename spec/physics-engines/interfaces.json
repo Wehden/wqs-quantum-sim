@@ -1,0 +1,231 @@
+{
+  "version": "1.0.0",
+  "modules": {
+    "qsim/physics_results.py": {
+      "description": "Pure numeric result/allocation contracts and bounded serialization; safe for API import.",
+      "public_exports": [
+        {
+          "name": "ArraySpec",
+          "kind": "type",
+          "signature": "ArraySpec(name: str, dtype: str, shape: tuple[int, ...], units: str | None)"
+        },
+        {
+          "name": "ResultPlan",
+          "kind": "type",
+          "signature": "ResultPlan(arrays: tuple[ArraySpec, ...], numeric_bytes: int, npz_upper_bytes: int, callback_upper_bytes: int)"
+        },
+        {
+          "name": "AllocationPlan",
+          "kind": "type",
+          "signature": "AllocationPlan(policy_revision: str, algorithm: str, dimensions: dict, allocation_items: tuple, peak_bytes: int, coefficient_plan: dict, result: ResultPlan)"
+        },
+        {
+          "name": "PhysicsExecutionResult",
+          "kind": "type",
+          "signature": "PhysicsExecutionResult(arrays: Mapping[str, numpy.ndarray], metadata: Mapping[str, JsonValue], work: Mapping[str, JsonValue])"
+        },
+        {
+          "name": "plan_result",
+          "kind": "function",
+          "signature": "plan_result(arrays: Sequence[ArraySpec], *, metadata_characters: int, summary_bytes: int) -> ResultPlan"
+        },
+        {
+          "name": "serialize_physics_result",
+          "kind": "function",
+          "signature": "serialize_physics_result(result: PhysicsExecutionResult, plan: ResultPlan) -> tuple[dict, str]"
+        }
+      ],
+      "internal_only": [
+        "_validate_array",
+        "_validate_metadata",
+        "_npz_bytes"
+      ]
+    },
+    "qsim/lindblad_models.py": {
+      "description": "Strict schema-v1 lindblad request models, normalization and preallocation admission; no native solver imports.",
+      "public_exports": [
+        {
+          "name": "LindbladRequest",
+          "kind": "class",
+          "signature": "LindbladRequest(**strict_fields); canonical_envelope() -> dict; admission_plan() -> AllocationPlan"
+        }
+      ],
+      "internal_only": [
+        "_finite",
+        "_shape_products",
+        "_physical_checks"
+      ]
+    },
+    "qsim/scqubits_models.py": {
+      "description": "Strict schema-v1 scqubits request models, normalization and preallocation admission; no native solver imports.",
+      "public_exports": [
+        {
+          "name": "ScqubitsRequest",
+          "kind": "class",
+          "signature": "ScqubitsRequest(**strict_fields); canonical_envelope() -> dict; admission_plan() -> AllocationPlan"
+        }
+      ],
+      "internal_only": [
+        "_finite",
+        "_shape_products",
+        "_physical_checks"
+      ]
+    },
+    "qsim/josim_models.py": {
+      "description": "Strict schema-v1 josim request models, normalization and preallocation admission; no native solver imports.",
+      "public_exports": [
+        {
+          "name": "JoSIMRequest",
+          "kind": "class",
+          "signature": "JoSIMRequest(**strict_fields); canonical_envelope() -> dict; admission_plan() -> AllocationPlan"
+        }
+      ],
+      "internal_only": [
+        "_finite",
+        "_shape_products",
+        "_physical_checks"
+      ]
+    },
+    "qsim/lindblad_model.py": {
+      "description": "Native operators, states and certified segmented numeric coefficients, isolated child only.",
+      "public_exports": [
+        {
+          "name": "NativeLindbladModel",
+          "kind": "type",
+          "signature": "NativeLindbladModel(hamiltonian, collapse_operators, initial_state, tensor_order, coefficient_segments, allocation_plan)"
+        },
+        {
+          "name": "build_lindblad_model",
+          "kind": "function",
+          "signature": "build_lindblad_model(request: LindbladRequest, plan: AllocationPlan) -> NativeLindbladModel"
+        }
+      ],
+      "internal_only": [
+        "_tensor_operators",
+        "_initial_state",
+        "_collapse_operators",
+        "_coefficient_segments"
+      ]
+    },
+    "qsim/lindblad_adapter.py": {
+      "description": "Pinned native evolution/static adapters and child-local work accounting; no queue or callback authority.",
+      "public_exports": [
+        {
+          "name": "run_lindblad",
+          "kind": "function",
+          "signature": "run_lindblad(request: LindbladRequest, plan: AllocationPlan, *, execution_context: Mapping) -> PhysicsExecutionResult"
+        }
+      ],
+      "internal_only": [
+        "_AccountedVern7",
+        "_work_ledger",
+        "_run_evolve",
+        "_run_mc",
+        "_run_propagator",
+        "_run_static"
+      ]
+    },
+    "qsim/scqubits_adapter.py": {
+      "description": "Class-specific native diagonalization and same-basis operator/export handling in the isolated child.",
+      "public_exports": [
+        {
+          "name": "run_scqubits",
+          "kind": "function",
+          "signature": "run_scqubits(request: ScqubitsRequest, plan: AllocationPlan, *, execution_context: Mapping) -> PhysicsExecutionResult"
+        }
+      ],
+      "internal_only": [
+        "_native_constructor",
+        "_eigensystem",
+        "_operator_matrices",
+        "_matrix_mode_export"
+      ]
+    },
+    "qsim/josim_validation.py": {
+      "description": "Positive normalized netlist grammar and semantic/reference/size checks without invoking native code.",
+      "public_exports": [
+        {
+          "name": "validate_josim_netlist",
+          "kind": "function",
+          "signature": "validate_josim_netlist(text: str) -> tuple[str, Mapping[str, JsonValue]]"
+        }
+      ],
+      "internal_only": [
+        "_numeric_token",
+        "_normalize_lines",
+        "_statement_allowlist"
+      ]
+    },
+    "qsim/josim_adapter.py": {
+      "description": "Trusted fixed executable/argv, private scratch and bounded SI trace parsing inside the numerical boundary.",
+      "public_exports": [
+        {
+          "name": "run_josim",
+          "kind": "function",
+          "signature": "run_josim(request: JoSIMRequest, plan: AllocationPlan, *, execution_context: Mapping) -> PhysicsExecutionResult"
+        }
+      ],
+      "internal_only": [
+        "_native_argv",
+        "_scratch",
+        "_parse_selected_traces"
+      ]
+    },
+    "qsim/physics_submission.py": {
+      "description": "Physics-only route normalization, model selection and canonical identity; legacy circuit path remains independent.",
+      "public_exports": [
+        {
+          "name": "NormalizedPhysicsRequest",
+          "kind": "type",
+          "signature": "NormalizedPhysicsRequest(request: LindbladRequest | ScqubitsRequest | JoSIMRequest, canonical_envelope: Mapping)"
+        },
+        {
+          "name": "ValidatedPhysicsRequest",
+          "kind": "type",
+          "signature": "ValidatedPhysicsRequest(normalized: NormalizedPhysicsRequest, allocation_plan: AllocationPlan, dispatch_context: Mapping)"
+        },
+        {
+          "name": "normalize_physics_submission",
+          "kind": "function",
+          "signature": "normalize_physics_submission(payload: Mapping, *, explicit_engine: str | None = None) -> NormalizedPhysicsRequest"
+        },
+        {
+          "name": "admit_physics_request",
+          "kind": "function",
+          "signature": "admit_physics_request(normalized: NormalizedPhysicsRequest, *, policy: Mapping) -> ValidatedPhysicsRequest"
+        },
+        {
+          "name": "canonical_physics_request",
+          "kind": "function",
+          "signature": "canonical_physics_request(normalized: NormalizedPhysicsRequest) -> str"
+        },
+        {
+          "name": "physics_schema",
+          "kind": "function",
+          "signature": "physics_schema(engine: str, schema_version: int) -> dict"
+        },
+        {
+          "name": "physics_capabilities",
+          "kind": "function",
+          "signature": "physics_capabilities(enabled_certificates: Mapping) -> Mapping[str, dict]"
+        }
+      ],
+      "internal_only": [
+        "_physics_validation_error"
+      ]
+    },
+    "qsim/settings.py": {
+      "description": "Additive pure server-policy resolver. Existing settings exports remain unchanged; this function performs no scheduling and returns no credentials.",
+      "public_exports": [
+        {
+          "name": "physics_execution_profile",
+          "kind": "function",
+          "signature": "physics_execution_profile(engine: str, operation: str, *, admission_policy_revision: str) -> Mapping[str, JsonValue]"
+        }
+      ],
+      "internal_only": [
+        "_certified_physics_profiles"
+      ]
+    }
+  }
+}
