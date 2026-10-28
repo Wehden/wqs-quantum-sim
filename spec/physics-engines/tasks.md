@@ -749,21 +749,34 @@ All GPU discovery and runtime execution must be scheduled through the existing S
 
 The owner-approved test budget is $25 total. Use a test-owned SkyPilot Runpod allocation with automatic teardown and explicit cleanup through SkyPilot on provisioning/setup failure. Preserve existing local GPU consumers and credentials. Keep numerical child limits unchanged for the first hardware probes; the fixed higher-address-space initialization sweep is diagnostic only, not authorization to relax numerical isolation. Laminar PR #170 was merged and the NVIDIA resource-selection correction applied; local cards still have existing consumers.
 
-### Initial execution receipt
+### Execution checklist reconciled, 2026-10-27
 
 Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b62342337399b17373c3`; dependency commit `9c27fb1` contains TASK-001 before the three parallel backend executors started in the same worktree. Each executor wrote only its disjoint lease; the coordinator owns this status and README.
 
 | Task | Current evidence and state |
 | --- | --- |
 | TASK-001 | Complete: [baseline](discovery/baseline.md), 96 focused tests. Full pinned-image check: 803 Python tests, 6 subtests and 3 console tests pass. Additive capability engine entries remain allowed. |
-| TASK-002 | [Constrained CPU reference complete](discovery/lindblad.md). Pulse/work ceilings, final per-operation bounds and shape decisions remain explicit G1 inputs. |
+| TASK-002 | [Constrained CPU reference complete](discovery/lindblad.md). Pulse/work ceilings, per-operation bounds and shape decisions were accepted with G1 on 2026-10-26; native implementation evidence remains required. |
 | TASK-003 | [CPU discovery complete](discovery/scqubits.md): all four classes, 16 operator pairs, 12 execution fixtures and four dimension refusals. |
 | TASK-004 | [Native discovery complete](discovery/josim.md): real SFQ physics, safe-subset prototype and deterministic native seed checks. Distribution/license closure belongs to dependency/image tasks. |
 | TASK-005 | [Declared-case discovery complete](discovery/gpu.md): SkyPilot RTX4090 run passed 48 CPU and 48 GPU-candidate comparisons under approved separate bounds. Native scqubits kernels were slower at measured sizes; tested QuTiP paths fell back to CPU. Production GPU acceptance remains gated. |
-| TASK-006 | Complete G1 proposal: decisions, export/import artifacts, work-accounting proof and traceability prepared for owner review. G1 approval pending; runtime contracts not yet approved. |
-| TASK-007 onward | Not started. Runtime integration and production activation remain gated by G1. |
+| TASK-006 | Complete: the owner approved the G1 contracts, work accounting and sequencing amendment on 2026-10-26. See [decisions](decisions.md) and the approval record below. |
+| TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
+| TASK-008 | Implemented in PR #42: bounded numeric result serialization, 75 focused tests. Awaiting merge to main. |
+| TASK-017 | Staged request schema and validation implemented in PR #43, merged into PR #42's branch. 129 focused tests passed. Native allocation certificates and execution integration remain pending; the backend is not enabled. |
+| TASK-020 | Staged JoSIM schema and positive netlist validation implemented in PR #44, merged into PR #42's branch. 138 focused tests passed. Native workspace certification and execution integration remain pending; the backend is not enabled. |
+| TASK-009 through TASK-016 | Not started. Next Lindblad lane begins with strict request models, followed by native operators, states and solvers in dependency order. |
+| TASK-018, TASK-019 | Not started. Native scqubits spectra/matrix elements follow the shared result boundary and staged schema; export also waits for TASK-016. |
+| TASK-021 | Not started. Native JoSIM execution follows the shared result boundary and staged validation. |
+| TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
-The initial discovery PR combines the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
+The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
+
+### Foundation integration receipt, 2026-10-27
+
+PR #41 reached main at merge commit `67f281d`. PRs #43 and #44 were merged into `codex/physics-results`, not directly into main; PR #42 carries their staged schemas together with TASK-008. PR #42 now targets main and includes main's ancestry. Its merge remains the owner's action. This checklist update is coordinator-owned and adds no runtime interface or implementation lease.
+
+The frozen combined serializer/scqubits/JoSIM source passed 1,149 Python tests, 6 subtests and 3 console tests in a nonroot 2-CPU/4-GiB CI container; the explicit project interpreter checked 146 compatible packages. Fresh PR CI must pass for the reconciled head. These results establish the shared result boundary and staged validation only, not native runtime acceptance. G1 is approved; G2 CPU integration, G3 GPU decisions and G4 release acceptance remain open. No new implementation lane has started in this reconciliation.
 
 ### Commands and evidence
 
@@ -771,7 +784,7 @@ Existing main commands are `bash tools/ci/check.sh`, `bash tools/ci/check-worker
 
 Use the pinned CI runner environment. The recent dependency work exposed a host-specific OpenMP static-TLS loader mismatch outside that environment; do not weaken numerical tests, change product resource limits or ship host preload hacks to mask it. Hardware tests have a separate trusted configuration and must report actual execution or an explicit unavailable outcome.
 
-Baseline circuit dependencies include Clifft 0.12.0, Google qsim 0.22.1, Qiskit 2.6.0 and Aer 0.17.2. Candidate physics pins remain discovery inputs until TASK-006/007 confirms the combined image. CUDA/library presence alone is not GPU acceptance. Resource snapshots are not reservations.
+Baseline circuit dependencies include Clifft 0.12.0, Google qsim 0.22.1, Qiskit 2.6.0 and Aer 0.17.2. TASK-007 records the selected combined CPU physics pins and footprint evidence. Final worker packaging and native allocation certificates remain later tasks. CUDA/library presence alone is not GPU acceptance. Resource snapshots are not reservations.
 
 The existing source has a 3 GiB numerical-child RLIMIT_AS and a 12 MiB RLIMIT_FSIZE. The result field allows 12 MiB of base64, the HTTP body 16 MiB and summary JSON 2 MiB. Count complete output JSON/file overhead as well as arrays and archive overhead. GPU virtual address requirements and VRAM need explicit treatment; no blanket removal of isolation limits is authorized.
 
@@ -835,3 +848,9 @@ After reviewing the SkyPilot RTX4090 initialization sweep, the owner approved th
 The packet now records source-pinned vern7 per-call bounds and cumulative job accounting without a new job-wide cutoff; strict internal exports/import boundaries; explicit result/model/profile contracts; all-three CPU scope and the measured GPU matrix. The CPU-only wrapper prototype and its bounded exhaustion/MC-repeat checks passed in a 2-CPU/4-GiB container. No production runtime, dependency lock, deployment or existing credential was changed by this packet pass. A separate correction of PR #39 timing evidence reran the already-approved fixed GPU cases through SkyPilot and verified teardown; existing GPU workloads were preserved. The owner approved the complete G1 packet on 2026-10-26 and authorized TASK-007 onward in dependency order. Native certificate/pulse/license and combined-image tests remain mandatory G2/G3 acceptance, not unresolved design choices.
 
 The proposed G1 sequencing amendment makes TASK-024 depend on TASK-026, so the existing settings/store lease installs pure profile resolution and nullable profile metadata before API admission begins writing it. There is no cycle: TASK-026 depends on 005/006/023, not 024. File/write budgets are unchanged. The owner approved this ordering amendment with the G1 packet on 2026-10-26.
+
+### Implementation handoff, 2026-10-26
+
+TASK-007 passed its frozen combined environment, all 807 Python tests/6 subtests/3 console tests, and actual API/worker image checks; its detailed evidence is in [dependencies](discovery/dependencies.md). TASK-008 may now proceed. Coordinator contract correction: allow Python's standard-library `base64` in `physics_results.py`, required by the already-approved artifact encoding contract. This adds no native dependency, public export or resource authority. The coordinator owns only this task-status entry and the matching import-boundary artifact; TASK-008 retains its separate two-file/eight-symbol implementation lease.
+
+TASK-008 passed its isolated full canonical CI (882 Python tests, 6 subtests and 3 console tests) and 75 focused constrained result tests. The implementation has six approved exports and eight class/function declarations, including exact NPZ/base64/summary/callback byte validation. This result boundary does not activate a backend or waive native allocation certificates.

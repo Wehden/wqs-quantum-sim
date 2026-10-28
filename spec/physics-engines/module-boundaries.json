@@ -17,7 +17,8 @@
         "enum",
         "functools",
         "operator",
-        "numpy"
+        "numpy",
+        "base64"
       ],
       "forbidden_imports_from": [
         "qutip",
