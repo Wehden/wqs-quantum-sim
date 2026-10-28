@@ -749,7 +749,7 @@ All GPU discovery and runtime execution must be scheduled through the existing S
 
 The owner-approved test budget is $25 total. Use a test-owned SkyPilot Runpod allocation with automatic teardown and explicit cleanup through SkyPilot on provisioning/setup failure. Preserve existing local GPU consumers and credentials. Keep numerical child limits unchanged for the first hardware probes; the fixed higher-address-space initialization sweep is diagnostic only, not authorization to relax numerical isolation. Laminar PR #170 was merged and the NVIDIA resource-selection correction applied; local cards still have existing consumers.
 
-### Execution checklist reconciled, 2026-10-27
+### Execution checklist reconciled, 2026-10-28
 
 Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b62342337399b17373c3`; dependency commit `9c27fb1` contains TASK-001 before the three parallel backend executors started in the same worktree. Each executor wrote only its disjoint lease; the coordinator owns this status and README.
 
@@ -762,21 +762,33 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-005 | [Declared-case discovery complete](discovery/gpu.md): SkyPilot RTX4090 run passed 48 CPU and 48 GPU-candidate comparisons under approved separate bounds. Native scqubits kernels were slower at measured sizes; tested QuTiP paths fell back to CPU. Production GPU acceptance remains gated. |
 | TASK-006 | Complete: the owner approved the G1 contracts, work accounting and sequencing amendment on 2026-10-26. See [decisions](decisions.md) and the approval record below. |
 | TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
-| TASK-008 | Implemented in PR #42: bounded numeric result serialization, 75 focused tests. Awaiting merge to main. |
-| TASK-017 | Staged request schema and validation implemented in PR #43, merged into PR #42's branch. 129 focused tests passed. Native allocation certificates and execution integration remain pending; the backend is not enabled. |
-| TASK-020 | Staged JoSIM schema and positive netlist validation implemented in PR #44, merged into PR #42's branch. 138 focused tests passed. Native workspace certification and execution integration remain pending; the backend is not enabled. |
-| TASK-009 through TASK-016 | Not started. Next Lindblad lane begins with strict request models, followed by native operators, states and solvers in dependency order. |
-| TASK-018, TASK-019 | Not started. Native scqubits spectra/matrix elements follow the shared result boundary and staged schema; export also waits for TASK-016. |
-| TASK-021 | Not started. Native JoSIM execution follows the shared result boundary and staged validation. |
+| TASK-008 | Complete, merged to main through PR #42: bounded numeric result serialization and 75 focused tests. |
+| TASK-017 | Staged request schema and validation implemented in PR #43, merged into main through PR #42. 129 focused tests passed. Native allocation certificates and execution integration remain pending; the backend is not enabled. |
+| TASK-020 | Staged JoSIM schema and positive netlist validation implemented in PR #44, merged into main through PR #42. 138 focused tests passed. Native workspace certification and execution integration remain pending; the backend is not enabled. |
+| TASK-009 | Strict Lindblad request models and bounded validation implemented in this increment; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
+| TASK-010 through TASK-016 | Not started. Native Lindblad operators, states, pulses and solvers follow the request-model lane in dependency order. |
+| TASK-018 | Native spectra/matrix-elements stage implemented in PR #45, awaiting merge. All four classes and 16 operators tested, including maximum basis sizes. Public execution remains blocked by missing native allocation certificates. |
+| TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
+| TASK-021 | Native transient stage implemented in PR #46, awaiting merge. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
 | TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
 
 ### Foundation integration receipt, 2026-10-27
 
-PR #41 reached main at merge commit `67f281d`. PRs #43 and #44 were merged into `codex/physics-results`, not directly into main; PR #42 carries their staged schemas together with TASK-008. PR #42 now targets main and includes main's ancestry. Its merge remains the owner's action. This checklist update is coordinator-owned and adds no runtime interface or implementation lease.
+PR #41 reached main at merge commit `67f281d`. PRs #43 and #44 first merged into `codex/physics-results`; PR #42 then brought their staged schemas, TASK-008 and the reconciled checklist to main at `d39650e`. Before starting the next lanes on 2026-10-28, the coordinator verified #42's final head `319547b` was an ancestor of main and its source tree matched main exactly. This checklist update is coordinator-owned and adds no runtime interface or implementation lease.
 
-The frozen combined serializer/scqubits/JoSIM source passed 1,149 Python tests, 6 subtests and 3 console tests in a nonroot 2-CPU/4-GiB CI container; the explicit project interpreter checked 146 compatible packages. Fresh PR CI must pass for the reconciled head. These results establish the shared result boundary and staged validation only, not native runtime acceptance. G1 is approved; G2 CPU integration, G3 GPU decisions and G4 release acceptance remain open. No new implementation lane has started in this reconciliation.
+The frozen combined serializer/scqubits/JoSIM source passed 1,149 Python tests, 6 subtests and 3 console tests in a nonroot 2-CPU/4-GiB CI container; the explicit project interpreter checked 146 compatible packages. PR #42 passed fresh CI and current-head automatic review before its merge. These results establish the shared result boundary and staged validation only, not native runtime acceptance. G1 is approved; G2 CPU integration, G3 GPU decisions and G4 release acceptance remain open. The owner authorized the next disjoint implementation lanes after the main verification.
+
+### Parallel implementation receipt, 2026-10-28
+
+TASK-009 owns only `qsim/lindblad_models.py` and `tests/test_lindblad_models.py` (two files, 38 production declarations against a 48-declaration budget). TASK-018 owns only `qsim/scqubits_adapter.py` and `tests/test_scqubits_execution.py` (two files, five declarations against an eight-declaration budget). TASK-021 owns only `qsim/josim_adapter.py` and `tests/test_josim_execution.py` (two files, three declarations against an eight-declaration budget). All lanes start from main `d39650e` and have disjoint writes. The coordinator owns checklist/design status updates and publication; executors do not change shared integration files, dependencies or production settings.
+
+TASK-009 passed 186 focused schema, canonicalization, physical validation and result-planning tests with no skips or warnings under the constrained CPU profile. It preserves canonical requests before physical admission, bounded API-only NumPy checks, escaped semantic pointers and explicit missing-certificate refusal. The native builder must recover a ket for accepted physically pure density inputs to SE/MC; no canonical input state is repaired or rewritten. TASK-018 passed 45 native execution tests, 129 schema tests and 75 shared result tests under the existing constrained CPU profile. TASK-021 passed 22 execution tests with the real pinned discovery binary, 138 validation/security tests and 75 shared result tests. Both junction SFQ integrals meet the 2% tolerance; all 999 returned rows and five traces are preserved. An independent coordinator repeat of both lanes passed 409 tests with no skips in the frozen combined environment. Ordinary CI without the JoSIM test binary explicitly skips its single native fixture; that skip is not native acceptance. The separate constrained real-binary test provides numerical evidence.
+
+Public adapter entry points reproduce admission and remain closed while native allocation certificates are missing. Native helpers are tested directly without mocking admission. TASK-022 must derive an exact JoSIM result plan from verified actual rows within the admitted ceiling before serialization. TASK-023 must establish the production binary identity and complete native distribution obligations. No new route, native capability advertisement, GPU allocation or production release is included.
+
+The coordinator then ran the canonical combined CI command against all six frozen source/test files: 1,402 Python tests, 6 subtests and 3 console tests passed, with no skips, in 118.21 seconds for pytest. The real pinned JoSIM binary was present for this run. Explicit interpreter dependency verification checked all 146 installed packages successfully. Each PR still requires its own current-head automatic review and required CI checks; this combined result does not replace those merge gates.
 
 ### Commands and evidence
 
