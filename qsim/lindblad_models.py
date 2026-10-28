@@ -422,7 +422,7 @@ class LindbladRequest(_Base):
                     _error(pointer + '/index', 'Fock index outside mode')
                 if factor.kind == 'coherent':
                     amplitude = complex(factor.amplitude.re, factor.amplitude.im)
-                    if abs(amplitude) > math.sqrt(np.finfo(float).max):
+                    if math.hypot(amplitude.real, amplitude.imag) > math.sqrt(np.finfo(float).max):
                         _error(pointer + '/amplitude', 'unrepresentable coherent occupation')
                 if factor.kind == 'thermal':
                     if factor.occupation < 0:

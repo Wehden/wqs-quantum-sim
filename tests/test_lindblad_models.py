@@ -562,3 +562,13 @@ def test_complex_sample_magnitude_and_hc_overflow_bounds(sample, amplitude):
                               'envelope': {'shape': 'sampled', 'times': [0, 1], 'values': [sample, sample]}}]
     with pytest.raises(ValueError, match='drive strength'):
         LindbladRequest(**body)._physical_checks()
+
+
+def test_coherent_component_magnitude_overflow_has_semantic_pointer():
+    body = payload()
+    body['initial_state'] = {'kind': 'product', 'modes': {
+        'q': {'kind': 'coherent', 'amplitude': {'re': 1.7e308, 'im': 1.7e308}}}}
+    request = LindbladRequest(**body)
+    with pytest.raises(ValueError, match='coherent occupation') as caught:
+        request.admission_plan()
+    assert caught.value.pointer == '/initial_state/modes/q/amplitude'
