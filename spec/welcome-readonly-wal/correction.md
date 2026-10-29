@@ -42,3 +42,9 @@ The bounded implementation adds store.keep_wal_available and wraps native-admin 
 Focused verification passed86 tests: WAL lifecycle, management provider, welcome provider/evidence and legacy approvals. Six new lifecycle cases include normal/exception shutdown with notification enabled/disabled, query-only write refusal, and independent writer commit plus TRUNCATE checkpoint visibility. On hosts enforcing a directory write refusal SQLite may return SQLITE_READONLY_DIRECTORY rather than the production read-only mount's SQLITE_CANTOPEN; both are the same missing-sidecar precondition, and the actual mount was independently tested.
 
 A separate network-disabled container using the immutable published welcome image and a genuine read-only bind successfully read a synthetic database while the actual new helper retained sidecars, then observed an independent committed insert after a successful TRUNCATE checkpoint. Closing the helper removed the sidecars. No production data was used. Deployment, merge and source promotion remain pending final review and the owner-approved path.
+
+## Review completion and remaining ship gate
+
+Implementation source is frozen at cb84dd6d5ef4aa0187033c5c483ee247d6f43f94. Root coordinated independent test, simplification, security, docs and final correctness reviews, all PASS with no findings. The independent test review reported150 targeted tests, genuine read-only container verification and cancellation cleanup proof. See verification.md and post-execution-log.md.
+
+The branch is ready for source PR and required CI. WQS manual merge preference remains in force. Registry publication, the exact native-admin image-only promotion and central activation remain the final concrete ship gate; this packet does not declare activation completed or bootstrap verification satisfied.
