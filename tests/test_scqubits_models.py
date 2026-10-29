@@ -354,7 +354,11 @@ plan = r._result_plan(r._physical_checks())
 summary, artifact = serialize_physics_result(result, plan)
 assert len(artifact) <= plan.callback_upper_bytes
 assert result.arrays['eigenvalues'].shape == (32,)
-assert resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024 < 512*1024**2
+# Linux ru_maxrss can retain the old pre-exec address-space peak.
+with open('/proc/self/status', encoding='ascii') as status:
+    peak = next(line.split() for line in status if line.startswith('VmHWM:'))
+assert peak[2] == 'kB'
+assert int(peak[1]) * 1024 < 512*1024**2
 '''
     subprocess.run([sys.executable, '-c', code, json.dumps(body)], check=True,
                    env={**os.environ, 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1',
