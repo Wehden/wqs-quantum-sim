@@ -45,6 +45,12 @@ and grants no access. Original `SENT` means SMTP acceptance, not inbox delivery.
 ## Evidence and mapping
 
 The process opens the existing SQLite database with `mode=ro` and `query_only`.
+The native admin retains one query-only SQLite connection for its service lifetime
+so WAL sidecars remain available to the provider's read-only mount. This connection
+holds no transaction between reads and does not prevent writer commits or WAL
+checkpoints. Start the native admin before checking welcome readiness. If it stops
+and SQLite removes the sidecars, welcome evidence can become unavailable until the
+owner restarts; do not change the provider mount to writable or use `immutable=1`.
 It reads request metadata and compares an approved request's hash internally with
 an active identity in a fresh Kubernetes Secret GET. It brackets observations
 with another registry read and detects concurrent mapping changes, retrying once.

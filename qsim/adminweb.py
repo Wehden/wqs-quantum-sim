@@ -159,12 +159,15 @@ async def notification_loop():
 async def lifespan(app):
     store.init()
     signer();cipher()  # Fail startup if the private key material is missing/invalid.
-    task=asyncio.create_task(notification_loop()) if os.environ.get('QSIM_NOTIFY','1')=='1' else None
-    yield
-    if task:
-        task.cancel()
-        try:await task
-        except asyncio.CancelledError:pass
+    with store.keep_wal_available():
+        task=asyncio.create_task(notification_loop()) if os.environ.get('QSIM_NOTIFY','1')=='1' else None
+        try:
+            yield
+        finally:
+            if task:
+                task.cancel()
+                try:await task
+                except asyncio.CancelledError:pass
 
 
 app=FastAPI(lifespan=lifespan,docs_url=None,redoc_url=None,openapi_url=None)
