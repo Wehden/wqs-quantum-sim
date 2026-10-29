@@ -85,6 +85,20 @@ def init():
 
 
 @contextlib.contextmanager
+def keep_wal_available():
+    """Keep SQLite sidecars available to separate read-only welcome processes."""
+    db = sqlite3.connect(settings.DATA / "jobs.sqlite3", timeout=30)
+    try:
+        db.execute("PRAGMA query_only=ON").close()
+        cursor = db.execute("SELECT count(*) FROM sqlite_master")
+        cursor.fetchone()
+        cursor.close()
+        yield
+    finally:
+        db.close()
+
+
+@contextlib.contextmanager
 def connect():
     db = sqlite3.connect(settings.DATA / "jobs.sqlite3", timeout=30)
     db.row_factory = sqlite3.Row

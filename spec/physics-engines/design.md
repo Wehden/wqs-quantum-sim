@@ -1,6 +1,6 @@
 # Integration design
 
-Status: the base design was approved on 2026-10-25. This **complete G1 amendment is proposed for owner review**, not runtime implementation or production activation. The detailed choices, evidence and PHY-001 through PHY-020 traceability are in [decisions.md](decisions.md). Requirements remain unchanged. Approval accepts the proposed pulse deferrals and work policy; later gates still require runtime evidence.
+Status: the base design was approved on 2026-10-25. The owner approved this **complete G1 amendment on 2026-10-26** and authorized implementation in task dependency order. Production activation remains subject to the later acceptance gates. The detailed choices, evidence and PHY-001 through PHY-020 traceability are in [decisions.md](decisions.md). Requirements remain unchanged. Approval accepts the proposed pulse deferrals and work policy; later gates still require runtime evidence.
 
 ## Overview
 
@@ -114,7 +114,7 @@ G1 owner review freezes this proposal. TASK-007 onward then implements all three
 
 ## Open Design Questions
 
-No work-accounting or internal-interface choice remains delegated to implementation. Owner review is pending for the proposed pulse deferrals, native per-call/cumulative-accounting policy and initial CPU-only production enable matrix. Largest-shape certificates, native licenses, pulse convergence, combined-image behavior and live acceptance are named evidence gates; their absence prevents activation and is not permission to improvise a new algorithm or resource profile.
+No work-accounting or internal-interface choice remains delegated to implementation. The owner approved the pulse deferrals, native per-call/cumulative-accounting policy and initial CPU-only execution recommendation with G1 on 2026-10-26. Largest-shape certificates, native licenses, pulse convergence, combined-image behavior and live acceptance are named evidence gates; their absence prevents activation and is not permission to improvise a new algorithm or resource profile.
 
 ## Simplicity Budget
 
