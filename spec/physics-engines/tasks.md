@@ -1,8 +1,8 @@
 # Implementation task plan: physics engines
 
-Status: **approved for implementation on 2026-10-25**. The owner approved the task plan and parallel System2 execution within write leases. Execution starts with TASK-001, followed by TASK-002 through TASK-004 in parallel and TASK-005 after its CPU references pass. All three backends and useful GPU acceleration remain in scope. Deployment remains subject to the existing acceptance gates. The owner approved the JoSIM bounded-history design direction on 2026-10-28; new TASK-035/036 below are prepared for task-plan review and are not yet approved for implementation.
+Status: **approved for implementation on 2026-10-25**. The owner approved the task plan and parallel System2 execution within write leases. Execution starts with TASK-001, followed by TASK-002 through TASK-004 in parallel and TASK-005 after its CPU references pass. All three backends and useful GPU acceleration remain in scope. Deployment remains subject to the existing acceptance gates. The JoSIM bounded-history design and TASK-035/036 execution plan are approved. The owner confirmed that existing approval on 2026-10-30; the earlier pending-approval labels were stale.
 
-Prepared with System2 1.1.1 `task-planner`, scoped to the existing `spec/physics-engines` directory. Planning baseline: current main `83ffac2ebc55423cc804b62342337399b17373c3`, which includes merged PRs #34, #35 and #36. The approved requirements/design remain unchanged. This plan replaces the earlier PHY-T01 through PHY-T12 outline with atomic TASK IDs.
+Prepared with System2 1.1.1 `task-planner`, scoped to the existing `spec/physics-engines` directory. Original planning baseline: main `83ffac2ebc55423cc804b62342337399b17373c3`, which includes merged PRs #34, #35 and #36. The approved requirements/design remain unchanged. This plan replaces the earlier PHY-T01 through PHY-T12 outline with atomic TASK IDs.
 
 ## Task Graph Overview (short)
 
@@ -730,7 +730,7 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ### TASK-035: Prove the native JoSIM history dependencies
 
 - **Goal:** Derive the smallest retained state that preserves the admitted native solver and output semantics before changing native code.
-- **Dependencies:** Existing TASK-004/020/021 stages; owner-approved bounded-history design amendment on 2026-10-28. This task plan awaits implementation approval.
+- **Dependencies:** Existing TASK-004/020/021 stages and the approved bounded-history design/task plan. The owner confirmed execution approval on 2026-10-30.
 - **Requirements:** PHY-005, PHY-011, PHY-012, PHY-013, PHY-016, PHY-018.
 - **Recommended Mode:** test-engineer.
 - **Risk:** High: discarding history used by integration or output interpolation can silently change the simulated physics.
@@ -749,7 +749,7 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ### TASK-036: Patch and verify bounded native JoSIM history
 
 - **Goal:** Implement the audited retention policy with unchanged numerical/output semantics and a source-derived memory bound independent of internal step count.
-- **Dependencies:** TASK-035 passes and the owner approves this task plan for implementation (approval pending). A failed audit requires a new design decision.
+- **Dependencies:** TASK-035 passes under the already-approved execution plan. A failed audit requires a new design decision.
 - **Requirements:** PHY-005, PHY-011, PHY-012, PHY-013, PHY-016, PHY-018.
 - **Recommended Mode:** executor.
 - **Risk:** High: native lifetime changes can corrupt retry state, alter output or retain hidden allocations.
@@ -791,7 +791,7 @@ All GPU discovery and runtime execution must be scheduled through the existing S
 
 The owner-approved test budget is $25 total. Use a test-owned SkyPilot Runpod allocation with automatic teardown and explicit cleanup through SkyPilot on provisioning/setup failure. Preserve existing local GPU consumers and credentials. Keep numerical child limits unchanged for the first hardware probes; the fixed higher-address-space initialization sweep is diagnostic only, not authorization to relax numerical isolation. Laminar PR #170 was merged and the NVIDIA resource-selection correction applied; local cards still have existing consumers.
 
-### Execution checklist reconciled, 2026-10-28
+### Execution checklist reconciled, 2026-10-30
 
 Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b62342337399b17373c3`; dependency commit `9c27fb1` contains TASK-001 before the three parallel backend executors started in the same worktree. Each executor wrote only its disjoint lease; the coordinator owns this status and README.
 
@@ -805,15 +805,15 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-006 | Complete: the owner approved the G1 contracts, work accounting and sequencing amendment on 2026-10-26. See [decisions](decisions.md) and the approval record below. |
 | TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
 | TASK-008 | Complete, merged to main through PR #42: bounded numeric result serialization and 75 focused tests. |
-| TASK-017 | Staged request schema and validation implemented in PR #43, merged into main through PR #42. 129 focused tests passed. Native allocation certificate and consumer integration are published as PR #50 and awaiting CI/merge; the backend is not enabled. |
-| TASK-020 | Staged JoSIM schema and positive netlist validation implemented in PR #44, merged into main through PR #42. 138 focused tests passed. Native workspace certification is blocked by adaptive internal-history retention; see [evidence and approved design](discovery/josim-workspace.md). TASK-035/036 planning is prepared for review; the backend is not enabled. |
+| TASK-017 | Complete request-model stage for all four classes and three operations. Schema/validation reached main through PR #42; PR #50 adds the source/algorithm allocation certificate for spectra and matrix elements. Export admission remains gated by TASK-019. Worker/API activation and final image acceptance remain open. |
+| TASK-020 | Partial: schema and positive netlist validation reached main through PR #42, with the small-output/adaptive-history regression added by PR #51. Native workspace certification waits for approved TASK-035/036; see [evidence and design](discovery/josim-workspace.md). The backend is not enabled. |
 | TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
-| TASK-010 | Native static Hamiltonian/operator implementation in progress on verified main; published as PR #49; merge and required CI remain pending. |
+| TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. Lindblad states, collapse channels, pulses and solvers remain later tasks. |
 | TASK-011 through TASK-016 | Not started. States, pulses and solvers follow the native operator lane in dependency order. |
-| TASK-018 | Native spectra/matrix-elements stage merged in PR #45. All four classes and 16 operators tested, including maximum basis sizes. The certificate consumer is implemented in the next batch, PR #50; worker/API integration and final image acceptance remain gated. |
+| TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
 | TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
-| TASK-035/036 | Bounded-history design approved on 2026-10-28; this implementation plan awaits owner review. Neither audit harness nor native patch has been implemented. |
+| TASK-035/036 | Approved for execution; owner confirmed the existing approval on 2026-10-30. TASK-035 is ready alongside TASK-011 under disjoint leases. TASK-036 follows a successful audit. Neither the audit harness nor native patch has been implemented. |
 | TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
@@ -838,7 +838,7 @@ The coordinator then ran the canonical combined CI command against all six froze
 
 Main `fbab28c020377396daa0b3bb2f150ee7791cd056` contains PRs #45, #46, #47 and the separate LaminarAuth-owned PR #48. PR #46 head `f82ac6b4a4192895eaa4d78efbfddedafe3c343e` is an ancestor of main and has the same source tree. The coordinator verified these facts before opening the next disjoint leases: TASK-010 operators, TASK-017 allocation proof and TASK-020 workspace discovery. TASK-018 consumes the certificate within its existing separate adapter/test lease. Production routes and capabilities remain unchanged.
 
-The JoSIM audit found that the output-row bound does not bound native adaptive history. Two independent constrained runs reproduced roughly 11 MiB versus 98 MiB peak child RSS with the same 1,000 output rows. The source audit and explicit small-output regression preserve admission refusal. The owner approved the bounded-history design direction and requested an implementation plan. TASK-035 and TASK-036 above are that plan, pending approval to execute. They serialize on the probe path; unrelated Lindblad/scqubits leases can continue. No native patch, resource allocation, credential change or release-gate change is authorized by this planning record.
+The JoSIM audit found that the output-row bound does not bound native adaptive history. Two independent constrained runs reproduced roughly 11 MiB versus 98 MiB peak child RSS with the same 1,000 output rows. The source audit and explicit small-output regression preserve admission refusal. The owner approved the bounded-history design direction and requested an implementation plan. TASK-035 and TASK-036 above are that plan. Its execution approval is confirmed in the 2026-10-30 reconciliation below. They serialize on the probe path; unrelated Lindblad/scqubits leases can continue. That discovery/planning increment implemented no native patch and changed no resources, credentials or release gates; the confirmed TASK-035/036 execution approval is recorded below.
 
 ### Current batch verification receipt
 
@@ -870,6 +870,22 @@ One 512 MiB import/native-headroom charge is retained. Current actual qsim.worke
 
 Numeric results are charged separately. Metadata reserves3*4*65536+65536 bytes for Unicode/UTF8/scalar and summary. NPZ serialization reserves4N for BytesIO capacity, raw value, member chunk and validation/coexisting copy. Base64 reserves2B for encoded bytes and ASCII string. Callback JSON reserves5C for worst Unicode and UTF8 coexistence. Parent/child handoff reserves2C explicitly for each side's bounded callback representation. Here N=result.npz_upper_bytes, B=4ceil(N/3), C=result.callback_upper_bytes. No process boundary is assumed to make result arrays or wire buffers disappear. Sum of line items is checked against2 GiB.3-GiB address space / 4-GiB isolation remains unchanged.
 
+
+### Main reconciliation and next lanes, 2026-10-30
+
+The source checkpoint is main `943bb0ab773630259a5dcfbb371d984d218f4a77`, the merge of PR #52. Final heads from PRs #49, #50, #51 and #52 are all ancestors of that main revision. PR #52 head `aa7d5ebd16b343f63a8b9253c5af0273830a7c95` has the same source tree as the main merge. Before this documentation reconciliation, the open WQS PR list was empty. PR #53 was withdrawn as superseded by Laminar's shared enforcing-policy repair; its dedicated WQS profile selection is absent from main.
+
+PR #49 closes TASK-010's operator stage. PR #50 closes the TASK-017/018 spectra/matrix-elements allocation and runtime-identity work. PR #51 contains the JoSIM workspace evidence and TASK-035/036 plan. PR #52 updates the two pinned setup-python references to upstream v7.1.0; it adds no simulator capability. The final combined PR CI passed 1,516 Python tests, 6 subtests and 3 console tests on Standpunkt, with the existing optional native JoSIM fixture skipped. Hosted image/tool checks passed. Historical real-binary JoSIM evidence remains separate from that CI skip.
+
+The owner confirmed that TASK-035/036 were already approved; this correction removes stale approval blockers without changing their scope, budgets or verification. G1 remains approved. G2 implementation and all-three CPU acceptance remain open; G3/G4 runtime and release acceptance are later gates. Merged adapters and green ordinary CI do not complete worker/API integration or combined-image acceptance.
+
+Next lanes:
+
+- TASK-011 is ready: build Lindblad initial states and collapse operators in `qsim/lindblad_model.py` and `tests/test_lindblad_states.py`. Continue through TASK-012 to TASK-016 in dependency order; these tasks share builder/adapter paths and must serialize their overlapping leases.
+- TASK-035 is ready in parallel: audit native JoSIM history lifetimes and establish equivalence fixtures in `spec/physics-engines/discovery/josim-workspace.md` and `spec/physics-engines/probe_josim_history.py`. TASK-036 may start after that audit succeeds, using the approved patch/test/probe lease. A failed proof or changed numerical contract returns for a design decision.
+- TASK-019 waits for TASK-016 and completed TASK-018, so scqubits export cannot yet start independently. TASK-022/023 worker integration and packaging wait for their backend prerequisites, including the JoSIM certificate.
+
+There are no runtime write leases opened by this documentation change. The next implementation batch should start from current main after this reconciliation merges. Existing credentials, workloads and backup/release gates remain unchanged; all GPU work remains scheduled through SkyPilot.
 
 ### Commands and evidence
 
