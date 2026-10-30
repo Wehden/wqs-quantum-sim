@@ -11,15 +11,15 @@ def test_stateful_slots_keep_credentials_and_privileges_separate():
     sts = next(r for r in resources if r['kind'] == 'StatefulSet')
     assert sts['metadata']['namespace'] == 'wqs-ci'
     assert sts['metadata']['name'] == 'wqs-ci'
-    assert sts['spec']['replicas'] == 2
+    assert sts['spec']['replicas'] == 4
     assert sts['spec']['volumeClaimTemplates'][0]['metadata']['name'] == 'data'
     pod = sts['spec']['template']['spec']
     assert pod['automountServiceAccountToken'] is False
     assert 'volumes' not in pod  # no shared runner PVC, host paths, or production secrets
     runner = pod['containers'][0]
     assert runner['securityContext']['runAsNonRoot'] is True
-    assert runner['resources'] == {'requests': {'cpu': '1', 'memory': '1Gi'},
-                                   'limits': {'cpu': '6', 'memory': '5Gi'}}
+    assert runner['resources'] == {'requests': {'cpu': '500m', 'memory': '512Mi'},
+                                   'limits': {'cpu': '3', 'memory': '3Gi'}}
     env = {e['name']: e for e in runner['env']}
     assert env['RUNNER_NAME']['valueFrom']['fieldRef']['fieldPath'] == 'metadata.name'
     assert set(env) == {'RUNNER_NAME', 'RUNNER_REPOSITORY', 'RUNNER_REGISTRATION_TOKEN'}
@@ -89,4 +89,5 @@ def test_capacity_fixture_is_manual_main_only():
     assert set(triggers) == {'workflow_dispatch'}
     assert workflow['jobs']['hold']['if'] == "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
     assert workflow['jobs']['hold']['timeout-minutes'] == 7
+    assert workflow['jobs']['hold']['strategy'] == {'fail-fast': False, 'max-parallel': 4, 'matrix': {'slot': [1, 2, 3, 4]}}
     assert not any('uses' in step for step in workflow['jobs']['hold']['steps'])

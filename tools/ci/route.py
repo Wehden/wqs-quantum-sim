@@ -22,7 +22,7 @@ def available(status, now):
             return False
         if not -15 <= now - observed <= 120:
             return False
-        return (value['capacity'] == 2 and value['online'] <= 2
+        return (value['capacity'] in (2, 4) and value['online'] <= value['capacity']
                 and value['busy'] + value['idle'] == value['online'] and value['idle'] > 0)
     except (ValueError, TypeError, OverflowError):
         return False
@@ -41,7 +41,7 @@ def choose(event, kind, repository, ref, enabled, status='', now=None):
     if enabled != 'true':
         return 'hosted', 'Standpunkt CI is disabled by repository configuration.'
     if not available(status, time.time() if now is None else now):
-        return 'hosted', 'No fresh, consistent idle capacity in the two-slot local CI pool.'
+        return 'hosted', 'No fresh, consistent idle capacity in the local CI pool.'
     return 'local', 'A local CI slot is reported idle; GitHub-hosted CI is used only if local capacity is unavailable; accepted execution failures remain failures.'
 
 

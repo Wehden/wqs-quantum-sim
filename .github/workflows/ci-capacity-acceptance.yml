@@ -1,7 +1,7 @@
 name: CI capacity acceptance
 
 # Bounded, credential-free slot occupancy test. Trigger ordinary PR CI while
-# both holds are running to test overflow against the actual capacity snapshot.
+# all four holds are running to test overflow against the actual capacity snapshot.
 on:
   workflow_dispatch:
 
@@ -13,9 +13,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 4
       matrix:
-        slot: [1, 2]
+        slot: [1, 2, 3, 4]
     runs-on: [self-hosted, Linux, X64, wqs-ci-local]
     timeout-minutes: 7
     steps:

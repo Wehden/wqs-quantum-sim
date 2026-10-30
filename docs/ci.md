@@ -1,8 +1,8 @@
 # CI and local validation
 
 The workflow follows CFD Playground's routing pattern: trusted main pushes and
-same-repository pull requests prefer the two-slot local Linux AMD64 pool when fresh status reports an idle slot. Fork pull requests and manual dispatches from non-main branches use GitHub’s
-hosted Ubuntu lane. The two runners run on Standpunkt and carry the dedicated `wqs-ci-local` label.
+same-repository pull requests prefer the four-slot local Linux AMD64 pool when fresh status reports an idle slot. Fork pull requests and manual dispatches from non-main branches use GitHub’s
+hosted Ubuntu lane. The four runners run on Standpunkt and carry the dedicated `wqs-ci-local` label.
 The workflow names both lanes, marks the unused lane skipped, and writes the
 selection and reason to its run summary.
 
@@ -30,8 +30,8 @@ repository variable `CI_LOCAL_RUNNER_STATUS` every 30 seconds with this schema:
 `observed_at` is UTC epoch seconds. Routing uses hosted CI when status is missing,
 malformed, older than 120 seconds, more than 15 seconds in the future, has
 inconsistent counts, or reports no idle runners. Counts must be nonnegative
-integers, `capacity` must be 2, and `busy + idle == online <= capacity`.
-Only the two ordinary runners labelled `wqs-ci-local` belong in this snapshot;
+integers, `capacity` must be 2 or 4 during the staged transition, and `busy + idle == online <= capacity`.
+Only ordinary runners labelled `wqs-ci-local` belong in this snapshot;
 exclude the legacy `wqs-local` runner and the restricted `wqs-deploy` runner.
 The workflow has no inventory credential. The publisher's GitHub credential
 stays on its trusted host, outside the ordinary CI pods.
@@ -63,7 +63,7 @@ that receipt, verifies the exact correlation and workflow identity, and cancels 
 active child even after the controller process is killed. Unknown dispatch discovery
 is bounded to 30 seconds; cancellation confirmation is bounded to 90 seconds.
 Unresolved or ambiguous outcomes fail closed. Loss of the entire hosted runner can
-still prevent cleanup; the child execution timeout applies after assignment. No ordinary-runner resource reservations change.
+still prevent cleanup; the child execution timeout applies after assignment. The concurrency profile below keeps the pool aggregate requests unchanged.
 
 `tools/ci/local_attempt.py` is a stdlib controller reusable by other repositories.
 It accepts `LOCAL_PARENT_RUN`, `LOCAL_PARENT_ATTEMPT`, `LOCAL_CHECKOUT_SHA`,
@@ -91,7 +91,7 @@ runner. Dispatch the reviewed main workflow with:
 gh workflow run ci-capacity-acceptance.yml --repo Wehden/wqs-quantum-sim --ref main
 ```
 
-The two matrix jobs each hold a slot for five minutes, with a seven-minute execution
+The four matrix jobs each hold a slot for five minutes, with a seven-minute execution
 timeout. Verify actual runner occupancy before testing capacity routing. For an
 assignment-race test, retain a genuinely observed idle snapshot briefly while the
 holds acquire both slots, then trigger ordinary CI and restore the publisher. Verify
@@ -162,3 +162,32 @@ and verify that every contributing PR's merge commit is an ancestor of
 the exact integrated main SHA separately from the individual PR checks. If a
 merge used squash or rebase, reconcile the resulting main commit and diff
 explicitly instead of claiming ancestry that does not exist.
+
+## Test concurrency and rollout
+
+`tools/ci/check.sh` runs pytest in two processes with `--dist=loadfile`, so
+all tests in a module stay together. Numerical-library threads remain one.
+`--max-worker-restart=0` makes worker crashes fail without retry. Set
+`WQS_TEST_WORKERS=1` for the serial baseline; only 1 and 2 are accepted.
+Console tests remain a separate unchanged step.
+
+The target pool has four independent PVC-backed registrations. Each requests
+500m CPU and 512Mi memory, with 3CPU/3Gi limits. Aggregate requests remain
+2CPU/2Gi, matching the previous two-slot pool; aggregate limits become
+12CPU/12Gi. Requests are scheduling minima, not simultaneous peak guarantees.
+The measured two-process working set is recorded with the Laminar acceptance
+receipt. Keep host services and other CI pools in the capacity assessment.
+
+Roll out the compatible router before changing the publisher or registration
+count. It accepts both capacity2 and capacity4 while retaining strict count,
+age and trust checks. The publisher must then be configured for four real
+registrations. A partial/mismatched pool fails toward hosted. Do not publish
+a two-slot snapshot that pretends four registrations are two. Preserve each
+existing PVC and registration; add new slots without copying `.runner` state.
+Recreate existing slots only while idle and coordinate dispatch. Run the
+four-slot occupancy fixture only after all four are online.
+
+Rollback first restores a two-registration pool and publisher capacity2,
+then the old router if necessary. Set `WQS_TEST_WORKERS=1` to disable test
+parallelism. Production/CD runner counts and `wqs-production` serialization
+remain unchanged. No deployment is used as a concurrency acceptance test.
