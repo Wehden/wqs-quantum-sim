@@ -1,4 +1,4 @@
-"""Native numerical evidence; public execution remains certificate-gated."""
+"""Certified CPU runtime identity and native numerical execution evidence."""
 import copy
 import io
 import base64
@@ -11,7 +11,7 @@ import pytest
 import scqubits as scq
 
 from qsim import scqubits_adapter as adapter
-from qsim.physics_results import AllocationPlan, serialize_physics_result
+from qsim.physics_results import serialize_physics_result
 from qsim.scqubits_models import ScqubitsRequest
 
 
@@ -44,7 +44,8 @@ def request(qubit='Transmon', operation='spectrum', **changes):
 @pytest.mark.parametrize('qubit', PARAMETERS)
 def test_spectrum_matches_pinned_native_eigenpairs_and_npz(qubit):
     req = request(qubit, return_vectors=True)
-    result = adapter._run_native(req)
+    plan = req.admission_plan()
+    result = adapter.run_scqubits(req, plan, execution_context={"backend": "cpu"})
     direct = getattr(scq, qubit)(**PARAMETERS[qubit], truncated_dim=6,
                                esys_method='esys_scipy_dense', evals_method='evals_scipy_dense')
     energies, vectors = direct.eigensys(evals_count=6)
@@ -59,7 +60,7 @@ def test_spectrum_matches_pinned_native_eigenpairs_and_npz(qubit):
     assert result.metadata['raw_basis_dimension'] == req._physical_checks()
     assert result.work == {'eigensystem_calls': '1', 'raw_basis_dimension': str(actual.shape[0]),
                            'requested_levels': '6', 'operator_transforms': '0'}
-    summary, artifact = serialize_physics_result(result, req._result_plan(actual.shape[0]))
+    summary, artifact = serialize_physics_result(result, plan.result)
     assert summary['arrays']['eigenvalues']['units'] == 'GHz'
     with np.load(io.BytesIO(base64.b64decode(artifact)), allow_pickle=False) as loaded:
         np.testing.assert_array_equal(loaded['eigenvectors'], actual)
@@ -114,28 +115,35 @@ def test_degenerate_subspace_and_operator_block_are_phase_invariant():
     assert result.metadata['basis']['degenerate_vectors'] == 'arbitrary basis within degenerate subspaces'
 
 
-def test_public_execution_remains_blocked_without_certificate(monkeypatch):
+@pytest.mark.parametrize('corruption', ['policy', 'peak', 'dimensions', 'algorithm'])
+def test_public_execution_rejects_forged_plan_before_native_constructor(corruption, monkeypatch):
+    from dataclasses import replace
+
     req = request()
-    plan = AllocationPlan('not-a-certificate', 'esys_scipy_dense', {}, (), 0, {}, req._result_plan(61))
-    def forbidden(_):
-        pytest.fail('native construction preceded certified admission')
-    monkeypatch.setattr(adapter, '_native_constructor', forbidden)
-    with pytest.raises(ValueError, match='frozen scqubits native allocation certificate'):
+    plan = req.admission_plan()
+    changes = {'policy': {'policy_revision': 'obsolete'}, 'peak': {'peak_bytes': plan.peak_bytes+1},
+               'dimensions': {'dimensions': {}}, 'algorithm': {'algorithm': 'uncertified'}}
+    plan = replace(plan, **changes[corruption])
+    monkeypatch.setattr(adapter, '_native_constructor',
+                        lambda _: pytest.fail('native construction preceded certified admission'))
+    with pytest.raises(ValueError, match='allocation plan'):
         adapter.run_scqubits(req, plan, execution_context={})
 
 
-def test_import_and_failed_admission_do_not_import_native_libraries():
+def test_import_and_plan_rejection_do_not_import_native_libraries():
     code = '''
 import sys
 from qsim.scqubits_adapter import run_scqubits
 from qsim.scqubits_models import ScqubitsRequest
 r=ScqubitsRequest(schema_version=1, operation="spectrum", model={"qubit":"Transmon", "params":{"EJ":15.,"EC":.3,"ng":0.,"ncut":30}})
+p=r.admission_plan()
+assert p.policy_revision
 try:
     run_scqubits(r, None, execution_context={})
 except ValueError as exc:
-    assert "certificate" in str(exc)
+    assert "allocation plan" in str(exc)
 else:
-    raise AssertionError("uncertified admission succeeded")
+    raise AssertionError("invalid plan succeeded")
 assert not any(x in sys.modules for x in ("scqubits", "qutip", "scipy"))
 '''
     subprocess.run([sys.executable, '-c', code], check=True)
@@ -202,10 +210,11 @@ def test_largest_raw_basis_and_32_levels_remain_numerically_valid(qubit):
         req.model.params.cutoff = 512
     else:
         req.model.params.ncut = 10 if qubit == 'FluxQubit' else 255
-    result = adapter._run_native(req)
+    plan = req.admission_plan()
+    result = adapter.run_scqubits(req, plan, execution_context={})
     assert result.arrays['eigenvectors'].shape == (req._physical_checks(), 32)
     assert result.arrays['eigenvalues'].shape == (32,)
-    serialize_physics_result(result, req._result_plan(req._physical_checks()))
+    serialize_physics_result(result, plan.result)
 
 
 @pytest.mark.parametrize('corruption', ['nan', 'nonhermitian', 'shape'])
@@ -234,3 +243,119 @@ def test_native_eigenpairs_are_sorted_together(monkeypatch):
     sorted_energies, sorted_vectors = adapter._eigensystem(native, req)
     np.testing.assert_array_equal(sorted_energies, energies)
     np.testing.assert_array_equal(sorted_vectors, vectors.astype(complex))
+
+
+@pytest.mark.parametrize('qubit,operator', [(q, o) for q, ops in OPERATORS.items() for o in ops])
+def test_public_matrix_elements_use_certified_plan_and_serialization(qubit, operator):
+    req = request(qubit, 'matrix_elements', operator=operator)
+    plan = req.admission_plan()
+    result = adapter.run_scqubits(req, plan, execution_context={})
+    assert result.arrays['matrix_elements'].shape == (6, 6)
+    assert result.metadata['policy_revision'] == plan.policy_revision
+    assert result.metadata['algorithm'] == plan.algorithm
+    serialize_physics_result(result, plan.result)
+
+
+@pytest.mark.parametrize('qubit', PARAMETERS)
+def test_largest_matrix_elements_cell_uses_real_certified_plan(qubit):
+    req = request(qubit, 'matrix_elements', evals_count=32)
+    if qubit == 'Fluxonium':
+        req.model.params.cutoff = 512
+    else:
+        req.model.params.ncut = 10 if qubit == 'FluxQubit' else 255
+    plan = req.admission_plan()
+    result = adapter.run_scqubits(req, plan, execution_context={})
+    assert result.arrays['matrix_elements'].shape == (32, 32)
+    serialize_physics_result(result, plan.result)
+
+
+@pytest.mark.parametrize('package', ['numpy', 'scipy', 'scqubits', 'qutip'])
+def test_runtime_version_mismatch_precedes_native_constructor(package, monkeypatch):
+    import scipy
+    import qutip
+
+    req = request()
+    plan = req.admission_plan()
+    module = {'numpy': np, 'scipy': scipy, 'scqubits': scq, 'qutip': qutip}[package]
+    monkeypatch.setattr(module, '__version__', 'unapproved-runtime')
+    monkeypatch.setattr(adapter, '_native_constructor',
+                        lambda _: pytest.fail('runtime mismatch reached native constructor'))
+    with pytest.raises(ValueError, match='execution_policy_mismatch: scqubits runtime identity'):
+        adapter.run_scqubits(req, plan, execution_context={})
+
+
+def test_export_stays_closed_at_public_admission():
+    req = request(operation='export_for_lindblad', operators=[])
+    with pytest.raises(ValueError, match='resource_limit'):
+        req.admission_plan()
+
+
+@pytest.mark.parametrize('kind', ['source_hashes', 'native_hashes'])
+@pytest.mark.parametrize('corruption', ['content', 'missing', 'extra', 'short'])
+def test_runtime_file_mismatch_precedes_native_constructor(kind, corruption, monkeypatch):
+    from qsim.scqubits_models import _CPU_CERTIFICATE
+
+    req = request()
+    plan = req.admission_plan()
+    relative, expected = next(iter(_CPU_CERTIFICATE[kind].items()))
+    original_open = open
+    def changed_open(path, mode):
+        if path.endswith('/' + relative):
+            if corruption == 'missing':
+                raise OSError('sensitive synthetic installation path')
+            size = expected['size'] + (1 if corruption == 'extra' else -1 if corruption == 'short' else 0)
+            return io.BytesIO(b'\0' * size)
+        return original_open(path, mode)
+    monkeypatch.setattr(adapter, 'open', changed_open, raising=False)
+    monkeypatch.setattr(adapter, '_native_constructor',
+                        lambda _: pytest.fail('changed runtime file reached native constructor'))
+    with pytest.raises(ValueError) as error:
+        adapter.run_scqubits(req, plan, execution_context={})
+    assert str(error.value) == 'execution_policy_mismatch: scqubits runtime identity'
+    assert 'sensitive' not in str(error.value)
+
+
+def test_runtime_hash_reads_are_bounded_and_identity_is_server_owned(monkeypatch):
+    from qsim.scqubits_models import _CPU_CERTIFICATE
+
+    calls = []
+    original_open = open
+    class CheckedFile:
+        def __init__(self, stream):
+            self.stream = stream
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            self.stream.close()
+        def read(self, size):
+            assert 0 < size <= 65536
+            calls.append(size)
+            return self.stream.read(size)
+    monkeypatch.setattr(adapter, 'open', lambda path, mode: CheckedFile(original_open(path, mode)), raising=False)
+    req = request()
+    before = req.canonical_envelope()
+    result = adapter.run_scqubits(req, req.admission_plan(), execution_context={
+        'source_hashes': {}, 'native_hashes': {}, 'versions': {},
+    })
+    assert calls and max(calls) == 65536
+    assert result.metadata['backend'] == 'cpu'
+    assert req.canonical_envelope() == before
+    assert req.admission_plan().coefficient_plan == {'certificate': _CPU_CERTIFICATE['digest']}
+
+
+def test_runtime_packages_must_share_certificate_root(monkeypatch):
+    req = request()
+    plan = req.admission_plan()
+    monkeypatch.setattr(scq, '__file__', '/synthetic/other-install/scqubits/__init__.py')
+    monkeypatch.setattr(adapter, '_native_constructor',
+                        lambda _: pytest.fail('different package root reached native constructor'))
+    with pytest.raises(ValueError, match='scqubits runtime identity'):
+        adapter.run_scqubits(req, plan, execution_context={})
+
+
+def test_gpu_context_refused_before_runtime_or_constructor(monkeypatch):
+    req = request()
+    monkeypatch.setattr(adapter, '_verify_runtime_identity',
+                        lambda: pytest.fail('unsupported backend reached runtime verification'))
+    with pytest.raises(ValueError, match='unsupported scqubits backend'):
+        adapter.run_scqubits(req, req.admission_plan(), execution_context={'backend': 'gpu'})

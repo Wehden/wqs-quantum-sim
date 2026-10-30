@@ -1,12 +1,46 @@
 """CPU scqubits numerics for isolated execution, gated by certified admission."""
 from collections.abc import Mapping
+import hashlib
 
 import numpy as np
 
 from .physics_results import AllocationPlan, PhysicsExecutionResult
-from .scqubits_models import ScqubitsRequest, _OPERATORS
+from .scqubits_models import ScqubitsRequest, _OPERATORS, _CPU_CERTIFICATE
 
 __all__ = ('run_scqubits',)
+
+
+def _verify_runtime_identity():
+    import scipy
+    import scqubits
+    import qutip
+
+    packages = {'numpy': np, 'scipy': scipy, 'scqubits': scqubits, 'qutip': qutip}
+    try:
+        if any(package.__version__ != _CPU_CERTIFICATE['versions'][name]
+               for name, package in packages.items()):
+            raise ValueError('version')
+        roots = {package.__file__.rsplit('/', 2)[0] for package in packages.values()}
+        if len(roots) != 1:
+            raise ValueError('package root')
+        root = roots.pop()
+        for group in ('source_hashes', 'native_hashes'):
+            for relative, expected in _CPU_CERTIFICATE[group].items():
+                digest = hashlib.sha256()
+                remaining = expected['size']
+                with open(root + '/' + relative, 'rb') as stream:
+                    while remaining:
+                        chunk = stream.read(min(65536, remaining))
+                        if not chunk:
+                            raise ValueError('short runtime file')
+                        remaining -= len(chunk)
+                        digest.update(chunk)
+                    if stream.read(1):
+                        raise ValueError('extra runtime bytes')
+                if digest.hexdigest() != expected['sha256']:
+                    raise ValueError('runtime digest')
+    except (OSError, ValueError, AttributeError, TypeError):
+        raise ValueError('execution_policy_mismatch: scqubits runtime identity') from None
 
 
 def _native_constructor(request: ScqubitsRequest):
@@ -126,6 +160,7 @@ def run_scqubits(request: ScqubitsRequest, plan: AllocationPlan, *,
         raise ValueError('execution_policy_mismatch: scqubits allocation plan')
     if execution_context.get('backend', 'cpu') != 'cpu':
         raise ValueError('execution_policy_mismatch: unsupported scqubits backend')
+    _verify_runtime_identity()
     result = _run_native(normalized)
     return PhysicsExecutionResult(result.arrays,
                                   {**result.metadata, 'policy_revision': plan.policy_revision,
