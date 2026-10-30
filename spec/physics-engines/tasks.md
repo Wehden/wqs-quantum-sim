@@ -2,7 +2,7 @@
 
 Status: **approved for implementation on 2026-10-25**. The owner approved the task plan and parallel System2 execution within write leases. Execution starts with TASK-001, followed by TASK-002 through TASK-004 in parallel and TASK-005 after its CPU references pass. All three backends and useful GPU acceleration remain in scope. Deployment remains subject to the existing acceptance gates. The JoSIM bounded-history design and TASK-035/036 execution plan are approved. The owner confirmed that existing approval on 2026-10-30; the earlier pending-approval labels were stale.
 
-Prepared with System2 1.1.1 `task-planner`, scoped to the existing `spec/physics-engines` directory. Planning baseline: current main `83ffac2ebc55423cc804b62342337399b17373c3`, which includes merged PRs #34, #35 and #36. The approved requirements/design remain unchanged. This plan replaces the earlier PHY-T01 through PHY-T12 outline with atomic TASK IDs.
+Prepared with System2 1.1.1 `task-planner`, scoped to the existing `spec/physics-engines` directory. Original planning baseline: main `83ffac2ebc55423cc804b62342337399b17373c3`, which includes merged PRs #34, #35 and #36. The approved requirements/design remain unchanged. This plan replaces the earlier PHY-T01 through PHY-T12 outline with atomic TASK IDs.
 
 ## Task Graph Overview (short)
 
@@ -838,7 +838,7 @@ The coordinator then ran the canonical combined CI command against all six froze
 
 Main `fbab28c020377396daa0b3bb2f150ee7791cd056` contains PRs #45, #46, #47 and the separate LaminarAuth-owned PR #48. PR #46 head `f82ac6b4a4192895eaa4d78efbfddedafe3c343e` is an ancestor of main and has the same source tree. The coordinator verified these facts before opening the next disjoint leases: TASK-010 operators, TASK-017 allocation proof and TASK-020 workspace discovery. TASK-018 consumes the certificate within its existing separate adapter/test lease. Production routes and capabilities remain unchanged.
 
-The JoSIM audit found that the output-row bound does not bound native adaptive history. Two independent constrained runs reproduced roughly 11 MiB versus 98 MiB peak child RSS with the same 1,000 output rows. The source audit and explicit small-output regression preserve admission refusal. The owner approved the bounded-history design direction and requested an implementation plan. TASK-035 and TASK-036 above are that plan. Its execution approval is confirmed in the 2026-10-30 reconciliation below. They serialize on the probe path; unrelated Lindblad/scqubits leases can continue. No native patch, resource allocation, credential change or release-gate change is authorized by this planning record.
+The JoSIM audit found that the output-row bound does not bound native adaptive history. Two independent constrained runs reproduced roughly 11 MiB versus 98 MiB peak child RSS with the same 1,000 output rows. The source audit and explicit small-output regression preserve admission refusal. The owner approved the bounded-history design direction and requested an implementation plan. TASK-035 and TASK-036 above are that plan. Its execution approval is confirmed in the 2026-10-30 reconciliation below. They serialize on the probe path; unrelated Lindblad/scqubits leases can continue. That discovery/planning increment implemented no native patch and changed no resources, credentials or release gates; the confirmed TASK-035/036 execution approval is recorded below.
 
 ### Current batch verification receipt
 
