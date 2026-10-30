@@ -1,6 +1,6 @@
 # JoSIM workspace evidence and approved bounded-history design
 
-Status: source audit and bounded native measurements complete on 2026-10-28. The workspace certificate remains unavailable. The owner approved the bounded-history design direction on 2026-10-28 and requested implementation planning. TASK-035/036 in [the task plan](../tasks.md#task-035-prove-the-native-josim-history-dependencies) await implementation approval; no native patch is implemented. Existing JoSIM admission remains closed.
+Status: source audit and bounded native measurements complete on 2026-10-28. The workspace certificate remains unavailable. The owner approved the bounded-history design direction on 2026-10-28 and requested implementation planning. The owner confirmed on 2026-10-30 that TASK-035/036 in [the task plan](../tasks.md#task-035-prove-the-native-josim-history-dependencies) are already approved for execution. Their audit and native patch are not yet implemented. Existing JoSIM admission remains closed.
 
 ## Why the output bound is insufficient
 
@@ -64,7 +64,7 @@ The native patch must preserve integration equations, adaptive-step decisions, c
 
 The patch adds no iteration, wall-time or job-wide work cutoff. Existing explicit memory/result limits still apply, with checks before allocation and sanitized resource failure rather than partial success. Requested output is neither padded nor truncated. Long-running work remains allowed within its memory profile.
 
-Implementation sequencing is specified by TASK-035/036, pending task-plan approval:
+Implementation sequencing follows approved TASK-035/036:
 
 1. Add a focused native-history task before completing TASK-020 certification and before TASK-022 integration. Lease the reviewed patch and a synthetic native equivalence/bounded-memory probe. Record immutable upstream, patch and resulting binary hashes.
 2. Compare unmodified and patched native output for the existing SFQ fixture, the DC reproducers, each admitted trace/device family, timestep retries and failure cases. Require exact deterministic CSV/array equality under the same toolchain and preserved native output times; the 2% SFQ physical-reference check is separate. Any numerical difference requires an explicit per-trace tolerance with source-backed justification and owner acceptance before patch implementation; preserve deterministic behavior where the unmodified solver is deterministic.
