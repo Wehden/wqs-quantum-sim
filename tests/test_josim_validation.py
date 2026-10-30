@@ -188,6 +188,23 @@ def test_admission_plans_numeric_result_then_fails_closed_for_missing_native_cer
     assert request.canonical_envelope() == canonical_before
 
 
+@pytest.mark.parametrize('step,stop', [('1e-12', '1e-9'), ('1e-11', '1e-8'), ('1e-9', '1e-6')])
+def test_small_output_grid_does_not_certify_junction_internal_history(step, stop):
+    from qsim.josim_models import JoSIMRequest
+
+    request = JoSIMRequest(netlist=(
+        'B01 1 0 MOD AREA=1\n'
+        'V01 1 0 DC 0.1\n'
+        '.MODEL MOD JJ(RTYPE=1 VG=0.0028 CAP=7e-14 R0=160 RN=16 ICRIT=0.0001)\n'
+        f'.TRAN {step} {stop}\n'
+        '.PRINT PHASE B01\n.END\n'))
+    _, info = validate_josim_netlist(request.netlist)
+    assert 1000 <= info['predicted_rows'] <= 1002
+    assert info['trace_names'] == ['P(B01)']
+    with pytest.raises(ValueError, match='resource_limit: JoSIM native workspace certificate'):
+        request.admission_plan()
+
+
 def test_numeric_node_labels_are_not_silently_merged():
     text = minimal().replace('L1 1 2 2p', 'L1 01 2 2p')
     normalized, _ = validate_josim_netlist(text)
