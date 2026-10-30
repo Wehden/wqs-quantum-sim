@@ -59,19 +59,12 @@ def _operator(request, operator):
     return qt.Qobj(matrix, dims=[sizes, sizes])
 
 
-def _build_static_model(request, plan):
-    """Construct static numerics; callers supply a separately certified allocation."""
+def _hamiltonian(request):
     import qutip as qt
 
-    if not isinstance(request, LindbladRequest) or not isinstance(plan, AllocationPlan):
-        raise ValueError('invalid_model: expected a Lindblad request and allocation plan')
-    dimension = request._physical_checks()
-    if request._result_plan(dimension) != plan.result:
-        raise ValueError('invalid_model: allocation result reservation differs from request')
-    if request.model.drives or request.model.collapse or request.initial_state is not None:
-        raise ValueError('invalid_model: static construction does not support states, collapse or drives yet')
     modes = request.model.modes
     sizes = [mode.dimension for mode in modes]
+    dimension = math.prod(sizes)
     with qt.CoreOptions(auto_tidyup=False):
         hamiltonian = qt.qzero(sizes)
         for index, mode in enumerate(modes):
@@ -93,8 +86,115 @@ def _build_static_model(request, plan):
     if matrix.shape != (dimension, dimension) or not np.isfinite(matrix).all():
         raise ValueError('invalid_model: native Hamiltonian shape or values differ from request')
     _hermitian(matrix, '/model/hamiltonian')
+    return hamiltonian
+
+
+def _build_static_model(request, plan):
+    """Construct static numerics; callers supply a separately certified allocation."""
+    if not isinstance(request, LindbladRequest) or not isinstance(plan, AllocationPlan):
+        raise ValueError('invalid_model: expected a Lindblad request and allocation plan')
+    dimension = request._physical_checks()
+    if request._result_plan(dimension) != plan.result:
+        raise ValueError('invalid_model: allocation result reservation differs from request')
+    if request.model.drives or request.model.collapse or request.initial_state is not None:
+        raise ValueError('invalid_model: static construction does not support states, collapse or drives yet')
+    hamiltonian = _hamiltonian(request)
+    modes = request.model.modes
     return NativeLindbladModel(hamiltonian, (), None,
                                tuple(mode.name for mode in modes), (), plan)
+
+
+def _initial_state(request):
+    import qutip as qt
+
+    if request.operation != 'evolve':
+        return None
+    sizes = [mode.dimension for mode in request.model.modes]
+    dimension = math.prod(sizes)
+    supplied = request.initial_state
+    if supplied is not None and supplied.kind == 'amplitudes':
+        vector = _complex_array(supplied.values, (dimension,), '/initial_state/values')
+        scale = max(float(np.max(np.abs(vector.real))), float(np.max(np.abs(vector.imag))))
+        vector = vector.real / scale + 1j * (vector.imag / scale)
+        state = qt.Qobj(vector / np.linalg.norm(vector), dims=[sizes, [1]*len(sizes)])
+    elif supplied is not None and supplied.kind == 'density':
+        density = _complex_array(supplied.values, (dimension, dimension), '/initial_state/values')
+        if request.solver in ('se', 'mc'):
+            _, vectors = np.linalg.eigh(density)
+            state = qt.Qobj(vectors[:, -1], dims=[sizes, [1]*len(sizes)])
+        else:
+            state = qt.Qobj(density, dims=[sizes, sizes])
+    else:
+        factors = []
+        for mode in request.model.modes:
+            factor = supplied.modes.get(mode.name) if supplied is not None else None
+            if factor is None or factor.kind == 'fock':
+                value = qt.basis(mode.dimension, factor.index if factor is not None else 0)
+            elif mode.dimension == 1:
+                value = qt.basis(1, 0)
+            elif factor.kind == 'coherent':
+                amplitude = complex(factor.amplitude.re, factor.amplitude.im)
+                value = qt.coherent(mode.dimension, amplitude, method='operator')
+            elif factor.occupation == 0:
+                value = qt.basis(mode.dimension, 0)
+            else:
+                value = qt.thermal_dm(mode.dimension, factor.occupation, method='analytic')
+                value = value / value.tr()
+            factors.append(value)
+        if request.solver == 'me':
+            factors = [qt.ket2dm(value) if value.isket else value for value in factors]
+        state = qt.tensor(factors)
+    if request.solver == 'me' and state.isket:
+        state = qt.ket2dm(state)
+    values = state.full()
+    shape = (dimension, dimension) if request.solver == 'me' else (dimension, 1)
+    if values.shape != shape or not np.isfinite(values).all():
+        raise ValueError('invalid_model: native initial state shape or values differ from request')
+    norm = state.tr() if request.solver == 'me' else state.norm()
+    if not np.isfinite(norm) or abs(norm - 1) > 1e-10:
+        raise ValueError('invalid_model: native initial state is not normalized')
+    return state
+
+
+def _collapse_operators(request):
+    channels = []
+    modes = request.model.modes
+    for channel in request.model.collapse:
+        if channel.kind == 'operator':
+            channels.append(math.sqrt(channel.rate) * _operator(request, channel.operator))
+        elif channel.kind == 'relaxation':
+            channels.append(math.sqrt(1/channel.T1) * _tensor_operators(modes, {channel.mode: 'a'}))
+        elif channel.kind == 'dephasing':
+            channels.append(math.sqrt(2/channel.Tphi) * _tensor_operators(modes, {channel.mode: 'n'}))
+        else:
+            channels.append(math.sqrt(channel.rate*(channel.occupation+1)) *
+                            _tensor_operators(modes, {channel.mode: 'a'}))
+            channels.append(math.sqrt(channel.rate*channel.occupation) *
+                            _tensor_operators(modes, {channel.mode: 'adag'}))
+    dimension = math.prod(mode.dimension for mode in modes)
+    if any(value.shape != (dimension, dimension) or not np.isfinite(value.full()).all()
+           for value in channels):
+        raise ValueError('invalid_model: native collapse shape or values differ from request')
+    return tuple(channels)
+
+
+def _build_model(request, plan):
+    """Construct native state/channel numerics under a separately certified plan."""
+    import qutip as qt
+
+    if not isinstance(request, LindbladRequest) or not isinstance(plan, AllocationPlan):
+        raise ValueError('invalid_model: expected a Lindblad request and allocation plan')
+    dimension = request._physical_checks()
+    if request._result_plan(dimension) != plan.result:
+        raise ValueError('invalid_model: allocation result reservation differs from request')
+    if request.model.drives:
+        raise ValueError('invalid_model: numeric drives are not supported yet')
+    with qt.CoreOptions(auto_tidyup=False):
+        hamiltonian = _hamiltonian(request)
+        state = _initial_state(request)
+        channels = _collapse_operators(request)
+    return NativeLindbladModel(hamiltonian, channels, state,
+                               tuple(mode.name for mode in request.model.modes), (), plan)
 
 
 def build_lindblad_model(request: LindbladRequest, plan: AllocationPlan) -> NativeLindbladModel:
@@ -103,4 +203,4 @@ def build_lindblad_model(request: LindbladRequest, plan: AllocationPlan) -> Nati
         raise ValueError('invalid_model: expected a Lindblad request and allocation plan')
     if request.admission_plan() != plan:
         raise ValueError('invalid_model: native allocation plan differs from admission')
-    return _build_static_model(request, plan)
+    return _build_model(request, plan)
