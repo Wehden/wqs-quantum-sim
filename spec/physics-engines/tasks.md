@@ -1,6 +1,6 @@
 # Implementation task plan: physics engines
 
-Status: **approved for implementation on 2026-10-25**. The owner approved the task plan and parallel System2 execution within write leases. Execution starts with TASK-001, followed by TASK-002 through TASK-004 in parallel and TASK-005 after its CPU references pass. All three backends and useful GPU acceleration remain in scope. Deployment remains subject to the existing acceptance gates.
+Status: **approved for implementation on 2026-10-25**. The owner approved the task plan and parallel System2 execution within write leases. Execution starts with TASK-001, followed by TASK-002 through TASK-004 in parallel and TASK-005 after its CPU references pass. All three backends and useful GPU acceleration remain in scope. Deployment remains subject to the existing acceptance gates. The owner approved the JoSIM bounded-history design direction on 2026-10-28; new TASK-035/036 below are prepared for task-plan review and are not yet approved for implementation.
 
 Prepared with System2 1.1.1 `task-planner`, scoped to the existing `spec/physics-engines` directory. Planning baseline: current main `83ffac2ebc55423cc804b62342337399b17373c3`, which includes merged PRs #34, #35 and #36. The approved requirements/design remain unchanged. This plan replaces the earlier PHY-T01 through PHY-T12 outline with atomic TASK IDs.
 
@@ -23,7 +23,8 @@ flowchart TD
   G --> J[020-021 JoSIM validation and execution]
   H --> K[022 worker and 023 image]
   I --> K
-  J --> K
+  J --> JH[035 history audit and 036 native patch]
+  JH --> K
   K --> L[026 durable profiles and pure policy]
   L --> M[024 API and 025 integration safety]
   M --> N[027-029 GPU compatibility and proof]
@@ -414,7 +415,7 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ### TASK-020: Implement JoSIM request validation and netlist safety
 
 - **Goal:** Implement JoSIM request validation and netlist safety.
-- **Dependencies:** TASK-004, TASK-006.
+- **Dependencies:** TASK-004, TASK-006; remaining native workspace certification also requires TASK-036. The existing schema/grammar stage is already implemented.
 - **Requirements:** PHY-004, PHY-005, PHY-011, PHY-014, PHY-016, PHY-018.
 - **Recommended Mode:** executor.
 - **Risk:** High: an include alias or output directive can cross the filesystem boundary.
@@ -454,7 +455,7 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ### TASK-022: Integrate physics into the isolated worker wrapper
 
 - **Goal:** Integrate physics into the isolated worker wrapper.
-- **Dependencies:** TASK-008, TASK-016, TASK-019, TASK-021.
+- **Dependencies:** TASK-008, TASK-016, TASK-019, TASK-021, TASK-036 and the completed TASK-020 native workspace certificate.
 - **Requirements:** PHY-002, PHY-005, PHY-011, PHY-012, PHY-013.
 - **Recommended Mode:** executor.
 - **Risk:** High: native execution must not receive callback credentials or break existing engine dispatch.
@@ -726,6 +727,47 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ^docs/physics\-engines\.md$
 ```
 
+### TASK-035: Prove the native JoSIM history dependencies
+
+- **Goal:** Derive the smallest retained state that preserves the admitted native solver and output semantics before changing native code.
+- **Dependencies:** Existing TASK-004/020/021 stages; owner-approved bounded-history design amendment on 2026-10-28. This task plan awaits implementation approval.
+- **Requirements:** PHY-005, PHY-011, PHY-012, PHY-013, PHY-016, PHY-018.
+- **Recommended Mode:** test-engineer.
+- **Risk:** High: discarding history used by integration or output interpolation can silently change the simulated physics.
+- **Files/areas:** `spec/physics-engines/discovery/josim-workspace.md`, proposed `spec/physics-engines/probe_josim_history.py`. Exact native patch hunks are determined by this audit, not guessed in advance.
+- **Steps:** Audit every writer/reader and allocation of retained time, selected trace and device history in upstream commit `02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224`. Cover R/L/junction devices, DC/PWL sources, phase/voltage/current conversions, retries, startup, output selection and interpolation. Record a reader-to-lifetime table with immutable source references and checked row/index arithmetic. Add fixed synthetic comparisons using explicit trusted original/patched binary paths; the probe must not provision resources, download code, select a caller binary in production or add a product timeout. Freeze original output references and require exact deterministic CSV and parsed-array equality under the same toolchain by default. A differing trace needs an explicit per-unit/trace tolerance with a source-backed numerical justification and owner acceptance before TASK-036; the separate 2% SFQ integral tolerance is not a waveform tolerance. A path needing unbounded history blocks the patch and returns to the owner.
+- **Verification:** The existing `python3 spec/physics-engines/probe_josim.py --binary /absolute/original-josim-cli` remains the SFQ reference. The new probe command, to be created and verified by this task, is `python3 spec/physics-engines/probe_josim_history.py --original /absolute/original-josim-cli --candidate /absolute/original-josim-cli`; self-comparison validates fixture coverage only, not the amendment. Exercise the DC reproducers, each accepted device/trace family, PWL boundaries, timestep retries, convergence failure and output interval boundaries. Record commands, binary/source identities, tolerances and measured counts under the unchanged constrained CPU profile.
+- **Rollback / Backout:** Retain the evidence and current certificate refusal. Do not narrow accepted syntax, approximate interpolation or increase memory limits to make the audit pass.
+- **Change budget:** max_files=2, max_new_symbols=8 (probe declarations only), interface_policy=none.
+- **write_lease:**
+
+```text
+^spec/physics\-engines/discovery/josim-workspace\.md$
+^spec/physics\-engines/probe_josim_history\.py$
+```
+
+### TASK-036: Patch and verify bounded native JoSIM history
+
+- **Goal:** Implement the audited retention policy with unchanged numerical/output semantics and a source-derived memory bound independent of internal step count.
+- **Dependencies:** TASK-035 passes and the owner approves this task plan for implementation (approval pending). A failed audit requires a new design decision.
+- **Requirements:** PHY-005, PHY-011, PHY-012, PHY-013, PHY-016, PHY-018.
+- **Recommended Mode:** executor.
+- **Risk:** High: native lifetime changes can corrupt retry state, alter output or retain hidden allocations.
+- **Files/areas:** proposed `vendor/josim/bounded-history.patch`, `tests/test_josim_history.py`, and `spec/physics-engines/probe_josim_history.py`. Patch hunks may touch only the pinned upstream history producers/consumers identified by TASK-035. Record their exact source-path lease before editing; exceeding this area or budget returns for an amendment. Final image/build integration remains TASK-023.
+- **Steps:** Retain the proven rolling device/integration history and bounded requested output. Preserve equations, adaptive timesteps, retry/convergence decisions, units, trace order and native time selection/interpolation. Bound capacities, scratch buffers and transient reallocation overlap before allocation with checked arithmetic. Keep complete results or return a sanitized resource error. Add no iteration/work/wall-time cap or partial-result success. Build original and candidate reproducibly from the same pinned source/toolchain; record patch and binary hashes. Do not package or activate the candidate in production in this task.
+- **Verification:** Run the TASK-035 probe with distinct original/candidate binaries. Compare all admitted-family fixtures, SFQ integrals within the existing 2% tolerance, exact native output times/row counts/order and exact deterministic CSV/array equality under the same toolchain. Any differing trace blocks completion unless TASK-035 has recorded an explicit owner-accepted per-trace numerical tolerance and its source-backed justification. Investigate every difference; matching SFQ integrals alone cannot establish waveform equivalence. Run `pytest -q tests/test_josim_history.py tests/test_josim_execution.py tests/test_josim_validation.py tests/test_josim_security.py` in the pinned environment. Native acceptance requires real binaries, not mocks or skipped fixtures. Increase internal step counts while holding requested rows fixed, instrument actual retained capacities and compare them to the source ledger. Verify retry cleanup and all largest admitted dimensions under 2 CPU/4 GiB, 3-GiB child address space and 12-MiB files, with the total planned charge at most 2 GiB. Instrumented evidence must correspond to the final uninstrumented source and binary; RSS observations alone are insufficient.
+- **Rollback / Backout:** Withhold the patch from the worker image and leave native admission closed. Preserve the original executable and failing comparison evidence. Existing simulations, credentials and release/backup gates stay unchanged.
+- **Change budget:** max_files=3 repository artifacts; max_new_symbols=16 across Python and the applied native patch, interface_policy=none. No new production Python module or HTTP path.
+- **write_lease:**
+
+```text
+^vendor/josim/bounded-history\.patch$
+^tests/test_josim_history\.py$
+^spec/physics\-engines/probe_josim_history\.py$
+```
+
+After TASK-036, resume TASK-020's fixed source/binary-bound admission certificate, then TASK-021/022 integration. TASK-023 owns production build provenance, patch distribution and notices/relink obligations. The native patch and final combined worker image must both pass before G2 can accept JoSIM.
+
 ## Definition of Done Checklist
 
 - [ ] Every PHY-001 through PHY-020 requirement maps to executed evidence; approved scope has not shrunk to one backend.
@@ -763,13 +805,15 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-006 | Complete: the owner approved the G1 contracts, work accounting and sequencing amendment on 2026-10-26. See [decisions](decisions.md) and the approval record below. |
 | TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
 | TASK-008 | Complete, merged to main through PR #42: bounded numeric result serialization and 75 focused tests. |
-| TASK-017 | Staged request schema and validation implemented in PR #43, merged into main through PR #42. 129 focused tests passed. Native allocation certificates and execution integration remain pending; the backend is not enabled. |
-| TASK-020 | Staged JoSIM schema and positive netlist validation implemented in PR #44, merged into main through PR #42. 138 focused tests passed. Native workspace certification and execution integration remain pending; the backend is not enabled. |
-| TASK-009 | Strict Lindblad request models and bounded validation implemented in this increment; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
-| TASK-010 through TASK-016 | Not started. Native Lindblad operators, states, pulses and solvers follow the request-model lane in dependency order. |
-| TASK-018 | Native spectra/matrix-elements stage implemented in PR #45, awaiting merge. All four classes and 16 operators tested, including maximum basis sizes. Public execution remains blocked by missing native allocation certificates. |
+| TASK-017 | Staged request schema and validation implemented in PR #43, merged into main through PR #42. 129 focused tests passed. Native allocation certificate and consumer integration are published as PR #50 and awaiting CI/merge; the backend is not enabled. |
+| TASK-020 | Staged JoSIM schema and positive netlist validation implemented in PR #44, merged into main through PR #42. 138 focused tests passed. Native workspace certification is blocked by adaptive internal-history retention; see [evidence and approved design](discovery/josim-workspace.md). TASK-035/036 planning is prepared for review; the backend is not enabled. |
+| TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
+| TASK-010 | Native static Hamiltonian/operator implementation in progress on verified main; published as PR #49; merge and required CI remain pending. |
+| TASK-011 through TASK-016 | Not started. States, pulses and solvers follow the native operator lane in dependency order. |
+| TASK-018 | Native spectra/matrix-elements stage merged in PR #45. All four classes and 16 operators tested, including maximum basis sizes. The certificate consumer is implemented in the next batch, PR #50; worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
-| TASK-021 | Native transient stage implemented in PR #46, awaiting merge. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
+| TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
+| TASK-035/036 | Bounded-history design approved on 2026-10-28; this implementation plan awaits owner review. Neither audit harness nor native patch has been implemented. |
 | TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
@@ -789,6 +833,43 @@ TASK-009 passed 187 focused schema, canonicalization, physical validation and re
 Public adapter entry points reproduce admission and remain closed while native allocation certificates are missing. Native helpers are tested directly without mocking admission. TASK-022 must derive an exact JoSIM result plan from verified actual rows within the admitted ceiling before serialization. TASK-023 must establish the production binary identity and complete native distribution obligations. No new route, native capability advertisement, GPU allocation or production release is included.
 
 The coordinator then ran the canonical combined CI command against all six frozen source/test files: 1,403 Python tests, 6 subtests and 3 console tests passed, with no skips, in 120.05 seconds for pytest. The real pinned JoSIM binary was present for this run. Explicit interpreter dependency verification checked all 146 installed packages successfully. Each PR still requires its own current-head automatic review and required CI checks; this combined result does not replace those merge gates.
+
+### Next batch and JoSIM planning amendment, 2026-10-28
+
+Main `fbab28c020377396daa0b3bb2f150ee7791cd056` contains PRs #45, #46, #47 and the separate LaminarAuth-owned PR #48. PR #46 head `f82ac6b4a4192895eaa4d78efbfddedafe3c343e` is an ancestor of main and has the same source tree. The coordinator verified these facts before opening the next disjoint leases: TASK-010 operators, TASK-017 allocation proof and TASK-020 workspace discovery. TASK-018 consumes the certificate within its existing separate adapter/test lease. Production routes and capabilities remain unchanged.
+
+The JoSIM audit found that the output-row bound does not bound native adaptive history. Two independent constrained runs reproduced roughly 11 MiB versus 98 MiB peak child RSS with the same 1,000 output rows. The source audit and explicit small-output regression preserve admission refusal. The owner approved the bounded-history design direction and requested an implementation plan. TASK-035 and TASK-036 above are that plan, pending approval to execute. They serialize on the probe path; unrelated Lindblad/scqubits leases can continue. No native patch, resource allocation, credential change or release-gate change is authorized by this planning record.
+
+### Current batch verification receipt
+
+The scqubits certificate digest is `531974791bde44c9f6bb29e85fe042e785e1315326e8c0288c788ad38ab4991d`. The complete version/source/native manifest and exact file sizes are fixed in `qsim/scqubits_models.py`; the worker checks them before numerical construction. Certificate coverage is the pinned Linux CPython 3.12 x86_64 CPU environment. Export remains gated.
+
+The independent coordinator cross-lane repeat passed 704 tests with the real pinned JoSIM executable and no skips. A subsequent canonical suite exposed an inherited pre-exec `getrusage` peak in the new child-RSS assertion; an independent 600-MiB-parent reproducer reported 626,436 KiB from `getrusage` but 11,184 KiB from post-exec `/proc/self/status` VmHWM. The corrected test uses Linux post-exec VmHWM with the same 512-MiB threshold and resource profile. All 20 maximum-size cases also passed while a synthetic 600-MiB parent remained resident. The final canonical constrained run passed 1,517 Python tests, 6 subtests and 3 console tests with zero skips; the explicit interpreter check confirmed all 146 packages compatible. Each PR still requires its own current-head CI and automatic review before merge. One upstream scqubits invalid-escape deprecation warning appeared. TASK-010 now includes 32 operator tests, including relative comparisons for `1e-20` coefficients and restoration of QuTiP settings after success/failure. TASK-017/018 separately passed 322 integrated tests and 20 fresh maximum-basis native children. The largest planned charge is 760,735,000 bytes. These are constrained source/numerical checks, not final TASK-023 packaging or service activation evidence.
+
+#### Frozen scqubits native selection
+
+scqubits `eigensys` with server-selected esys_scipy_dense calls self.hamiltonian() once (qubit_base.py457-472), casts an ndarray without native copies (diag.py64-125), and scipy.linalg.eigh(...,subset_by_index=(0,K-1)). _decomp.py564 selects EVR; real matrices use DSYEVR and FluxQubit complex matrices use ZHEEVR. The adapter separately constructs H for validation, so charge TWO constructor invocations; neither is assumed reused. The selected default driver source is hash-bound, not merely named in metadata. Worker validates every fixed path with expected bytes/EOF/hash before any native constructor. No path or identity override comes from request data.
+
+All D=1..512 real and complex queries were executed in this exact environment. For D >= 2: DSYEVR lwork33D,liwork10D; ZHEEVR lwork33D,lrwork24D,liwork10D. D1 liwork/lrwork are1 and lwork33. Frozen charges bound the special case:304D and760D bytes respectively. LAPACK Fortran matrix copy, outputs and support vectors are separately charged. Requery occurs only in tests, never API validation.
+
+#### Constructor ledger
+
+D is FULL raw dimension; K<=min(32,D). These are class-specific source-call-site counts, summed conservatively even when temporaries do not coexist. They are not a universal solver workspace factor.
+
+Transmon/Tunable per H call:8D²+32D. One real diagonal matrix; list conversion and arange/advanced indices fit four8D vector charges. Worst allowlisted operator56D²+8D: real offdiagonal matrix8D², complex scaling16D², conjugate16D², possible overlapping inplace temporary16D² and real repeat vector8D.
+
+Fluxonium per H call:12*8D²+8*16D²+196D. Real matrices: LC diagonal1; creation/annihilation/sum/scale/division phi5; alpha-phi,identity,beta-identity,sum argument4; EJ scaling and final subtraction2. Complex matrices: cosm real-input exponent1, output1 and six explicit native exponential work matrices6. SciPy 1.18.1 C src/_matfuncs_expm.c2740 allocates complex128(6D²+4D), plus int32(D) pivots; no allocation grows with scaling/squaring count. The 196D linear budget covers at most128D real constructor/diagonal/index vectors plus64D complex exponential vectors and4D pivots. For the two oscillator ladders, NumPy diagflat source bounds each sqrt input/output plus arange/index arithmetic by 48D; their 96D plus LC/argument indices fit 128D. Worst cos/sin operator removes LC and final two real H buffers, giving9*8D²+8*16D²+188D. n/phi operators fit this upper envelope. At SciPy commit `e4e854eaa8f18d807cd3496028e257e36caa93cc`, the [C kernel](https://github.com/scipy/scipy/blob/e4e854eaa8f18d807cd3496028e257e36caa93cc/scipy/linalg/src/_matfuncs_expm.c) has SHA `accbf76ec32c090a0ce30ed0853b35f9bd83bdd672ac6b3bffcc11ef54c912f9`; the separate [C extension wrapper](https://github.com/scipy/scipy/blob/e4e854eaa8f18d807cd3496028e257e36caa93cc/scipy/linalg/_matfuncsmodule.c) has SHA `e2e6897101a0743a8921c5aac18f767b626516e58f7f5d56bc0f54180dffd54d`. The SciPy 1.18.1 source distribution SHA is `52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307`. Its Python facade `_matfuncs.py` matches the installed wheel (`72da5780b458ecf9f78fd75662fa28c95cb14b66c4faf1327891be009830a1b6`). The installed compiled extension is independently bound by the certificate manifest.
+
+FluxQubit per H call:17*16D²+736D+96. Three kinetic terms each allocate a full complex kron and scalar output (6); four potential terms allocate2,2,3,3 full complex matrices (10); kinetic+potential sum1. Small n/identity/subtraction/matmul/exp factors are bounded by152D+152D+128D+304D=736D, using sqrt(D)<=D for the primitive diagonal vectors. The 2x2 capacitance, inverse and scaling consume 96 bytes. Worst sin operator4*16D²+40D includes full kron, scaling, conjugate and possible inplace-overlap buffer; small exp factor+identity<=40D.
+
+The plan sums twice the class H constructor cost, optionally the largest selected-class operator cost, then named validation/copy charges; no buffer is assumed reusable. Validation charges scaled H, abs,conjugate,difference,absolute difference/RHS and ten conservative boolean masks. EVR copy/work/output charges are separate. Ordered eigenpair arrays, complex conversion and sort indices are separate. Residual+Gram/norm allocations charge72DK+48K²+16K+8D, and matrix-element transform charges32DK+16K² plus106D² operator validation buffers. Native matrix constructors are finite-shape, independent of energy magnitude. Native-order overflow/underflow checks now also reject unrepresentable Fluxonium8*EL*EC and FluxQubit2*EC intermediates before admission, preserving valid finite scales without a physical GHz cutoff.
+
+#### Serialization and process coexistence
+
+One 512 MiB import/native-headroom charge is retained. Current actual qsim.worker top-level imports are stdlib; fresh nonroot parent import RSS20,284 KiB. Largest observed fresh combined numerical child RSS302,504 KiB; the sum322,788 KiB is below512 MiB. These observations support headroom and do not replace the named byte accounting. Future worker integration must retain a single bounded parent/child execution and rerun actual combined-image/live acceptance; this certificate is not permission for concurrent unbounded children.
+
+Numeric results are charged separately. Metadata reserves3*4*65536+65536 bytes for Unicode/UTF8/scalar and summary. NPZ serialization reserves4N for BytesIO capacity, raw value, member chunk and validation/coexisting copy. Base64 reserves2B for encoded bytes and ASCII string. Callback JSON reserves5C for worst Unicode and UTF8 coexistence. Parent/child handoff reserves2C explicitly for each side's bounded callback representation. Here N=result.npz_upper_bytes, B=4ceil(N/3), C=result.callback_upper_bytes. No process boundary is assumed to make result arrays or wire buffers disappear. Sum of line items is checked against2 GiB.3-GiB address space / 4-GiB isolation remains unchanged.
+
 
 ### Commands and evidence
 
@@ -832,20 +913,20 @@ Runtime rollback uses the existing controlled drain/hold runbook and compatible 
 - **PHY-002:** TASK-001, TASK-006, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-033, TASK-034.
 - **PHY-003:** TASK-001, TASK-006, TASK-009, TASK-024, TASK-025, TASK-032, TASK-033, TASK-034.
 - **PHY-004:** TASK-001, TASK-004, TASK-006, TASK-009, TASK-017, TASK-020, TASK-024, TASK-025, TASK-033, TASK-034.
-- **PHY-005:** TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-009, TASK-010, TASK-011, TASK-012, TASK-017, TASK-018, TASK-020, TASK-021, TASK-022, TASK-023, TASK-025, TASK-027, TASK-028, TASK-030, TASK-033, TASK-034.
+- **PHY-005:** TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-009, TASK-010, TASK-011, TASK-012, TASK-017, TASK-018, TASK-020, TASK-021, TASK-022, TASK-023, TASK-025, TASK-027, TASK-028, TASK-030, TASK-033, TASK-034, TASK-035, TASK-036.
 - **PHY-006:** TASK-002, TASK-003, TASK-006, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-021, TASK-028, TASK-029, TASK-032, TASK-033, TASK-034.
 - **PHY-007:** TASK-002, TASK-006, TASK-009, TASK-010, TASK-012, TASK-016, TASK-019, TASK-033, TASK-034.
 - **PHY-008:** TASK-002, TASK-006, TASK-009, TASK-011, TASK-013, TASK-014, TASK-033, TASK-034.
 - **PHY-009:** TASK-002, TASK-006, TASK-009, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-028, TASK-033, TASK-034.
 - **PHY-010:** TASK-002, TASK-006, TASK-009, TASK-010, TASK-011, TASK-015, TASK-016, TASK-033, TASK-034.
-- **PHY-011:** TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-020, TASK-021, TASK-022, TASK-023, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030, TASK-032, TASK-033, TASK-034.
-- **PHY-012:** TASK-002, TASK-003, TASK-004, TASK-006, TASK-008, TASK-013, TASK-014, TASK-015, TASK-016, TASK-018, TASK-019, TASK-021, TASK-022, TASK-025, TASK-028, TASK-031, TASK-032, TASK-033, TASK-034.
-- **PHY-013:** TASK-002, TASK-004, TASK-006, TASK-008, TASK-013, TASK-015, TASK-016, TASK-021, TASK-022, TASK-025, TASK-031, TASK-033, TASK-034.
+- **PHY-011:** TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-020, TASK-021, TASK-022, TASK-023, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030, TASK-032, TASK-033, TASK-034, TASK-035, TASK-036.
+- **PHY-012:** TASK-002, TASK-003, TASK-004, TASK-006, TASK-008, TASK-013, TASK-014, TASK-015, TASK-016, TASK-018, TASK-019, TASK-021, TASK-022, TASK-025, TASK-028, TASK-031, TASK-032, TASK-033, TASK-034, TASK-035, TASK-036.
+- **PHY-013:** TASK-002, TASK-004, TASK-006, TASK-008, TASK-013, TASK-015, TASK-016, TASK-021, TASK-022, TASK-025, TASK-031, TASK-033, TASK-034, TASK-035, TASK-036.
 - **PHY-014:** TASK-006, TASK-007, TASK-009, TASK-017, TASK-020, TASK-024, TASK-030, TASK-032, TASK-033, TASK-034.
 - **PHY-015:** TASK-001, TASK-006, TASK-007, TASK-023, TASK-025, TASK-027, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033, TASK-034.
-- **PHY-016:** TASK-003, TASK-004, TASK-006, TASK-007, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-023, TASK-024, TASK-031, TASK-032, TASK-033, TASK-034.
+- **PHY-016:** TASK-003, TASK-004, TASK-006, TASK-007, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-023, TASK-024, TASK-031, TASK-032, TASK-033, TASK-034, TASK-035, TASK-036.
 - **PHY-017:** TASK-003, TASK-006, TASK-017, TASK-018, TASK-019, TASK-023, TASK-024, TASK-031, TASK-032, TASK-033, TASK-034.
-- **PHY-018:** TASK-004, TASK-006, TASK-020, TASK-021, TASK-023, TASK-024, TASK-031, TASK-032, TASK-033, TASK-034.
+- **PHY-018:** TASK-004, TASK-006, TASK-020, TASK-021, TASK-023, TASK-024, TASK-031, TASK-032, TASK-033, TASK-034, TASK-035, TASK-036.
 - **PHY-019:** TASK-003, TASK-005, TASK-006, TASK-014, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033, TASK-034.
 - **PHY-020:** TASK-005, TASK-006, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033, TASK-034.
 
