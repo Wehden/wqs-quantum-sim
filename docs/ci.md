@@ -191,3 +191,20 @@ Rollback first restores a two-registration pool and publisher capacity2,
 then the old router if necessary. Set `WQS_TEST_WORKERS=1` to disable test
 parallelism. Production/CD runner counts and `wqs-production` serialization
 remain unchanged. No deployment is used as a concurrency acceptance test.
+
+## October 30 validation
+
+The current-main comparison used the same 1,518 JUnit cases in each mode:
+1,517 passed, one existing optional native-JoSIM test skipped, and six subtests
+passed. At the proposed 3-CPU/3-GiB limits, serial execution took 289 seconds;
+two workers took 168 seconds. Sampled peak working set was about 1.32 GiB,
+and the three console tests passed. Source was `b1490a8`, based on main
+`943bb0a`; the subsequent main merge changed only physics planning documents.
+
+Four independent target-profile Pods then ran together for 182 seconds. Each
+passed the same complete JUnit case multiset and all console tests, with no
+OOM events. These temporary CPU-only test Pods had isolated filesystems and
+no GitHub registration, Kubernetes token or production credentials. They
+validate concurrent job resource usage, not a completed four-registration
+GitHub rollout. The latter still needs actual runner identities and capacity
+snapshot acceptance after the compatible router reaches main.
