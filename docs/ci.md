@@ -108,6 +108,16 @@ ordinary-CI security boundary in namespace `wqs-ci`, with a new StatefulSet name
 with cached registration belonging to another slot. It removes the short-lived
 registration token from the runner process environment after setup.
 
+The main runner container selects the enforcing `wqs-ci-runner` Localhost
+AppArmor profile. Install and verify Laminar's reviewed WQS CI policy package on
+Standpunkt before applying this manifest. The dedicated profile preserves the
+containerd confinement rules and permits same-profile signals for the stacked
+`//&unconfined` peer label. This fixes child termination without changing the
+shared runtime policy, seccomp, dropped capabilities or backup cleanup tests.
+Roll only idle runner slots after host readback, then verify SIGTERM/SIGKILL and
+the unchanged backup termination test before rerunning PR CI. Preserve each
+slot's PVC and cached registration during the rollout.
+
 Build from the reviewed commit:
 
 ```bash

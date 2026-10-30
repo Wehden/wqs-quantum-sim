@@ -78,6 +78,10 @@ spec:
             runAsGroup: 1001
             runAsNonRoot: true
             allowPrivilegeEscalation: false
+            # Install Laminar's reviewed host profile before applying this manifest.
+            appArmorProfile:
+              type: Localhost
+              localhostProfile: wqs-ci-runner
             capabilities:
               drop: [ALL]
           volumeMounts:

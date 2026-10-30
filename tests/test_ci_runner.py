@@ -18,6 +18,11 @@ def test_stateful_slots_keep_credentials_and_privileges_separate():
     assert 'volumes' not in pod  # no shared runner PVC, host paths, or production secrets
     runner = pod['containers'][0]
     assert runner['securityContext']['runAsNonRoot'] is True
+    assert runner['securityContext']['appArmorProfile'] == {
+        'type': 'Localhost', 'localhostProfile': 'wqs-ci-runner'}
+    assert runner['securityContext']['allowPrivilegeEscalation'] is False
+    assert runner['securityContext']['capabilities'] == {'drop': ['ALL']}
+    assert pod['securityContext']['seccompProfile'] == {'type': 'RuntimeDefault'}
     assert runner['resources'] == {'requests': {'cpu': '1', 'memory': '1Gi'},
                                    'limits': {'cpu': '6', 'memory': '5Gi'}}
     env = {e['name']: e for e in runner['env']}
