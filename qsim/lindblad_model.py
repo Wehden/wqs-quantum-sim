@@ -208,8 +208,10 @@ def _envelope_bounds(envelope, left, right, sample_times):
         return 0., 0., 0.
     if envelope.shape == 'gaussian':
         return 1., 1/envelope.sigma, _bound_product(1/envelope.sigma, 1/envelope.sigma)
-    if envelope.shape == 'flattop_cosine' and (right <= envelope.start+envelope.rise or
-                                              left >= envelope.stop-envelope.rise):
+    # Rounded absolute ramp edges can lie inside a ramp. Retain derivative
+    # bounds whenever any part of this segment overlaps either ramp tail.
+    if envelope.shape == 'flattop_cosine' and (left-envelope.start < envelope.rise or
+                                              envelope.stop-right < envelope.rise):
         return 1., (.5*math.pi)/envelope.rise, _bound_product(
             math.pi/envelope.rise, math.pi/envelope.rise, .5)
     return 1., 0., 0.
