@@ -1,6 +1,5 @@
 """Native Lindblad construction inside the isolated numerical child."""
 from dataclasses import dataclass
-import bisect
 import math
 
 import numpy as np
@@ -193,14 +192,14 @@ def _bound_product(*factors):
     return product
 
 
-def _envelope_bounds(envelope, left, right):
+def _envelope_bounds(envelope, left, right, sample_times):
     """Bounds on |e|, |e'| and |e''| within one smooth, one-sided piece."""
     if envelope.shape == 'constant':
         return 1., 0., 0.
     if envelope.shape == 'sampled':
         if right <= envelope.times[0] or left >= envelope.times[-1]:
             return 0., 0., 0.
-        index = bisect.bisect_right(envelope.times, left)-1
+        index = int(np.searchsorted(sample_times, left, side='right'))-1
         index = min(index, len(envelope.times)-2)
         values = [complex(value.re, value.im) for value in envelope.values[index:index+2]]
         width = envelope.times[index+1]-envelope.times[index]
@@ -216,14 +215,15 @@ def _envelope_bounds(envelope, left, right):
     return 1., 0., 0.
 
 
-def _envelope_values(envelope, times):
+def _envelope_values(envelope, times, sample_times):
     """Evaluate a segment's one-sided envelope, including its endpoint limits."""
     if envelope.shape == 'constant':
         return np.ones(times.size, dtype=np.complex128)
     if envelope.shape == 'sampled':
         if times[-1] <= envelope.times[0] or times[0] >= envelope.times[-1]:
             return np.zeros(times.size, dtype=np.complex128)
-        index = min(bisect.bisect_right(envelope.times, times[0])-1, len(envelope.times)-2)
+        index = min(int(np.searchsorted(sample_times, times[0], side='right'))-1,
+                    len(envelope.times)-2)
         first, last = (complex(value.re, value.im) for value in envelope.values[index:index+2])
         weight = (times-envelope.times[index])/(envelope.times[index+1]-envelope.times[index])
         return first*(1-weight)+last*weight
@@ -268,7 +268,7 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
         return ()
     if type(refinement) is not int or refinement < 1:
         raise ValueError('invalid_model: coefficient refinement must be a positive integer')
-    output = request.canonical_envelope()['times']
+    output = np.asarray(request.canonical_envelope()['times'], dtype=np.float64)
     start, stop = output[0], output[-1]
     edges = {start, stop}
     operators = []
@@ -294,7 +294,10 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
                                   2 if request.solver == 'me' else 1)
         if not math.isfinite(strength):
             raise ValueError('resource_limit: coefficient operator bound is unrepresentable')
-        operators.append((operator, strength))
+        # Cache each bounded sample vector once; lookup must not repeatedly
+        # convert a full Python sample list for every smooth segment.
+        sample_times = np.asarray(envelope.times, dtype=np.float64) if envelope.shape == 'sampled' else None
+        operators.append((operator, strength, sample_times))
     edges = sorted(edges)
     plans = []
     knot_count = 0
@@ -302,9 +305,9 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
         duration = right-left
         bounds = []
         phase_bounds = []
-        for drive, (_, strength) in zip(request.model.drives, operators):
+        for drive, (_, strength, sample_times) in zip(request.model.drives, operators):
             try:
-                value, slope, curvature = _envelope_bounds(drive.envelope, left, right)
+                value, slope, curvature = _envelope_bounds(drive.envelope, left, right, sample_times)
                 frequency = abs(2*math.pi*drive.detuning)
                 derivative = curvature + _bound_product(2, frequency, slope) + _bound_product(
                     frequency, frequency, value)
@@ -338,7 +341,8 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
     grids = []
     knot_count = 0
     for left, right, intervals, curvature, phase_error in plans:
-        requested = output[bisect.bisect_left(output, left):bisect.bisect_right(output, right)]
+        requested = output[np.searchsorted(output, left, side='left'):
+                           np.searchsorted(output, right, side='right')]
         merged = set(np.linspace(left, right, intervals+1))
         merged.update(requested)
         knot_count += len(merged)
@@ -360,8 +364,8 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
     for left, right, times, feature_step, actual_error in grids:
         terms = [hamiltonian]
         coefficients = []
-        for drive, (operator, _) in zip(request.model.drives, operators):
-            values = _envelope_values(drive.envelope, times)
+        for drive, (operator, _, sample_times) in zip(request.model.drives, operators):
+            values = _envelope_values(drive.envelope, times, sample_times)
             omega = 2*math.pi*drive.detuning
             # Separate range reduction prevents a large phase/origin from
             # swallowing an otherwise representable varying carrier.
