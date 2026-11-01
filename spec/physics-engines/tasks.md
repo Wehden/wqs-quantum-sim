@@ -267,16 +267,17 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - **Requirements:** PHY-005, PHY-006, PHY-007, PHY-009, PHY-011.
 - **Recommended Mode:** executor.
 - **Risk:** High: an output-only grid can omit a pulse or alias modulation.
-- **Files/areas:** `qsim/lindblad_model.py`, `tests/test_lindblad_drives.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
+- **Files/areas:** `qsim/lindblad_model.py`, `tests/test_lindblad_drives.py`, and the one superseded drive-refusal assertion in `tests/test_lindblad_states.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
 - **Steps:** Implement only the pulse shapes resolved in TASK-006. Construct a bounded coefficient grid containing required support boundaries, supplied sample knots and sufficient analytic/modulation resolution independently of output times. Use QuTiP numeric coefficients with explicit linear interpolation and conjugation. Set the verified integration-step constraint. Refuse excessive grid growth; do not call string coefficient compilation.
 - **Verification:** Run uv run --frozen --extra worker --extra controller --extra backup pytest -q tests/test_lindblad_drives.py. Include a pulse entirely between output times, complex exponential modulation, DRAG/rise cases if admitted, sample extrapolation, phase/units and grid-refinement convergence against declared tolerances.
 - **Rollback / Backout:** Withhold unresolved drive shapes and keep the last approved schema; do not approximate silently.
-- **Change budget:** max_files=2, max_new_symbols=10, interface_policy=extend-only.
+- **Change budget:** max_files=3, max_new_symbols=10, interface_policy=extend-only.
 - **write_lease:**
 
 ```text
 ^qsim/lindblad_model\.py$
 ^tests/test_lindblad_drives\.py$
+^tests/test_lindblad_states\.py$
 ```
 
 ### TASK-013: Implement deterministic Lindblad evolution
@@ -810,7 +811,7 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
 | TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States and collapse channels are complete through TASK-011; pulses and solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
-| TASK-012 | In progress from main `3d8cbd6`: bounded numeric drive grids under the approved two-file lease. Implementation, numerical verification and PR acceptance are outstanding. |
+| TASK-012 | In progress from main `3d8cbd6`: bounded numeric drive grids under the amended three-file lease. Implementation, numerical verification and PR acceptance are outstanding. |
 | TASK-013 through TASK-016 | Not started. Solvers follow TASK-012 in dependency order. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
@@ -1025,6 +1026,8 @@ TASK-008 passed its isolated full canonical CI (882 Python tests, 6 subtests and
 
 PR #55 merged TASK-011 at `2310ca97f96d5dd63949e09e654bd7b596afd7c8`. PR #56 merged TASK-035 at `3d8cbd62049d8e5657a69a65aa638971fdc6fecf`. Both are on current main; exact-main CI run 41333543501 passed with Standpunkt tests and hosted image/tool checks. The automatic review for PR #56 completed cleanly at its final head before the owner merged it.
 
-The owner authorized the next batch. TASK-012 and TASK-036 start from `3d8cbd6` in separate worktrees. TASK-012 owns only `qsim/lindblad_model.py` and `tests/test_lindblad_drives.py`. TASK-036 owns only `vendor/josim/bounded-history.patch`, `tests/test_josim_history.py` and `spec/physics-engines/probe_josim_history.py`. Its native patch hunks are restricted to pinned upstream `include/JoSIM/Simulation.hpp`, `src/Simulation.cpp`, `src/Output.cpp` and `include/JoSIM/Transient.hpp`. The coordinator owns this checklist and README; neither executor edits shared status. Existing task budgets and interface restrictions apply.
+The owner authorized the next batch. TASK-012 and TASK-036 start from `3d8cbd6` in separate worktrees. TASK-012 owns `qsim/lindblad_model.py`, `tests/test_lindblad_drives.py` and the superseded refusal test in `tests/test_lindblad_states.py`. TASK-036 owns only `vendor/josim/bounded-history.patch`, `tests/test_josim_history.py` and `spec/physics-engines/probe_josim_history.py`. Its native patch hunks are restricted to pinned upstream `include/JoSIM/Simulation.hpp`, `src/Simulation.cpp`, `src/Output.cpp` and `include/JoSIM/Transient.hpp`. The coordinator owns this checklist and README; neither executor edits shared status. Existing task budgets and interface restrictions apply.
 
 The existing circuit release at `00185b5` passed all eight live acceptance cases and native SkyPilot checks; CD run 41200949699 is green. This closes that operational bootstrap baseline. It does not complete physics G2, G3 or G4, or authorize physics admission. Worker/API integration, native memory certificates and final physics image/release acceptance remain required. Credentials, unrelated workloads and backup/release gates are unchanged. All GPU work remains scheduled through SkyPilot; this batch adds no GPU allocation.
+
+TASK-012 lease clarification: the existing state suite explicitly refuses all private drive construction as a placeholder for future work. Bounded drive construction supersedes that assertion. The executor may change only that adjacent assertion to verify segmented private construction while public admission remains gated. The task file budget becomes three; the production symbol budget, published interfaces and semantic scope are unchanged. This amendment is recorded before the adjacent test is edited.
