@@ -1,0 +1,334 @@
+diff --git a/include/JoSIM/Simulation.hpp b/include/JoSIM/Simulation.hpp
+index c069237..89378e2 100755
+--- a/include/JoSIM/Simulation.hpp
++++ b/include/JoSIM/Simulation.hpp
+@@ -9,6 +9,8 @@
+ #include "JoSIM/Misc.hpp"
+ 
+ #include <cassert>
++#include <array>
++#include <stdexcept>
+ #include <suitesparse/klu.h>
+ 
+ namespace JoSIM {
+@@ -23,6 +25,13 @@ class Results {
+   public:
+     std::vector<std::optional<std::vector<double>>> xVector;
+     std::vector<double>                             timeAxis;
++    bool bounded = false;
++    static constexpr size_t rowLimit = 4096;
++    std::array<std::vector<double>, 3> rolling;
++
++    double sample(int64_t variable, size_t row, size_t previous = 0) const {
++        return xVector.at(variable).value().at(bounded ? 3 * row + 2 - previous : row - previous);
++    }
+ };
+ 
+ class Simulation {
+@@ -45,6 +54,12 @@ class Simulation {
+     klu_l_numeric*  Numeric_;
+ #endif
+ 
++    double nextPrintPoint_ = 0;
++#ifdef WQS_JOSIM_HISTORY_AUDIT
++    uint64_t attempts_ = 0, internalSteps_ = 0;
++#endif
++    bool bounded_history(Input& iObj, const Matrix& mObj) const;
++    void capture(int64_t i, double step);
+     void setup(Input& iObj, Matrix& mObj);
+     void trans_sim(Matrix& mObj);
+     void setup_b(Matrix& mObj, int64_t i, double step, double factor = 1);
+diff --git a/include/JoSIM/Transient.hpp b/include/JoSIM/Transient.hpp
+index e90dda7..6896d3e 100755
+--- a/include/JoSIM/Transient.hpp
++++ b/include/JoSIM/Transient.hpp
+@@ -6,6 +6,9 @@
+ #include "JoSIM/Parameters.hpp"
+ #include "JoSIM/TypeDefines.hpp"
+ 
++#include <cmath>
++#include <limits>
++#include <stdexcept>
+ #include <string>
+ #include <vector>
+ 
+@@ -32,7 +35,14 @@ class Transient {
+ 
+     double      prfirwindow() const { return prfirwindow_; }
+ 
+-    int64_t     simsize() const { return static_cast<int64_t>(tstop_ / tstep_); }
++    int64_t simsize() const {
++        const double rows = tstop_ / tstep_;
++        if (!std::isfinite(tstep_) || tstep_ <= 0 || !std::isfinite(tstop_) || tstop_ <= 0
++            || !std::isfinite(rows) || rows < 1 || rows >= std::ldexp(1.0, 63)) {
++            throw std::runtime_error("Transient representation limit");
++        }
++        return static_cast<int64_t>(rows);
++    }
+ 
+     bool        startup() const { return startup_; }
+ 
+diff --git a/src/Output.cpp b/src/Output.cpp
+index a925a23..4d7de27 100755
+--- a/src/Output.cpp
++++ b/src/Output.cpp
+@@ -72,6 +72,10 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+     for (auto& hanning : firwindow) { hanning = firscale * hanning; }
+     // Indices to print
+     std::vector<int64_t> result_indices;
++    if (sObj.results.bounded) {
++        result_indices.reserve(t.size());
++        for (size_t i = 0; i < t.size(); ++i) { result_indices.emplace_back(static_cast<int64_t>(i)); }
++    } else {
+     for (auto i = 0; i < t.size(); ++i) {
+         if (t.at(i) >= tran.prstart()) {
+             result_indices.emplace_back(i);
+@@ -85,6 +89,7 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+             next_print_point += tran.prstep();
+         }
+     }
++    }
+     // Create the time trace
+     traces.emplace_back("time");
+     traces.back().type_ = 'T';
+@@ -140,26 +145,26 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+                         // Calculate individual voltage sample
+                         double value;
+                         // Shorthand values
+-                        auto   valin1 = i1 != -1 ? x.at(i1).value().at(jk) : 0;
+-                        auto   valin2 = i2 != -1 ? x.at(i2).value().at(jk) : 0;
++                        auto   valin1 = i1 != -1 ? sObj.results.sample(i1, jk) : 0;
++                        auto   valin2 = i2 != -1 ? sObj.results.sample(i2, jk) : 0;
+                         // If the analysis method was voltage
+                         if (iObj.argAnal == AnalysisType::Voltage) {
+                             value = valin1 - valin2;
+                             // Else calculate the voltage from the phase value
+                         } else {
+                             if (i.deviceLabel.value().at(3) == 'B' && vi != -1) {
+-                                value = x.at(vi).value().at(jk);
++                                value = sObj.results.sample(vi, jk);
+                             } else {
+                                 double valin1n1, valin1n2;
+                                 double valin2n1, valin2n2;
+-                                if (jk >= 2) {
+-                                    valin1n2 = i1 != -1 ? x.at(i1).value().at(jk - 2) : 0;
+-                                    valin1n1 = i1 != -1 ? x.at(i1).value().at(jk - 1) : 0;
+-                                    valin2n2 = i2 != -1 ? x.at(i2).value().at(jk - 2) : 0;
+-                                    valin2n1 = i2 != -1 ? x.at(i2).value().at(jk - 1) : 0;
++                                if (sObj.results.bounded || jk >= 2) {
++                                    valin1n2 = i1 != -1 ? sObj.results.sample(i1, jk, 2) : 0;
++                                    valin1n1 = i1 != -1 ? sObj.results.sample(i1, jk, 1) : 0;
++                                    valin2n2 = i2 != -1 ? sObj.results.sample(i2, jk, 2) : 0;
++                                    valin2n1 = i2 != -1 ? sObj.results.sample(i2, jk, 1) : 0;
+                                 } else if (jk == 1) {
+-                                    valin1n2 = valin1n1 = i1 != -1 ? x.at(i1).value().at(jk - 1) : 0;
+-                                    valin2n2 = valin2n1 = i2 != -1 ? x.at(i2).value().at(jk - 1) : 0;
++                                    valin1n2 = valin1n1 = i1 != -1 ? sObj.results.sample(i1, jk, 1) : 0;
++                                    valin2n2 = valin2n1 = i2 != -1 ? sObj.results.sample(i2, jk, 1) : 0;
+                                 } else {
+                                     valin1n2 = valin1n1 = valin1;
+                                     valin2n2 = valin2n1 = valin2;
+@@ -194,8 +199,8 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+                                 jk = xsize - 1;
+                             }
+                             // Calculate individual phase sample
+-                            auto valin1  = i1 != -1 ? x.at(i1).value().at(jk) : 0;
+-                            auto valin2  = i2 != -1 ? x.at(i2).value().at(jk) : 0;
++                            auto valin1  = i1 != -1 ? sObj.results.sample(i1, jk) : 0;
++                            auto valin2  = i2 != -1 ? sObj.results.sample(i2, jk) : 0;
+                             auto value   = valin1 - valin2;
+                             accumulator += firwindow.at(k) * value;
+                         }
+@@ -217,7 +222,7 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+                                     jk = xsize - 1;
+                                 }
+                                 // Get individual phase sample
+-                                auto value   = x.at(vi).value().at(jk);
++                                auto value   = sObj.results.sample(vi, jk);
+                                 accumulator += firwindow.at(k) * value;
+                             }
+                             traces.back().data_.emplace_back(accumulator);
+@@ -230,8 +235,8 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+                         vectphase.reserve(xsize);
+                         double phaseN1 = 0., phaseN2 = phaseN1;
+                         for (auto j = 0; j < xsize; j++) {
+-                            auto valin1 = i1 != -1 ? x.at(i1).value().at(j) : 0;
+-                            auto valin2 = i2 != -1 ? x.at(i2).value().at(j) : 0;
++                            auto valin1 = i1 != -1 ? sObj.results.sample(i1, j) : 0;
++                            auto valin2 = i2 != -1 ? sObj.results.sample(i2, j) : 0;
+                             auto value  = ((2.0 * iObj.transSim.tstep()) / (3.0 * Constants::SIGMA)) * (valin1 - valin2)
+                                          + (4.0 / 3.0) * (phaseN1) - (1.0 / 3.0) * (phaseN2);
+                             phaseN2 = phaseN1;
+@@ -279,7 +284,7 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+                         // Get individual current sample
+                         double value;
+                         if (i.deviceLabel.value().at(3) != 'I') {
+-                            value = x.at(i1).value().at(jk);
++                            value = sObj.results.sample(i1, jk);
+                         } else {
+                             value = mObj.sourcegen.at(i.sourceIndex.value()).value(t.at(jk));
+                         }
+@@ -326,7 +331,7 @@ void Output::write_output(const Input& iObj, Matrix& mObj, Simulation& sObj) {
+                     } else if (static_cast<size_t>(jk) >= xsize) {
+                         jk = xsize - 1;
+                     }
+-                    accumulator += firwindow.at(k) * x.at(i.second).value().at(jk);
++                    accumulator += firwindow.at(k) * sObj.results.sample(i.second, jk);
+                 }
+                 traces.back().data_.emplace_back(accumulator);
+             }
+diff --git a/src/Simulation.cpp b/src/Simulation.cpp
+index 80fc79d..c3ee5c2 100755
+--- a/src/Simulation.cpp
++++ b/src/Simulation.cpp
+@@ -18,6 +18,9 @@ using namespace JoSIM;
+ 
+ Simulation::Simulation(Input& iObj, Matrix& mObj) {
+     while (needsTR_) {
++#ifdef WQS_JOSIM_HISTORY_AUDIT
++        ++attempts_;
++#endif
+         // Do generic simulation setup for given step size
+         setup(iObj, mObj);
+         // Do solver setup
+@@ -48,6 +51,75 @@ Simulation::Simulation(Input& iObj, Matrix& mObj) {
+         klu_l_free_numeric(&Numeric_, &Common_);
+ #endif
+     }
++#ifdef WQS_JOSIM_HISTORY_AUDIT
++    size_t history = sizeof(Results) + results.timeAxis.capacity() * sizeof(double)
++                     + results.xVector.capacity() * sizeof(decltype(results.xVector)::value_type);
++    size_t selected = 0;
++    for (const auto& v : results.xVector) {
++        if (v) { history += v->capacity() * sizeof(double); ++selected; }
++    }
++    for (const auto& v : results.rolling) { history += v.capacity() * sizeof(double); }
++    std::cerr << "WQS_HISTORY {\"bounded\":" << (results.bounded ? "true" : "false")
++              << ",\"history_capacity_bytes\":" << history
++              << ",\"rows\":" << results.timeAxis.size()
++              << ",\"dimension\":" << results.xVector.size()
++              << ",\"selected_variables\":" << selected
++              << ",\"rhs_capacity_bytes\":" << (x_.capacity() + b_.capacity()) * sizeof(double)
++              << ",\"klu_peak_bytes\":" << Common_.mempeak
++              << ",\"matrix_nonzeros\":" << mObj.nz.size()
++              << ",\"final_attempt_steps\":" << simSize_
++              << ",\"attempts\":" << attempts_
++              << ",\"internal_steps\":" << internalSteps_ << "}\n";
++#endif
++}
++
++bool Simulation::bounded_history(Input& iObj, const Matrix& mObj) const {
++    if (iObj.argAnal != AnalysisType::Phase || iObj.transSim.prstart() != 0
++        || iObj.transSim.prfirwindow() != 0 || !iObj.transSim.startup()
++        || !iObj.cli_output_file || iObj.cli_output_file->type() != FileOutputType::Csv
++        || iObj.globalTemp.has_value() || !iObj.output_files.empty() || mObj.relevantTraces.empty()
++        || mObj.relevantTraces.size() > 8 || mObj.relevantIndices.size() > 24
++        || mObj.branchIndex <= 0 || mObj.branchIndex > 80 || mObj.nm.size() > 16
++        || iObj.netlist.expNetlist.size() > 32 || !mObj.components.mutualinductances.empty()) { return false; }
++    if (!std::isfinite(iObj.transSim.prstep()) || iObj.transSim.prstep() <= 0
++        || iObj.transSim.tstop() / iObj.transSim.prstep() > Results::rowLimit) { return false; }
++    for (const auto& line : iObj.netlist.expNetlist) {
++        const auto& tokens = line.first;
++        if (tokens.empty() || tokens.front().empty()) { return false; }
++        for (const auto& token : tokens) { if (token.rfind("TEMP=", 0) == 0) { return false; } }
++        const auto kind = tokens.front().front();
++        if (kind != 'R' && kind != 'L' && kind != 'B' && kind != 'I' && kind != 'V') { return false; }
++        if ((kind == 'I' || kind == 'V')
++            && (tokens.size() < 4 || (tokens.at(3) != "DC" && tokens.at(3).rfind("PWL(", 0) != 0))) { return false; }
++    }
++    return true;
++}
++
++void Simulation::capture(int64_t i, double step) {
++    if (!results.bounded) {
++        for (size_t j = 0; j < results.xVector.size(); ++j) {
++            if (results.xVector.at(j)) { results.xVector.at(j)->emplace_back(x_.at(j)); }
++        }
++        results.timeAxis.emplace_back(step);
++        return;
++    }
++    auto& row = results.rolling.at(static_cast<size_t>(i % 3));
++    std::copy_n(x_.begin(), row.size(), row.begin());
++    if (i != 0 && step < nextPrintPoint_) { return; }
++    if (results.timeAxis.size() >= Results::rowLimit) { throw std::runtime_error("History resource limit"); }
++    for (size_t j = 0; j < results.xVector.size(); ++j) {
++        if (!results.xVector.at(j)) { continue; }
++        for (int previous = 2; previous >= 0; --previous) {
++            const auto index = i < previous ? 0 : i - previous;
++            results.xVector.at(j)->emplace_back(results.rolling.at(static_cast<size_t>(index % 3)).at(j));
++        }
++    }
++    results.timeAxis.emplace_back(step);
++    if (i != 0) {
++        const double next = nextPrintPoint_ + prstep_;
++        if (!std::isfinite(next) || next <= nextPrintPoint_) { throw std::runtime_error("Print representation limit"); }
++        nextPrintPoint_ = next;
++    }
+ }
+ 
+ void Simulation::setup(Input& iObj, Matrix& mObj) {
+@@ -61,6 +133,11 @@ void Simulation::setup(Input& iObj, Matrix& mObj) {
+     prstep_   = iObj.transSim.prstep();
+     prstart_  = iObj.transSim.prstart();
+     startup_  = iObj.transSim.startup();
++    results.bounded = bounded_history(iObj, mObj);
++    nextPrintPoint_ = prstart_ + prstep_;
++    if (results.bounded && !std::isfinite((3.0 * Constants::SIGMA) / (2.0 * stepSize_))) {
++        throw std::runtime_error("Transient representation limit");
++    }
+     x_.clear();
+     x_.resize(mObj.branchIndex, 0.0);
+     if (!mObj.relevantTraces.empty()) {
+@@ -69,6 +146,12 @@ void Simulation::setup(Input& iObj, Matrix& mObj) {
+     } else {
+         results.xVector.resize(mObj.branchIndex, std::vector<double>(0));
+     }
++    if (results.bounded) {
++        // Fixed dimensions are checked above before any history allocation.
++        for (auto& v : results.rolling) { v.assign(static_cast<size_t>(mObj.branchIndex), 0.0); }
++        results.timeAxis.reserve(Results::rowLimit);
++        for (auto& v : results.xVector) { if (v) { v->reserve(3 * Results::rowLimit); } }
++    }
+ }
+ 
+ void Simulation::trans_sim(Matrix& mObj) {
+@@ -87,8 +170,8 @@ void Simulation::trans_sim(Matrix& mObj) {
+     b_.resize(mObj.rp.size(), 0.0);
+     if (startup_) {
+         // Stabilize the simulation before starting at t=0
+-        int64_t startup = static_cast<int64_t>(2 * pow(10, (abs(log10(stepSize_)) - 12) * 2 + 1));
+-        if (startup > 1000) { startup = 1000; }
++        const double startupValue = 2 * pow(10, (abs(log10(stepSize_)) - 12) * 2 + 1);
++        int64_t startup = startupValue >= 1000 ? 1000 : static_cast<int64_t>(startupValue);
+         for (int64_t i = -startup; i < 0; ++i) {
+             double step = i * stepSize_;
+             // Setup the b matrix
+@@ -124,12 +207,10 @@ void Simulation::trans_sim(Matrix& mObj) {
+         // If anything is a amiss, complain about it
+         if (!simOK_) { Errors::simulation_errors(SimulationErrors::MATRIX_SINGULAR); }
+ #endif
+-        // Store results (only requested, to prevent massive memory usage)
+-        for (auto j = 0; j < results.xVector.size(); ++j) {
+-            if (results.xVector.at(j)) { results.xVector.at(j).value().emplace_back(x_.at(j)); }
+-        }
+-        // Store the time step
+-        results.timeAxis.emplace_back(step);
++        capture(i, step);
++#ifdef WQS_JOSIM_HISTORY_AUDIT
++        ++internalSteps_;
++#endif
+     }
+     if (!minOut_) {
+         bar.complete();
+@@ -138,7 +219,10 @@ void Simulation::trans_sim(Matrix& mObj) {
+ }
+ 
+ void Simulation::reduce_step(Input& iObj, Matrix& mObj) {
+-    iObj.transSim.tstep(iObj.transSim.tstep() / 2);
++    const double reduced = iObj.transSim.tstep() / 2;
++    if (!std::isfinite(reduced) || reduced <= 0) { throw std::runtime_error("Transient representation limit"); }
++    iObj.transSim.tstep(reduced);
++    iObj.transSim.simsize();
+     Rng::rewind();
+     bool tempMinOut = iObj.argMin;
+     if (!iObj.argMin) { iObj.argMin = true; }

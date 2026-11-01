@@ -143,7 +143,7 @@ def _parse(raw):
     return tuple(rows[0]), values, hashlib.sha256(packed).hexdigest()
 
 
-def _run(binary, netlist, success, guard):
+def _run(binary, netlist, success, guard, audit=False):
     with tempfile.TemporaryDirectory(prefix='wqs-josim-history-') as scratch:
         root = Path(scratch)
         (root / 'input.cir').write_text(netlist, encoding='ascii')
@@ -167,12 +167,24 @@ def _run(binary, netlist, success, guard):
             raise ValueError('failure must not produce partial CSV')
         if not success and b'Matrix is singular.' not in (root / 'diagnostic.txt').read_bytes():
             raise ValueError('expected native singular-matrix failure')
-        diagnostic_hash = hashlib.sha256((root / 'diagnostic.txt').read_bytes()).hexdigest()
+        diagnostics = (root / 'diagnostic.txt').read_bytes()
+        measurements = []
+        if audit:
+            measurements = [json.loads(line.removeprefix(b'WQS_HISTORY '))
+                            for line in diagnostics.splitlines() if line.startswith(b'WQS_HISTORY ')]
+            if len(measurements) != 1 or measurements[0].get('bounded') is not True:
+                raise ValueError('bounded native instrumentation missing')
+            diagnostics = b'\n'.join(line for line in diagnostics.splitlines()
+                                     if not line.startswith(b'WQS_HISTORY '))
+            if diagnostics:
+                diagnostics += b'\n'
+        diagnostic_hash = hashlib.sha256(diagnostics).hexdigest()
         parsed = _parse(raw) if success else None
         return {'status': completed.returncode, 'diagnostic_sha256': diagnostic_hash, 'csv_sha256': hashlib.sha256(raw).hexdigest(),
                 'array_sha256': parsed[2] if parsed else None,
                 'rows': len(parsed[1]) if parsed else 0, 'bytes': len(raw),
-                'elapsed_seconds': round(elapsed, 6)}, raw, parsed
+                'elapsed_seconds': round(elapsed, 6),
+                'history': measurements[0] if measurements else None}, raw, parsed
 
 
 def _compare(original, candidate):
@@ -206,10 +218,50 @@ def _self_checks():
     return {'malformed_csv_rejected': 3, 'comparison_tamper_rejected': 1}
 
 
+
+def _capacity_cases():
+    """Fixed admitted shapes; counts grow without changing output reservation."""
+    cases = {}
+    for name, step, stop in (('dc_1ns', '1e-12', '1e-9'),
+                            ('dc_10ns', '1e-11', '1e-8'),
+                            ('dc_100ns', '1e-10', '1e-7'),
+                            ('dc_1us', '1e-9', '1e-6')):
+        cases[name] = ('B01 1 0 MOD AREA=1\nV01 1 0 DC 0.1\n' + MODEL +
+                       f'.TRAN {step} {stop}\n.PRINT PHASE B01\n.END\n')
+    lines = [f'B{i:02d} {2*i-1} {2*i if i<8 else 0} MOD AREA=1' for i in range(1, 9)]
+    lines += [f'B{i:02d} {(i-9)%15+1} 0 MOD AREA=1' for i in range(9, 33)]
+    lines += [MODEL.rstrip(), '.TRAN 9.094947017729282e-13 3.725290298461914e-9']
+    lines += [f'.PRINT DEVV B{i:02d}' for i in range(1, 9)]
+    cases['maximum_history'] = '\n'.join([*lines, '.END', ''])
+    # Simultaneously cover the maximum admitted PWL input and output rows.
+    knots = ' '.join(f'{i*1e-12:.17g} {0 if i%2==0 else 1e-6}' for i in range(64))
+    lines[31] = f'I32 0 1 PWL({knots})'
+    cases['maximum_pwl'] = '\n'.join([*lines, '.END', ''])
+    return cases
+
+
+def _verify_capacity(record):
+    dimension, selected, rows = (record[key] for key in ('dimension', 'selected_variables', 'rows'))
+    if (record.get('bounded') is not True or not 0 < dimension <= 80
+            or not 0 < selected <= 24 or not 0 < rows <= 4096):
+        raise ValueError('bounded history dimensions')
+    # GCC13/libstdc++ reserve(n) allocates exactly n elements. Include 80 optional
+    # vector objects, all ring/vector owners, and allocator alignment headroom.
+    history_bound = 8 * (3*dimension + 3*selected*4096 + 4096) + 80*32 + 512
+    rhs_bound = 4 * (dimension+1) * 8
+    if (not 0 < record['history_capacity_bytes'] <= history_bound
+            or not 0 < record['rhs_capacity_bytes'] <= rhs_bound):
+        raise ValueError('bounded history/RHS capacity exceeded')
+    if record['attempts'] < 1 or record['internal_steps'] < record['final_attempt_steps']:
+        raise ValueError('invalid native attempt counters')
+    return {'history_bound_bytes': history_bound, 'rhs_bound_bytes': rhs_bound}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--original', required=True, type=Path)
     parser.add_argument('--candidate', required=True, type=Path)
+    parser.add_argument('--instrumented', type=Path, help='same patched source compiled with WQS_JOSIM_HISTORY_AUDIT')
     parser.add_argument('--guard-seconds', type=float, default=30,
                         help='fixed discovery harness guard only; never product policy')
     args = parser.parse_args()
@@ -252,6 +304,28 @@ def main():
             if not all(abs(value - 1) <= 0.02 for value in integrals):
                 raise ValueError('separate SFQ physical integral check failed')
             result['sfq_flux_quanta'] = integrals
+    if args.instrumented:
+        if (not args.instrumented.is_absolute() or not args.instrumented.is_file()
+                or not os.access(args.instrumented, os.X_OK)):
+            parser.error('instrumented requires a trusted absolute executable path')
+        result['instrumented_sha256'] = hashlib.sha256(args.instrumented.read_bytes()).hexdigest()
+        result['capacities'] = {}
+        for name, netlist in _capacity_cases().items():
+            measured = _run(args.instrumented, netlist, True, args.guard_seconds, audit=True)
+            record = measured[0]['history']
+            bound = _verify_capacity(record)
+            # Instrumentation is permitted to observe allocation only. Every
+            # long/max-shape candidate CSV must match its instrumented build.
+            native = _run(args.candidate, netlist, True, args.guard_seconds)
+            _compare(native, measured)
+            if name.startswith('maximum_'):
+                _compare(_run(args.original, netlist, True, args.guard_seconds), native)
+            result['capacities'][name] = {**record, **bound, 'csv_sha256': native[0]['csv_sha256']}
+        dc = [result['capacities'][name] for name in ('dc_1ns', 'dc_10ns', 'dc_100ns', 'dc_1us')]
+        if len({r['history_capacity_bytes'] for r in dc}) != 1:
+            raise ValueError('history capacity grows with native internal steps')
+        if any(b['internal_steps'] <= a['internal_steps'] for a, b in zip(dc, dc[1:])):
+            raise ValueError('internal-step growth experiment did not grow')
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
