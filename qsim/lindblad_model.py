@@ -254,6 +254,44 @@ def _carrier_argument_error(frequency, left, duration, phase):
                       _bound_product(frequency, math.ulp(duration))))
 
 
+def _linear_coefficient(times, values):
+    """Pinned native order-one interpolation with exact-knot binary lookup.
+
+    QuTiP 5.3.1 normally chooses uniform indexing with an allclose heuristic.
+    Restore its checked linear polynomial with dt=0 so observation knots retain
+    their declared positions. No callback or alternate interpolator is used.
+    """
+    from qutip.core.cy.coefficient import InterCoefficient
+
+    if (times.ndim != 1 or values.ndim != 1 or times.shape != values.shape or
+            not 2 <= times.size <= 65536 or times.dtype != np.float64 or
+            values.dtype != np.complex128 or not np.isfinite(times).all() or
+            not np.isfinite(values).all()):
+        raise ValueError('invalid_model: coefficient interpolation shape or values are invalid')
+    with np.errstate(over='ignore', invalid='ignore'):
+        widths = np.diff(times)
+    if not np.isfinite(widths).all() or not np.all(widths > 0):
+        raise ValueError('invalid_model: coefficient interpolation time widths are invalid')
+    times = np.ascontiguousarray(times)
+    polynomial = np.zeros((2, times.size), dtype=np.complex128)
+    polynomial[1] = values
+    rounding = 0.
+    if not np.all(values == values[0]):
+        with np.errstate(over='ignore', under='ignore', invalid='ignore', divide='ignore'):
+            polynomial[0, :-1] = np.diff(values)/widths
+        if not np.isfinite(polynomial).all():
+            raise ValueError('resource_limit: coefficient interpolation slope is unrepresentable')
+        magnitude = float(np.max(np.abs(values.real)+np.abs(values.imag)))
+        slope = float(np.max(np.abs(polynomial[0].real)+np.abs(polynomial[0].imag)))
+        if not math.isfinite(magnitude) or not math.isfinite(slope):
+            raise ValueError('resource_limit: coefficient interpolation magnitude is unrepresentable')
+        # IEEE-754 order-one evaluation: rounded differences/division, followed
+        # by slope*(t-knot)+value. The absolute term covers subnormal gradients
+        # and time differences; the ULP term covers normal complex arithmetic.
+        rounding = 64*math.ulp(magnitude)+64*math.ulp(0.)*max(1., float(np.max(widths)), slope)
+    return InterCoefficient.restore(times, polynomial, dt=0), rounding
+
+
 def _coefficient_segments(request, hamiltonian, *, refinement=1):
     """Build bounded linear coefficients; no function/string compilation occurs.
 
@@ -312,10 +350,14 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
                 derivative = curvature + _bound_product(2, frequency, slope) + _bound_product(
                     frequency, frequency, value)
                 bound = _bound_product(strength, derivative)
-                phase_error = _bound_product(duration, strength, value,
-                    _carrier_argument_error(frequency, left, duration, drive.phase))
+                envelope_error = (64*math.ulp(value) if value and
+                    drive.envelope.shape in ('sampled', 'gaussian', 'flattop_cosine') else 0.)
+                phase_error = math.fsum((
+                    _bound_product(duration, strength, value,
+                        _carrier_argument_error(frequency, left, duration, drive.phase)),
+                    _bound_product(duration, strength, envelope_error)))
                 if phase_error > 1e-6:
-                    raise ValueError('resource_limit: coefficient carrier precision is unresolved')
+                    raise ValueError('resource_limit: coefficient evaluation precision is unresolved')
             except (OverflowError, ZeroDivisionError):
                 bound = math.inf
             if not math.isfinite(bound):
@@ -353,18 +395,19 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
         if not np.all(np.diff(times) > 0) or not feature_step > 0:
             raise ValueError('resource_limit: coefficient grid has unrepresentable step spacing')
         spacing = float(np.max(np.diff(times)))
-        actual_error = _bound_product(right-left, curvature, spacing, spacing, .125)+phase_error
+        interpolation_error = _bound_product(right-left, curvature, spacing, spacing, .125)
+        actual_error = interpolation_error+phase_error
         if actual_error > 1e-6:
             raise ValueError('resource_limit: coefficient error budget cannot be resolved')
-        grids.append((left, right, times, feature_step, actual_error))
+        grids.append((left, right, times, feature_step, interpolation_error, phase_error))
     # Floating time rounding must not silently coarsen a certified feature grid.
-    if math.fsum(grid[-1] for grid in grids) > 1e-6:
+    if math.fsum(grid[-2]+grid[-1] for grid in grids) > 1e-6:
         raise ValueError('resource_limit: coefficient error budget cannot be resolved')
     result = []
-    for left, right, times, feature_step, actual_error in grids:
+    for left, right, times, feature_step, interpolation_error, roundoff_error in grids:
         terms = [hamiltonian]
         coefficients = []
-        for drive, (operator, _, sample_times) in zip(request.model.drives, operators):
+        for drive, (operator, strength, sample_times) in zip(request.model.drives, operators):
             values = _envelope_values(drive.envelope, times, sample_times)
             omega = 2*math.pi*drive.detuning
             # Separate range reduction prevents a large phase/origin from
@@ -374,16 +417,25 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
             if not np.isfinite(values).all():
                 raise ValueError('invalid_model: coefficient values are not finite')
             coefficients.append(values)
-            terms.append([operator, qt.coefficient(values, tlist=times, order=1)])
+            coefficient, native_roundoff = _linear_coefficient(times, values)
+            roundoff_error += _bound_product(right-left, strength, native_roundoff)
+            terms.append([operator, coefficient])
             if drive.hc:
                 conjugate = values.conj()
                 coefficients.append(conjugate)
-                terms.append([operator.dag(), qt.coefficient(conjugate, tlist=times, order=1)])
+                terms.append([operator.dag(), coefficient.conj()])
+        actual_error = interpolation_error+roundoff_error
+        if actual_error > 1e-6:
+            raise ValueError('resource_limit: coefficient roundoff budget cannot be resolved')
         result.append({'start': left, 'stop': right, 'times': times,
                        'coefficients': tuple(coefficients),
                        'hamiltonian': qt.QobjEvo(terms),
                        'max_step': feature_step,
-                       'coefficient_error_bound': actual_error})
+                       'coefficient_error_bound': actual_error,
+                       'coefficient_interpolation_bound': interpolation_error,
+                       'coefficient_roundoff_bound': roundoff_error})
+    if math.fsum(segment['coefficient_error_bound'] for segment in result) > 1e-6:
+        raise ValueError('resource_limit: coefficient roundoff budget cannot be resolved')
     return tuple(result)
 
 

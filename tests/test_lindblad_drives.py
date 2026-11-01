@@ -94,7 +94,8 @@ def test_smooth_pulses_certify_generator_error_and_converge_under_grid_doubling(
     refined = native._coefficient_segments(req, qt.qzero(2), refinement=2)
     certificate = sum(s['coefficient_error_bound'] for s in ordinary)
     assert 0 < certificate <= 1e-6
-    assert sum(s['coefficient_error_bound'] for s in refined) <= certificate/4*(1+1e-10)
+    interpolation = sum(s['coefficient_interpolation_bound'] for s in ordinary)
+    assert sum(s['coefficient_interpolation_bound'] for s in refined) <= interpolation/4*(1+1e-10)
     if shape == 'gaussian':
         analytic = lambda t: math.exp(-.5*((t-controls['center'])/controls['sigma'])**2)
     else:
@@ -185,7 +186,7 @@ def test_combined_segment_knots_refused_before_building_native_coefficients(monk
     req._physical_checks()
     def forbidden(*args, **kwargs):
         raise AssertionError('native coefficients allocated before complete knot count')
-    monkeypatch.setattr(qt, 'coefficient', forbidden)
+    monkeypatch.setattr(native, '_linear_coefficient', forbidden)
     with pytest.raises(ValueError, match='grid exceeds 65536'):
         native._coefficient_segments(req, qt.qzero(2))
 
@@ -248,3 +249,107 @@ def test_large_absolute_carrier_argument_is_refused_without_precision_certificat
                   amplitude=.03, detuning=.1, hc=True)
     with pytest.raises(ValueError, match='resource_limit: coefficient'):
         staged(req)
+
+
+def test_clipped_sampled_roundoff_cannot_claim_zero_error_at_large_coupling():
+    from fractions import Fraction
+    exact = Fraction(4, 3)
+    rounded = Fraction.from_float(1.3333333333333335)
+    assert (rounded-exact)*10**12/2 > Fraction(1, 10**6)
+    req = request({'shape': 'sampled', 'times': [0., 3.], 'values': [1., 2.]},
+                  times=[1., 1.5], amplitude=1e12)
+    with pytest.raises(ValueError, match='resource_limit: coefficient'):
+        staged(req)
+
+
+@pytest.mark.parametrize('values,times,amplitude', [
+    ([1., 2.], [1., 1.5], .03),
+    ([5e-324, 1e-323], [1., 1.5], .03),
+    ([1e12, -1e12], [1.499999999999, 1.5], 1e-12),
+])
+def test_sampled_normal_subnormal_and_cancellation_roundoff_has_exact_reference(values, times, amplitude):
+    from fractions import Fraction
+    envelope = {'shape': 'sampled', 'times': [0., 3.], 'values': values}
+    segments = staged(request(envelope, times=times, amplitude=amplitude)).coefficient_segments
+    assert sum(s['coefficient_error_bound'] for s in segments) > 0
+    for segment in segments:
+        bound = segment['coefficient_error_bound']
+        strength = 2*math.pi*amplitude*math.sqrt(2)
+        pointwise = bound/((segment['stop']-segment['start'])*strength)
+        for time, actual in zip(segment['times'], segment['coefficients'][0]):
+            weight = Fraction.from_float(float(time))/3
+            exact = Fraction.from_float(values[0])*(1-weight)+Fraction.from_float(values[1])*weight
+            error = abs(Fraction.from_float(float(actual.real))-exact)
+            assert error <= Fraction.from_float(float(pointwise))
+
+
+def test_native_linear_interpolation_uses_actual_nearly_uniform_knots():
+    from fractions import Fraction
+    times = np.array([0., 1e-9, 2.1e-9, 3e-9])
+    values = np.array([0., 1., 1., 0.], dtype=complex)
+    coefficient, bound = native._linear_coefficient(times, values)
+    time = 2.05e-9
+    exact = Fraction(1)
+    error = abs(Fraction.from_float(float(coefficient(time).real))-exact)
+    assert error <= Fraction.from_float(bound)
+
+
+@pytest.mark.parametrize('shape,controls', [
+    ('gaussian', {'center': 3., 'sigma': 2.}),
+    ('flattop_cosine', {'rise': 1.}),
+])
+def test_analytic_envelope_roundoff_is_charged_against_high_precision_reference(shape, controls):
+    from decimal import Decimal, localcontext
+    envelope = {'shape': shape, 'start': 2., 'stop': 6., **controls}
+    segments = staged(request(envelope)).coefficient_segments
+    with localcontext() as context:
+        context.prec = 80
+        pi = Decimal('3.141592653589793238462643383279502884197169399375105820974944592307816406286209')
+        for segment in segments:
+            if segment['start'] < 2 or segment['stop'] > 6:
+                continue
+            assert segment['coefficient_roundoff_bound'] > 0
+            strength = 2*math.pi*.03*math.sqrt(2)
+            limit = Decimal.from_float(segment['coefficient_roundoff_bound']/(
+                (segment['stop']-segment['start'])*strength))
+            for index in (0, len(segment['times'])//2, -1):
+                time = Decimal.from_float(float(segment['times'][index]))
+                if shape == 'gaussian':
+                    scaled = (time-Decimal(3))/2
+                    exact = (-scaled*scaled/2).exp()
+                else:
+                    distance = min(time-2, 6-time)
+                    if distance >= 1:
+                        exact = Decimal(1)
+                    else:
+                        angle = pi*distance
+                        cosine = term = Decimal(1)
+                        for order in range(1, 65):
+                            term *= -angle*angle/((2*order-1)*(2*order))
+                            cosine += term
+                        exact = (1-cosine)/2
+                actual = Decimal.from_float(float(segment['coefficients'][0][index].real))
+                assert abs(actual-exact) <= limit
+
+
+def test_native_slope_underflow_has_a_nonzero_absolute_error_allowance():
+    from fractions import Fraction
+    times = np.array([0., 1e308])
+    values = np.array([0., 1e-200], dtype=complex)
+    coefficient, bound = native._linear_coefficient(times, values)
+    assert bound > 0
+    exact = Fraction.from_float(1e-200)/2
+    actual = Fraction.from_float(float(coefficient(5e307).real))
+    assert abs(actual-exact) <= Fraction.from_float(bound)
+
+
+@pytest.mark.parametrize('times,values,error', [
+    ([0., 1e-320], [0., 1.], 'resource_limit'),
+    ([0., 1.], [0., float('nan')], 'invalid_model'),
+    ([0., 1.], [0., float('inf')], 'invalid_model'),
+    ([0., 0.], [0., 1.], 'invalid_model'),
+    ([-1e308, 1e308], [1., 1.], 'invalid_model'),
+])
+def test_invalid_or_unrepresentable_native_interpolation_is_refused(times, values, error):
+    with pytest.raises(ValueError, match=error):
+        native._linear_coefficient(np.array(times), np.array(values, dtype=complex))
