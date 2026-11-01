@@ -239,6 +239,21 @@ def _envelope_values(envelope, times):
     return np.ones(times.size, dtype=np.complex128)
 
 
+def _carrier_argument_error(frequency, left, duration, phase):
+    """Conservative argument uncertainty for factored absolute/relative carriers."""
+    rounding = 4*math.ulp(1.) if phase else 0.
+    if frequency == 0:
+        return rounding
+    origin, span = frequency*left, frequency*duration
+    if not math.isfinite(origin) or not math.isfinite(span):
+        raise ValueError('resource_limit: coefficient carrier is unrepresentable')
+    return math.fsum((rounding+12*math.ulp(1.),
+                      math.ulp(origin) if left else 0., math.ulp(span),
+                      _bound_product(abs(left), 2*math.ulp(frequency)),
+                      _bound_product(duration, 2*math.ulp(frequency)),
+                      _bound_product(frequency, math.ulp(duration))))
+
+
 def _coefficient_segments(request, hamiltonian, *, refinement=1):
     """Build bounded linear coefficients; no function/string compilation occurs.
 
@@ -286,6 +301,7 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
     for left, right in zip(edges, edges[1:]):
         duration = right-left
         bounds = []
+        phase_bounds = []
         for drive, (_, strength) in zip(request.model.drives, operators):
             try:
                 value, slope, curvature = _envelope_bounds(drive.envelope, left, right)
@@ -293,11 +309,16 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
                 derivative = curvature + _bound_product(2, frequency, slope) + _bound_product(
                     frequency, frequency, value)
                 bound = _bound_product(strength, derivative)
+                phase_error = _bound_product(duration, strength, value,
+                    _carrier_argument_error(frequency, left, duration, drive.phase))
+                if phase_error > 1e-6:
+                    raise ValueError('resource_limit: coefficient carrier precision is unresolved')
             except (OverflowError, ZeroDivisionError):
                 bound = math.inf
             if not math.isfinite(bound):
                 raise ValueError('resource_limit: coefficient derivative bound is unrepresentable')
             bounds.append(bound)
+            phase_bounds.append(phase_error)
         try:
             curvature = math.fsum(bounds)
         except OverflowError:
@@ -312,11 +333,11 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
         knot_count += intervals+1
         if knot_count > 65536:
             raise ValueError('resource_limit: coefficient grid exceeds 65536 knots')
-        plans.append((left, right, intervals, curvature))
+        plans.append((left, right, intervals, curvature, math.fsum(phase_bounds)))
     # Refuse every analytic piece before constructing any numeric time grid.
     grids = []
     knot_count = 0
-    for left, right, intervals, curvature in plans:
+    for left, right, intervals, curvature, phase_error in plans:
         requested = output[bisect.bisect_left(output, left):bisect.bisect_right(output, right)]
         merged = set(np.linspace(left, right, intervals+1))
         merged.update(requested)
@@ -324,18 +345,28 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
         if knot_count > 65536:
             raise ValueError('resource_limit: coefficient grid exceeds 65536 knots')
         times = np.array(sorted(merged))
-        if not np.all(np.diff(times) > 0) or float(np.min(np.diff(times)))/2 == 0:
+        feature_step = ((right-left)/intervals)/2
+        if not np.all(np.diff(times) > 0) or not feature_step > 0:
             raise ValueError('resource_limit: coefficient grid has unrepresentable step spacing')
-        grids.append((left, right, times, curvature))
-    result = []
-    for left, right, times, curvature in grids:
-        duration = right-left
         spacing = float(np.max(np.diff(times)))
+        actual_error = _bound_product(right-left, curvature, spacing, spacing, .125)+phase_error
+        if actual_error > 1e-6:
+            raise ValueError('resource_limit: coefficient error budget cannot be resolved')
+        grids.append((left, right, times, feature_step, actual_error))
+    # Floating time rounding must not silently coarsen a certified feature grid.
+    if math.fsum(grid[-1] for grid in grids) > 1e-6:
+        raise ValueError('resource_limit: coefficient error budget cannot be resolved')
+    result = []
+    for left, right, times, feature_step, actual_error in grids:
         terms = [hamiltonian]
         coefficients = []
         for drive, (operator, _) in zip(request.model.drives, operators):
             values = _envelope_values(drive.envelope, times)
-            values *= np.exp(1j*((2*math.pi*drive.detuning)*times+drive.phase))
+            omega = 2*math.pi*drive.detuning
+            # Separate range reduction prevents a large phase/origin from
+            # swallowing an otherwise representable varying carrier.
+            values *= np.exp(1j*drive.phase)*np.exp(1j*(omega*left))
+            values *= np.exp(1j*(omega*(times-left)))
             if not np.isfinite(values).all():
                 raise ValueError('invalid_model: coefficient values are not finite')
             coefficients.append(values)
@@ -347,8 +378,8 @@ def _coefficient_segments(request, hamiltonian, *, refinement=1):
         result.append({'start': left, 'stop': right, 'times': times,
                        'coefficients': tuple(coefficients),
                        'hamiltonian': qt.QobjEvo(terms),
-                       'max_step': float(np.min(np.diff(times)))/2,
-                       'coefficient_error_bound': _bound_product(duration, curvature, spacing, spacing, .125)})
+                       'max_step': feature_step,
+                       'coefficient_error_bound': actual_error})
     return tuple(result)
 
 

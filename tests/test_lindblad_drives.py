@@ -212,3 +212,39 @@ def test_extreme_scales_cannot_underflow_to_false_zero_error_certificate():
                   times=[0., 1e200], hc=True)
     with pytest.raises(ValueError, match='resource_limit: coefficient'):
         staged(req)
+
+
+def test_close_observation_knots_do_not_force_tiny_steps_across_empty_segment():
+    segments = staged(request({'shape': 'square', 'start': 40., 'stop': 42.},
+                             times=[0., 1e-12, 100.])).coefficient_segments
+    assert segments[0]['max_step'] == 20
+    expected = np.array([math.cos(2*math.pi*.03*2), -1j*math.sin(2*math.pi*.03*2)])
+    np.testing.assert_allclose(propagated(segments), expected, atol=2e-9)
+
+
+def test_absolute_time_rounding_cannot_coarsen_certified_grid():
+    req = request({'shape': 'constant'}, times=[1e16, 1e16+100],
+                  amplitude=.03, detuning=.0001, hc=True)
+    with pytest.raises(ValueError, match='resource_limit: coefficient'):
+        staged(req)
+
+
+def test_large_phase_offset_keeps_carrier_in_independent_factored_reference():
+    phase = 1e20
+    segment = staged(request({'shape': 'constant'}, amplitude=.03, detuning=.1,
+                             phase=phase, hc=True)).coefficient_segments[0]
+    factor = complex(math.cos(phase), math.sin(phase))
+    for time in (0., 2.5, 5., 7.5, 10.):
+        carrier = complex(math.cos(2*math.pi*.1*time), math.sin(2*math.pi*.1*time))
+        expected = 2*math.pi*.03*factor*carrier
+        pointwise_bound = segment['coefficient_error_bound']/(segment['stop']-segment['start'])
+        assert abs(segment['hamiltonian'](time).full()[0, 1]-expected) <= pointwise_bound
+
+
+def test_large_absolute_carrier_argument_is_refused_without_precision_certificate():
+    # Long absolute origin, short requested interval: the coefficient grid fits,
+    # but forming omega*t has uncertainty far above the generator error budget.
+    req = request({'shape': 'constant'}, times=[1e12, 1e12+1],
+                  amplitude=.03, detuning=.1, hc=True)
+    with pytest.raises(ValueError, match='resource_limit: coefficient'):
+        staged(req)
