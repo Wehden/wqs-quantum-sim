@@ -1,5 +1,6 @@
 """Native Lindblad construction inside the isolated numerical child."""
 from dataclasses import dataclass
+import bisect
 import math
 
 import numpy as np
@@ -178,6 +179,179 @@ def _collapse_operators(request):
     return tuple(channels)
 
 
+def _bound_product(*factors):
+    """Fail closed if positive bound arithmetic overflows or underflows."""
+    if any(not math.isfinite(value) or value < 0 for value in factors):
+        raise ValueError('resource_limit: coefficient bound is unrepresentable')
+    if 0 in factors:
+        return 0.
+    product = 1.
+    for value in factors:
+        product *= value
+        if not math.isfinite(product) or product == 0:
+            raise ValueError('resource_limit: coefficient bound is unrepresentable')
+    return product
+
+
+def _envelope_bounds(envelope, left, right):
+    """Bounds on |e|, |e'| and |e''| within one smooth, one-sided piece."""
+    if envelope.shape == 'constant':
+        return 1., 0., 0.
+    if envelope.shape == 'sampled':
+        if right <= envelope.times[0] or left >= envelope.times[-1]:
+            return 0., 0., 0.
+        index = bisect.bisect_right(envelope.times, left)-1
+        index = min(index, len(envelope.times)-2)
+        values = [complex(value.re, value.im) for value in envelope.values[index:index+2]]
+        width = envelope.times[index+1]-envelope.times[index]
+        return max(map(abs, values)), abs(values[1]-values[0])/width, 0.
+    if right <= envelope.start or left >= envelope.stop:
+        return 0., 0., 0.
+    if envelope.shape == 'gaussian':
+        return 1., 1/envelope.sigma, _bound_product(1/envelope.sigma, 1/envelope.sigma)
+    if envelope.shape == 'flattop_cosine' and (right <= envelope.start+envelope.rise or
+                                              left >= envelope.stop-envelope.rise):
+        return 1., (.5*math.pi)/envelope.rise, _bound_product(
+            math.pi/envelope.rise, math.pi/envelope.rise, .5)
+    return 1., 0., 0.
+
+
+def _envelope_values(envelope, times):
+    """Evaluate a segment's one-sided envelope, including its endpoint limits."""
+    if envelope.shape == 'constant':
+        return np.ones(times.size, dtype=np.complex128)
+    if envelope.shape == 'sampled':
+        if times[-1] <= envelope.times[0] or times[0] >= envelope.times[-1]:
+            return np.zeros(times.size, dtype=np.complex128)
+        index = min(bisect.bisect_right(envelope.times, times[0])-1, len(envelope.times)-2)
+        first, last = (complex(value.re, value.im) for value in envelope.values[index:index+2])
+        weight = (times-envelope.times[index])/(envelope.times[index+1]-envelope.times[index])
+        return first*(1-weight)+last*weight
+    if times[-1] <= envelope.start or times[0] >= envelope.stop:
+        return np.zeros(times.size, dtype=np.complex128)
+    if envelope.shape == 'gaussian':
+        return np.exp(-.5*((times-envelope.center)/envelope.sigma)**2).astype(complex)
+    if envelope.shape == 'flattop_cosine':
+        distance = np.minimum(times-envelope.start, envelope.stop-times)
+        return np.where(distance < envelope.rise,
+                        (1-np.cos(math.pi*np.maximum(distance, 0)/envelope.rise))/2,
+                        1.).astype(complex)
+    return np.ones(times.size, dtype=np.complex128)
+
+
+def _coefficient_segments(request, hamiltonian, *, refinement=1):
+    """Build bounded linear coefficients; no function/string compilation occurs.
+
+    Each dictionary is a private solver segment. Endpoint limits belong to that
+    segment, so a truncated pulse never acquires an artificial ramp. The native
+    solver must preserve the incoming state and original absolute time between
+    dictionaries. Admission/copy accounting remains separately certificate-gated.
+    """
+    import qutip as qt
+
+    if not request.model.drives:
+        return ()
+    if type(refinement) is not int or refinement < 1:
+        raise ValueError('invalid_model: coefficient refinement must be a positive integer')
+    output = request.canonical_envelope()['times']
+    start, stop = output[0], output[-1]
+    edges = {start, stop}
+    operators = []
+    for drive in request.model.drives:
+        envelope = drive.envelope
+        if envelope.shape == 'sampled':
+            edges.update(value for value in envelope.times if start < value < stop)
+        elif envelope.shape != 'constant':
+            edges.update(value for value in (envelope.start, envelope.stop) if start < value < stop)
+            if envelope.shape == 'flattop_cosine':
+                if not (envelope.start+envelope.rise > envelope.start and
+                        envelope.stop-envelope.rise < envelope.stop):
+                    raise ValueError('resource_limit: coefficient feature is not representable')
+                edges.update(value for value in (envelope.start+envelope.rise,
+                                                envelope.stop-envelope.rise)
+                             if start < value < stop)
+        operator = (2*math.pi*complex(drive.amplitude.re, drive.amplitude.im))*_operator(request, drive.operator)
+        matrix = operator.full()
+        scale = max(float(np.max(np.abs(matrix.real))), float(np.max(np.abs(matrix.imag))))
+        strength = _bound_product(scale, float(np.linalg.norm(
+            matrix.real/scale+1j*(matrix.imag/scale), ord='fro'))) if scale else 0.
+        strength = _bound_product(strength, 2 if drive.hc else 1,
+                                  2 if request.solver == 'me' else 1)
+        if not math.isfinite(strength):
+            raise ValueError('resource_limit: coefficient operator bound is unrepresentable')
+        operators.append((operator, strength))
+    edges = sorted(edges)
+    plans = []
+    knot_count = 0
+    for left, right in zip(edges, edges[1:]):
+        duration = right-left
+        bounds = []
+        for drive, (_, strength) in zip(request.model.drives, operators):
+            try:
+                value, slope, curvature = _envelope_bounds(drive.envelope, left, right)
+                frequency = abs(2*math.pi*drive.detuning)
+                derivative = curvature + _bound_product(2, frequency, slope) + _bound_product(
+                    frequency, frequency, value)
+                bound = _bound_product(strength, derivative)
+            except (OverflowError, ZeroDivisionError):
+                bound = math.inf
+            if not math.isfinite(bound):
+                raise ValueError('resource_limit: coefficient derivative bound is unrepresentable')
+            bounds.append(bound)
+        try:
+            curvature = math.fsum(bounds)
+        except OverflowError:
+            raise ValueError('resource_limit: coefficient derivative sum is unrepresentable') from None
+        # Sum over segments and operators to bound integrated generator error.
+        error_rate = _bound_product(duration, curvature, len(edges)-1)
+        spacing = math.sqrt((8*.99e-6)/error_rate) if error_rate else duration
+        ratio = duration/spacing if spacing else math.inf
+        if not math.isfinite(ratio) or ratio > 65535/refinement:
+            raise ValueError('resource_limit: coefficient grid exceeds 65536 knots')
+        intervals = max(1, math.ceil(ratio))*refinement
+        knot_count += intervals+1
+        if knot_count > 65536:
+            raise ValueError('resource_limit: coefficient grid exceeds 65536 knots')
+        plans.append((left, right, intervals, curvature))
+    # Refuse every analytic piece before constructing any numeric time grid.
+    grids = []
+    knot_count = 0
+    for left, right, intervals, curvature in plans:
+        requested = output[bisect.bisect_left(output, left):bisect.bisect_right(output, right)]
+        merged = set(np.linspace(left, right, intervals+1))
+        merged.update(requested)
+        knot_count += len(merged)
+        if knot_count > 65536:
+            raise ValueError('resource_limit: coefficient grid exceeds 65536 knots')
+        times = np.array(sorted(merged))
+        if not np.all(np.diff(times) > 0) or float(np.min(np.diff(times)))/2 == 0:
+            raise ValueError('resource_limit: coefficient grid has unrepresentable step spacing')
+        grids.append((left, right, times, curvature))
+    result = []
+    for left, right, times, curvature in grids:
+        duration = right-left
+        spacing = float(np.max(np.diff(times)))
+        terms = [hamiltonian]
+        coefficients = []
+        for drive, (operator, _) in zip(request.model.drives, operators):
+            values = _envelope_values(drive.envelope, times)
+            values *= np.exp(1j*((2*math.pi*drive.detuning)*times+drive.phase))
+            if not np.isfinite(values).all():
+                raise ValueError('invalid_model: coefficient values are not finite')
+            coefficients.append(values)
+            terms.append([operator, qt.coefficient(values, tlist=times, order=1)])
+            if drive.hc:
+                conjugate = values.conj()
+                coefficients.append(conjugate)
+                terms.append([operator.dag(), qt.coefficient(conjugate, tlist=times, order=1)])
+        result.append({'start': left, 'stop': right, 'times': times,
+                       'coefficients': tuple(coefficients),
+                       'hamiltonian': qt.QobjEvo(terms),
+                       'max_step': float(np.min(np.diff(times)))/2,
+                       'coefficient_error_bound': _bound_product(duration, curvature, spacing, spacing, .125)})
+    return tuple(result)
+
+
 def _build_model(request, plan):
     """Construct native state/channel numerics under a separately certified plan."""
     import qutip as qt
@@ -187,14 +361,13 @@ def _build_model(request, plan):
     dimension = request._physical_checks()
     if request._result_plan(dimension) != plan.result:
         raise ValueError('invalid_model: allocation result reservation differs from request')
-    if request.model.drives:
-        raise ValueError('invalid_model: numeric drives are not supported yet')
     with qt.CoreOptions(auto_tidyup=False):
         hamiltonian = _hamiltonian(request)
         state = _initial_state(request)
         channels = _collapse_operators(request)
+        segments = _coefficient_segments(request, hamiltonian)
     return NativeLindbladModel(hamiltonian, channels, state,
-                               tuple(mode.name for mode in request.model.modes), (), plan)
+                               tuple(mode.name for mode in request.model.modes), segments, plan)
 
 
 def build_lindblad_model(request: LindbladRequest, plan: AllocationPlan) -> NativeLindbladModel:
