@@ -129,3 +129,15 @@ class WorkflowTrustBoundaryTests(unittest.TestCase):
 def test_dependabot_is_hosted_with_idle_capacity():
     result = choose({'sender':{'login':'dependabot[bot]'},'pull_request':{'head':{'repo':{'full_name':'owner/repo'}}}}, 'pull_request', 'owner/repo', 'refs/pull/1/merge', 'true', json.dumps({'schema':1,'observed_at':1000,'capacity':2,'online':2,'busy':0,'idle':2}), 1000)
     assert result[0] == 'hosted'
+
+
+def test_four_slot_rollout_preserves_two_slot_compatibility():
+    from tools.ci.route import available
+    for capacity in (2, 4):
+        value = dict(schema=1, observed_at=NOW, capacity=capacity, online=capacity,
+                     busy=capacity-1, idle=1)
+        assert available(json.dumps(value), NOW)
+        value.update(busy=capacity, idle=0)
+        assert not available(json.dumps(value), NOW)
+    assert not available(json.dumps(dict(schema=1, observed_at=NOW, capacity=4,
+                                        online=5, busy=4, idle=1)), NOW)

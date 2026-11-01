@@ -49,6 +49,14 @@ or submit live simulation jobs. Those bootstrap actions remain explicit rollout
 work. Do not create a second deployment writer alongside an existing operator
 process: application image ownership must be assigned to this workflow first.
 
+A deploy attempt with bootstrap unverified exits before artifact publication,
+admission changes or deployment mutations. Its public diagnostic is
+`Release blocked [bootstrap_required]`. Inspect the private bootstrap evidence
+and complete outstanding application acceptance; do not set the acknowledgement
+merely to clear this message. Backup creation/readback evidence alone does not
+complete application acceptance. Other unclassified errors retain the redacted
+exception-type diagnostic to avoid exposing private configuration.
+
 ## Eligibility and artifact identity
 
 Only successful CI **push** runs for the same repository's current main SHA are

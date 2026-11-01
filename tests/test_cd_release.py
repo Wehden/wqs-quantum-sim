@@ -466,3 +466,36 @@ def test_failed_creation_never_applies_images(tmp_path, services, monkeypatch, f
     assert deploy.held
     assert not set(release.ROLES).intersection(deploy.calls)
     assert 'open' not in deploy.calls
+
+
+@pytest.mark.parametrize('bootstrap', [False, None])
+def test_cli_names_bootstrap_blocker_without_exposing_private_values(tmp_path, monkeypatch, bootstrap):
+    cfg = config(tmp_path)
+    cfg['bootstrap_verified'] = bootstrap
+    cfg['registry'] = 'private-registry-sentinel.example.invalid/wqs'
+    cfg['smoke_owner'] = 'private-identity-sentinel'
+    path = tmp_path / 'private-config.json'
+    path.write_text(json.dumps(cfg))
+    monkeypatch.setattr('sys.argv', ['release.py', 'deploy', '--config', str(path),
+                                    '--sha', SHA, '--run-id', '123', '--version', 'v0.1.0'])
+    monkeypatch.setattr(release, 'run', lambda *a, **k: pytest.fail('subprocess started before bootstrap approval'))
+    monkeypatch.setattr(release, 'github', lambda *a: pytest.fail('network started before bootstrap approval'))
+    monkeypatch.setattr(release, 'write_record', lambda *a: pytest.fail('state changed before bootstrap approval'))
+    with pytest.raises(SystemExit) as blocked:
+        release.main()
+    assert str(blocked.value) == ('Release blocked [bootstrap_required]: bootstrap verification required; '
+                                  'complete and record bootstrap acceptance before promotion')
+    assert path.read_text() == json.dumps(cfg)
+    assert not Path(cfg['state_dir']).exists()
+
+
+def test_cli_keeps_unclassified_private_exception_redacted(tmp_path, monkeypatch):
+    path = tmp_path / 'private-config.json'
+    path.write_text(json.dumps(config(tmp_path)))
+    monkeypatch.setattr('sys.argv', ['release.py', 'deploy', '--config', str(path)])
+    def fail(config):
+        raise ValueError('private-token-and-host-sentinel')
+    monkeypatch.setattr(release, 'validate_config', fail)
+    with pytest.raises(SystemExit) as failed:
+        release.main()
+    assert str(failed.value) == 'Release failed: ValueError; inspect private state'

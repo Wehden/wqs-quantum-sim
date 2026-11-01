@@ -18,6 +18,10 @@ TARGETS = ('api', 'controller', 'worker')
 ROLES = {'api': 'api', 'admin': 'api', 'controller': 'controller', 'observer': 'controller'}
 
 
+class BootstrapRequiredError(ValueError):
+    """Bootstrap gate refusal with a fixed, public-safe CLI diagnostic."""
+
+
 def run(args, timeout=120, env=None):
     return subprocess.run(args, check=True, capture_output=True, text=True, timeout=timeout, env=env).stdout.strip()
 
@@ -161,7 +165,7 @@ def acceptance_token(config):
 
 def validate_config(config):
     if not config.get('bootstrap_verified'):
-        raise ValueError('Bootstrap verification required')
+        raise BootstrapRequiredError('Bootstrap verification required')
     acceptance_token(config)
     for field in ('namespace', 'registry', 'state_dir', 'smoke_owner'):
         if not isinstance(config.get(field), str) or not config[field]:
@@ -445,6 +449,9 @@ def main():
             receipt = Deployer(config).deploy(args.artifacts, args.sha, args.run_id)
             # Public receipt intentionally excludes private image names and inventory.
             Path('release-receipt.json').write_text(json.dumps({k: receipt[k] for k in ('schema', 'sha', 'ci_run', 'status')}) + '\n')
+    except BootstrapRequiredError:
+        raise SystemExit('Release blocked [bootstrap_required]: bootstrap verification required; '
+                         'complete and record bootstrap acceptance before promotion') from None
     except Exception as error:
         # Subprocess output, URLs and config can contain credentials.
         raise SystemExit('Release failed: ' + type(error).__name__ + '; inspect private state') from None

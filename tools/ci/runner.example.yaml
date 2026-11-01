@@ -17,7 +17,7 @@ metadata:
   namespace: wqs-ci
 spec:
   serviceName: wqs-ci
-  replicas: 2
+  replicas: 4
   podManagementPolicy: Parallel
   selector:
     matchLabels:
@@ -68,11 +68,11 @@ spec:
                   optional: true
           resources:
             requests:
-              cpu: '1'
-              memory: 1Gi
+              cpu: 500m
+              memory: 512Mi
             limits:
-              cpu: '6'
-              memory: 5Gi
+              cpu: '3'
+              memory: 3Gi
           securityContext:
             runAsUser: 1001
             runAsGroup: 1001
