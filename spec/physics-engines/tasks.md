@@ -267,16 +267,17 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - **Requirements:** PHY-005, PHY-006, PHY-007, PHY-009, PHY-011.
 - **Recommended Mode:** executor.
 - **Risk:** High: an output-only grid can omit a pulse or alias modulation.
-- **Files/areas:** `qsim/lindblad_model.py`, `tests/test_lindblad_drives.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
+- **Files/areas:** `qsim/lindblad_model.py`, `tests/test_lindblad_drives.py`, and the one superseded drive-refusal assertion in `tests/test_lindblad_states.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
 - **Steps:** Implement only the pulse shapes resolved in TASK-006. Construct a bounded coefficient grid containing required support boundaries, supplied sample knots and sufficient analytic/modulation resolution independently of output times. Use QuTiP numeric coefficients with explicit linear interpolation and conjugation. Set the verified integration-step constraint. Refuse excessive grid growth; do not call string coefficient compilation.
 - **Verification:** Run uv run --frozen --extra worker --extra controller --extra backup pytest -q tests/test_lindblad_drives.py. Include a pulse entirely between output times, complex exponential modulation, DRAG/rise cases if admitted, sample extrapolation, phase/units and grid-refinement convergence against declared tolerances.
 - **Rollback / Backout:** Withhold unresolved drive shapes and keep the last approved schema; do not approximate silently.
-- **Change budget:** max_files=2, max_new_symbols=10, interface_policy=extend-only.
+- **Change budget:** max_files=3, max_new_symbols=10, interface_policy=extend-only.
 - **write_lease:**
 
 ```text
 ^qsim/lindblad_model\.py$
 ^tests/test_lindblad_drives\.py$
+^tests/test_lindblad_states\.py$
 ```
 
 ### TASK-013: Implement deterministic Lindblad evolution
@@ -791,7 +792,7 @@ All GPU discovery and runtime execution must be scheduled through the existing S
 
 The owner-approved test budget is $25 total. Use a test-owned SkyPilot Runpod allocation with automatic teardown and explicit cleanup through SkyPilot on provisioning/setup failure. Preserve existing local GPU consumers and credentials. Keep numerical child limits unchanged for the first hardware probes; the fixed higher-address-space initialization sweep is diagnostic only, not authorization to relax numerical isolation. Laminar PR #170 was merged and the NVIDIA resource-selection correction applied; local cards still have existing consumers.
 
-### Execution checklist reconciled, 2026-10-30
+### Execution checklist reconciled, 2026-11-01
 
 Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b62342337399b17373c3`; dependency commit `9c27fb1` contains TASK-001 before the three parallel backend executors started in the same worktree. Each executor wrote only its disjoint lease; the coordinator owns this status and README.
 
@@ -808,13 +809,15 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-017 | Complete request-model stage for all four classes and three operations. Schema/validation reached main through PR #42; PR #50 adds the source/algorithm allocation certificate for spectra and matrix elements. Export admission remains gated by TASK-019. Worker/API activation and final image acceptance remain open. |
 | TASK-020 | Partial: schema and positive netlist validation reached main through PR #42, with the small-output/adaptive-history regression added by PR #51. Native workspace certification waits for approved TASK-035/036; see [evidence and design](discovery/josim-workspace.md). The backend is not enabled. |
 | TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
-| TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. Lindblad states, collapse channels, pulses and solvers remain later tasks. |
-| TASK-011 | Implemented and verified locally from main `87b942f`; pending PR merge. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
-| TASK-012 through TASK-016 | Not started. Pulses and solvers follow TASK-011 in dependency order. |
+| TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States and collapse channels are complete through TASK-011; pulses and solvers remain later tasks. |
+| TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
+| TASK-012 | In progress from main `3d8cbd6`: bounded numeric drive grids under the amended three-file lease. Implementation, numerical verification and PR acceptance are outstanding. |
+| TASK-013 through TASK-016 | Not started. Solvers follow TASK-012 in dependency order. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
 | TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
-| TASK-035/036 | TASK-035 audit and fixed comparison harness are complete locally, pending PR merge. Finite history is feasible for the admitted path; seven frozen original fixtures self-compare exactly. TASK-036 has not started; patched equivalence and workspace certification remain unproven. |
+| TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence and workspace certification remain unproven. |
+| TASK-036 | In progress from main `3d8cbd6`: bounded native history under the approved three-artifact lease. Real original/candidate equivalence, retained-capacity proof and constrained memory acceptance remain outstanding. |
 | TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
@@ -880,10 +883,10 @@ PR #49 closes TASK-010's operator stage. PR #50 closes the TASK-017/018 spectra/
 
 The owner confirmed that TASK-035/036 were already approved; this correction removes stale approval blockers without changing their scope, budgets or verification. G1 remains approved. G2 implementation and all-three CPU acceptance remain open; G3/G4 runtime and release acceptance are later gates. Merged adapters and green ordinary CI do not complete worker/API integration or combined-image acceptance.
 
-Next lanes:
+Historical next lanes at that checkpoint:
 
-- TASK-011 is ready: build Lindblad initial states and collapse operators in `qsim/lindblad_model.py` and `tests/test_lindblad_states.py`. Continue through TASK-012 to TASK-016 in dependency order; these tasks share builder/adapter paths and must serialize their overlapping leases.
-- TASK-035 is ready in parallel: audit native JoSIM history lifetimes and establish equivalence fixtures in `spec/physics-engines/discovery/josim-workspace.md` and `spec/physics-engines/probe_josim_history.py`. TASK-036 may start after that audit succeeds, using the approved patch/test/probe lease. A failed proof or changed numerical contract returns for a design decision.
+- TASK-011 was ready: build Lindblad initial states and collapse operators in `qsim/lindblad_model.py` and `tests/test_lindblad_states.py`. Continue through TASK-012 to TASK-016 in dependency order; these tasks share builder/adapter paths and must serialize their overlapping leases.
+- TASK-035 was ready in parallel: audit native JoSIM history lifetimes and establish equivalence fixtures in `spec/physics-engines/discovery/josim-workspace.md` and `spec/physics-engines/probe_josim_history.py`. TASK-036 may start after that audit succeeds, using the approved patch/test/probe lease. A failed proof or changed numerical contract returns for a design decision.
 - TASK-019 waits for TASK-016 and completed TASK-018, so scqubits export cannot yet start independently. TASK-022/023 worker integration and packaging wait for their backend prerequisites, including the JoSIM certificate.
 
 There are no runtime write leases opened by this documentation change. The next implementation batch should start from current main after this reconciliation merges. Existing credentials, workloads and backup/release gates remain unchanged; all GPU work remains scheduled through SkyPilot.
@@ -1018,3 +1021,13 @@ The proposed G1 sequencing amendment makes TASK-024 depend on TASK-026, so the e
 TASK-007 passed its frozen combined environment, all 807 Python tests/6 subtests/3 console tests, and actual API/worker image checks; its detailed evidence is in [dependencies](discovery/dependencies.md). TASK-008 may now proceed. Coordinator contract correction: allow Python's standard-library `base64` in `physics_results.py`, required by the already-approved artifact encoding contract. This adds no native dependency, public export or resource authority. The coordinator owns only this task-status entry and the matching import-boundary artifact; TASK-008 retains its separate two-file/eight-symbol implementation lease.
 
 TASK-008 passed its isolated full canonical CI (882 Python tests, 6 subtests and 3 console tests) and 75 focused constrained result tests. The implementation has six approved exports and eight class/function declarations, including exact NPZ/base64/summary/callback byte validation. This result boundary does not activate a backend or waive native allocation certificates.
+
+### Merged-task reconciliation and execution start, 2026-11-01
+
+PR #55 merged TASK-011 at `2310ca97f96d5dd63949e09e654bd7b596afd7c8`. PR #56 merged TASK-035 at `3d8cbd62049d8e5657a69a65aa638971fdc6fecf`. Both are on current main; exact-main CI run 41333543501 passed with Standpunkt tests and hosted image/tool checks. The automatic review for PR #56 completed cleanly at its final head before the owner merged it.
+
+The owner authorized the next batch. TASK-012 and TASK-036 start from `3d8cbd6` in separate worktrees. TASK-012 owns `qsim/lindblad_model.py`, `tests/test_lindblad_drives.py` and the superseded refusal test in `tests/test_lindblad_states.py`. TASK-036 owns only `vendor/josim/bounded-history.patch`, `tests/test_josim_history.py` and `spec/physics-engines/probe_josim_history.py`. Its native patch hunks are restricted to pinned upstream `include/JoSIM/Simulation.hpp`, `src/Simulation.cpp`, `src/Output.cpp` and `include/JoSIM/Transient.hpp`. The coordinator owns this checklist and README; neither executor edits shared status. Existing task budgets and interface restrictions apply.
+
+The existing circuit release at `00185b5` passed all eight live acceptance cases and native SkyPilot checks; CD run 41200949699 is green. This closes that operational bootstrap baseline. It does not complete physics G2, G3 or G4, or authorize physics admission. Worker/API integration, native memory certificates and final physics image/release acceptance remain required. Credentials, unrelated workloads and backup/release gates are unchanged. All GPU work remains scheduled through SkyPilot; this batch adds no GPU allocation.
+
+TASK-012 lease clarification: the existing state suite explicitly refuses all private drive construction as a placeholder for future work. Bounded drive construction supersedes that assertion. The executor may change only that adjacent assertion to verify segmented private construction while public admission remains gated. The task file budget becomes three; the production symbol budget, published interfaces and semantic scope are unchanged. This amendment is recorded before the adjacent test is edited.
