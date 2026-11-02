@@ -245,13 +245,12 @@ def test_mutated_invalid_state_is_rechecked(change):
         native._build_model(req, plan)
 
 
-def test_future_drives_still_refused_and_public_builder_stays_gated():
+def test_private_drives_are_segmented_and_public_builder_stays_gated():
     req = request()
     body = req.canonical_envelope()
     body['model']['drives'] = [{'operator': {'kind': 'product', 'factors': {'q': 'n'}}, 'envelope': {'shape': 'constant'}}]
     req = LindbladRequest(**body)
-    with pytest.raises(ValueError, match='drives'):
-        native._build_model(req, plan_for(req))
+    assert len(native._build_model(req, plan_for(req)).coefficient_segments) == 1
     req = request(state=factor('fock', index=1), collapse=[relaxation()])
     with pytest.raises(ValueError, match='native allocation certificate is unavailable'):
         native.build_lindblad_model(req, plan_for(req))
