@@ -56,6 +56,17 @@ runner. There is no Service and an ingress-deny NetworkPolicy; allow outbound
 GitHub, registry, DNS and Kubernetes API traffic under the cluster's policies.
 The example does not constrain outbound traffic.
 
+Keep `fsGroupChangePolicy: OnRootMismatch` in the private rendering. Once the
+PVC root has the expected group and permissions, this avoids recursively adding
+group permissions to owner-only release directories on each pod replacement.
+See the [Kubernetes volume permission policy](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods).
+An initial ownership change can still affect existing children. After first
+installation, migration or an ownership mismatch, verify that
+`<state_dir>/backup-locators` is a real directory owned by the runner and has mode
+`0700` before enabling CD. If it was widened, stop releases, preserve the failed
+ledger, and narrow only that verified directory as its owner. Do not relax the
+backup hook's private-directory check or recursively chmod the PVC.
+
 The 100 GiB claim is an initial storage allocation, not measured release capacity.
 Check space for three image archives, loaded layers, runner work and retained
 state before activation. Release cleanup removes only owned image tags and archives.

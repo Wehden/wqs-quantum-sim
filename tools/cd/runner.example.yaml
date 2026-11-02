@@ -46,6 +46,7 @@ spec:
         kubernetes.io/arch: amd64
       securityContext:
         fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: runner
           image: registry.example.invalid/wqs-deployer@sha256:REPLACE_WITH_TESTED_DIGEST
