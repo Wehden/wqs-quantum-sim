@@ -23,6 +23,21 @@ import time
 ORIGINAL_SHA256 = 'b75dae95de6c4601efef4aac377104ba6b12a94c7d36f6b9b0ecde8cf9372450'
 SOURCE_COMMIT = '02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224'
 PHI0 = 2.0678338484619295e-15
+# Independently rebuilt original and source-matched candidate/audit builds.
+BUILD_PROVENANCE = {'build_type': 'Release -O3 -DNDEBUG',
+ 'candidate_binary_sha256': '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21',
+ 'compiler': 'GCC 13.3.0-6ubuntu2~24.04.1',
+ 'image': 'sha256:30465f32041d36dc6f3d0ac1e20fe5b856f72a25943f74829683cfc7fea61b79',
+ 'instrumented_binary_sha256': '2d610f8f02d5e16298bfad89ae844f4593744e5f916d610ebcb89235cf19e830',
+ 'original_binary_sha256': 'b75dae95de6c4601efef4aac377104ba6b12a94c7d36f6b9b0ecde8cf9372450',
+ 'patch_sha256': 'eb727347b5933f7bb42c983c26ec63098e51d0d5a43fa7ceb865bfa28ce768ae',
+ 'patched_source_sha256': {'include/JoSIM/Simulation.hpp': '52be5d18624dab8a5311d29412152a427ba4c6b1528c37fd6ba9accafc7986e4',
+                           'include/JoSIM/Transient.hpp': '6633e999427b540fd055e823a5323bb86c4378311b373fe1f40d3e07bffcfedd',
+                           'src/Output.cpp': 'e15afbe9799edb873f988bbe090028dbca1013dd5e2cb039483a40d53066ba13',
+                           'src/Simulation.cpp': '43b309c8861369558b6722cc6d6324da1121c23b89db7a038907a7c309a1707c'},
+ 'source_date_epoch': 1792989136,
+ 'upstream_commit': '02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224'}
+
 MODEL = '.MODEL MOD JJ(RTYPE=1 VG=0.0028 CAP=7e-14 R0=160 RN=16 ICRIT=0.0001)\n'
 # Filled only from the pinned original. A candidate never updates references.
 FROZEN = {'dc_10ns': {'array_sha256': '6ca9f55fe4183ce7bca8cc1d82d364c79d7e2b3230a9c3001d130fdca97541c2',
@@ -143,7 +158,7 @@ def _parse(raw):
     return tuple(rows[0]), values, hashlib.sha256(packed).hexdigest()
 
 
-def _run(binary, netlist, success, guard):
+def _run(binary, netlist, success, guard, audit=False):
     with tempfile.TemporaryDirectory(prefix='wqs-josim-history-') as scratch:
         root = Path(scratch)
         (root / 'input.cir').write_text(netlist, encoding='ascii')
@@ -167,12 +182,24 @@ def _run(binary, netlist, success, guard):
             raise ValueError('failure must not produce partial CSV')
         if not success and b'Matrix is singular.' not in (root / 'diagnostic.txt').read_bytes():
             raise ValueError('expected native singular-matrix failure')
-        diagnostic_hash = hashlib.sha256((root / 'diagnostic.txt').read_bytes()).hexdigest()
+        diagnostics = (root / 'diagnostic.txt').read_bytes()
+        measurements = []
+        if audit:
+            measurements = [json.loads(line.removeprefix(b'WQS_HISTORY '))
+                            for line in diagnostics.splitlines() if line.startswith(b'WQS_HISTORY ')]
+            if len(measurements) != 1 or measurements[0].get('bounded') is not True:
+                raise ValueError('bounded native instrumentation missing')
+            diagnostics = b'\n'.join(line for line in diagnostics.splitlines()
+                                     if not line.startswith(b'WQS_HISTORY '))
+            if diagnostics:
+                diagnostics += b'\n'
+        diagnostic_hash = hashlib.sha256(diagnostics).hexdigest()
         parsed = _parse(raw) if success else None
         return {'status': completed.returncode, 'diagnostic_sha256': diagnostic_hash, 'csv_sha256': hashlib.sha256(raw).hexdigest(),
                 'array_sha256': parsed[2] if parsed else None,
                 'rows': len(parsed[1]) if parsed else 0, 'bytes': len(raw),
-                'elapsed_seconds': round(elapsed, 6)}, raw, parsed
+                'elapsed_seconds': round(elapsed, 6),
+                'history': measurements[0] if measurements else None}, raw, parsed
 
 
 def _compare(original, candidate):
@@ -206,10 +233,111 @@ def _self_checks():
     return {'malformed_csv_rejected': 3, 'comparison_tamper_rejected': 1}
 
 
+
+def _capacity_cases():
+    """Fixed admitted shapes; counts grow without changing output reservation."""
+    cases = {}
+    for name, step, stop in (('dc_1ns', '1e-12', '1e-9'),
+                            ('dc_10ns', '1e-11', '1e-8'),
+                            ('dc_100ns', '1e-10', '1e-7'),
+                            ('dc_1us', '1e-9', '1e-6')):
+        cases[name] = ('B01 1 0 MOD AREA=1\nV01 1 0 DC 0.1\n' + MODEL +
+                       f'.TRAN {step} {stop}\n.PRINT PHASE B01\n.END\n')
+    lines = [f'B{i:02d} {2*i-1} {2*i if i<8 else 0} MOD AREA=1' for i in range(1, 9)]
+    lines += [f'B{i:02d} {(i-9)%15+1} 0 MOD AREA=1' for i in range(9, 33)]
+    lines += [MODEL.rstrip(), '.TRAN 9.094947017729282e-13 3.724380803760141e-9']
+    lines += [f'.PRINT DEVV B{i:02d}' for i in range(1, 9)]
+    cases['maximum_history'] = '\n'.join([*lines, '.END', ''])
+    # Simultaneously cover the maximum admitted PWL input and output rows.
+    knots = ' '.join(f'{i*1e-12:.17g} {0 if i%2==0 else 1e-6}' for i in range(64))
+    lines[31] = f'I32 0 1 PWL({knots})'
+    cases['maximum_pwl'] = '\n'.join([*lines, '.END', ''])
+    sources = [f'I{i:02d} 0 1 PWL({knots})' for i in range(1, 32)]
+    cases['maximum_source_storage'] = '\n'.join([*sources, 'R32 1 0 1', MODEL.rstrip(),
+        '.TRAN 9.094947017729282e-13 3.724380803760141e-9',
+        *[f'.PRINT DEVI I{i:02d}' for i in range(1, 9)], '.END', ''])
+    return cases
+
+
+def _verify_capacity(record):
+    dimension, selected, rows = (record[key] for key in ('dimension', 'selected_variables', 'rows'))
+    if (record.get('bounded') is not True or not 0 < dimension <= 80
+            or not 0 <= selected <= 24 or not 0 < rows <= 4096):
+        raise ValueError('bounded history dimensions')
+    # GCC13/libstdc++ reserve(n) allocates exactly n elements. Include 80 optional
+    # vector objects, all ring/vector owners, and allocator alignment headroom.
+    history_bound = 8 * (3*dimension + 3*selected*4096 + 4096) + 80*32 + 512
+    rhs_bound = 4 * (dimension+1) * 8
+    if (not 0 < record['history_capacity_bytes'] <= history_bound
+            or not 0 < record['rhs_capacity_bytes'] <= rhs_bound):
+        raise ValueError('bounded history/RHS capacity exceeded')
+    if record['attempts'] < 1 or record['internal_steps'] < record['final_attempt_steps']:
+        raise ValueError('invalid native attempt counters')
+    return {'history_bound_bytes': history_bound, 'rhs_bound_bytes': rhs_bound}
+
+
+
+def _workspace_charge():
+    """Pinned real-double/64-bit-int KLU and the accepted native envelope only.
+
+    JoSIM Simulation/Output keep fixed histories plus bounded selected output.
+    MatrixInfo has value/column/row-pointer vectors per device; dense D^2 is a
+    conservative ceiling for each admitted R/L/B stamp. Charge doubled vector
+    capacity and simultaneous old/new storage rather than logical length only.
+    Input.cpp read/parse and Netlist expansion can coexist with copied tokens;
+    four complete token sets cover those stages and line temporaries. With
+    libstdc++'s 32-byte string objects and heap capacity <= 2*(length+1), 36B
+    per source byte bounds the complete token set (including one-byte tokens).
+    Function.cpp parse_pwl moves its two double vectors. Sourcegen growth can
+    copy existing functions, so charge all 32 sources twice, each with 64 pairs.
+
+    Pinned CMakeSuiteSparse f4bc356: klu.c clamps L/U to n(n+1)/2; real Unit,
+    Int and Entry are eight bytes. klu_kernel.c grows by 1.2*capacity+2n+1,
+    with at most n entries per dense column in each factor. Charge both buffers
+    across realloc, all off-diagonal n^2 entries, linear index/solve work,
+    structs and AMD's <=2.4*nz+7n workspace. Two complete factorization budgets
+    cover the old KLU state during a retry matrix rebuild. No KLU allocation
+    scales with the number of internal timesteps. All arithmetic below is on
+    small fixed constants, and history allocation is preceded by the native
+    dimension/selected-variable/row checks.
+
+    The approved 512 MiB native/import reserve also covers allocator metadata,
+    library/regex/stack overhead and bounded device/container object owners.
+    This is a source/shape charge, not an RSS-derived multiplier. Final worker
+    integration, serialization and binary-bound admission remain separate.
+    """
+    d, k, rows, devices, source_bytes = 80, 24, 4096, 32, 65536
+    history = 8*(3*d + 3*k*rows + rows) + 80*32 + 512
+    output = 8*(9*rows + rows) + 512  # time/traces, selected-index vector
+    token_sets = 4*(36*source_bytes + 2*256*24)
+    source_vectors = 2 * devices * 2 * 64 * 8
+    matrix_vectors = 4 * 3 * d*d * 8 * (devices+1)
+    factor_units = 2*d*(d+1)
+    grown_units = math.ceil(1.2*factor_units) + 2*d+1
+    factors_and_realloc = 2 * grown_units * 8
+    numeric = factors_and_realloc + 16*(d*d+1) + 8*27*d + 1024
+    ordering = 8*(5*d*d + 21*d + 2)
+    klu = 2*(numeric + ordering)
+    charges = {'history': history, 'output_and_indices': output,
+               'source_tokens_and_temporaries': token_sets,
+               'all_source_vectors_and_copy_overlap': source_vectors,
+               'device_matrix_vectors_and_copy_overlap': matrix_vectors,
+               'klu_factor_retry_reallocation_and_ordering': klu,
+               'rhs_with_sentinel_and_copy_overlap': 4*(d+1)*8,
+               'native_import_reserve': 512*1024**2}
+    return {'components_bytes': charges, 'total_bytes': sum(charges.values()),
+            'maximum_charge_bytes': 2*1024**3,
+            'source_commit': SOURCE_COMMIT, 'build_image':
+            'sha256:30465f32041d36dc6f3d0ac1e20fe5b856f72a25943f74829683cfc7fea61b79',
+            'source_date_epoch': 1792989136,
+            'integration_certificate': 'not enabled; final binary/worker admission is separate'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--original', required=True, type=Path)
     parser.add_argument('--candidate', required=True, type=Path)
+    parser.add_argument('--instrumented', type=Path, help='same patched source compiled with WQS_JOSIM_HISTORY_AUDIT')
     parser.add_argument('--guard-seconds', type=float, default=30,
                         help='fixed discovery harness guard only; never product policy')
     args = parser.parse_args()
@@ -252,6 +380,35 @@ def main():
             if not all(abs(value - 1) <= 0.02 for value in integrals):
                 raise ValueError('separate SFQ physical integral check failed')
             result['sfq_flux_quanta'] = integrals
+    if args.instrumented:
+        if (not args.instrumented.is_absolute() or not args.instrumented.is_file()
+                or not os.access(args.instrumented, os.X_OK)):
+            parser.error('instrumented requires a trusted absolute executable path')
+        result['instrumented_sha256'] = hashlib.sha256(args.instrumented.read_bytes()).hexdigest()
+        if (identities['candidate'] != BUILD_PROVENANCE['candidate_binary_sha256']
+                or result['instrumented_sha256'] != BUILD_PROVENANCE['instrumented_binary_sha256']):
+            raise ValueError('instrumented/candidate differs from the source-matched build receipt')
+        result['build_provenance'] = BUILD_PROVENANCE
+        result['workspace_charge'] = _workspace_charge()
+        if result['workspace_charge']['total_bytes'] > result['workspace_charge']['maximum_charge_bytes']:
+            raise ValueError('source-derived planned charge exceeded')
+        result['capacities'] = {}
+        for name, netlist in _capacity_cases().items():
+            measured = _run(args.instrumented, netlist, True, args.guard_seconds, audit=True)
+            record = measured[0]['history']
+            bound = _verify_capacity(record)
+            # Instrumentation is permitted to observe allocation only. Every
+            # long/max-shape candidate CSV must match its instrumented build.
+            native = _run(args.candidate, netlist, True, args.guard_seconds)
+            _compare(native, measured)
+            if name.startswith('maximum_'):
+                _compare(_run(args.original, netlist, True, args.guard_seconds), native)
+            result['capacities'][name] = {**record, **bound, 'csv_sha256': native[0]['csv_sha256']}
+        dc = [result['capacities'][name] for name in ('dc_1ns', 'dc_10ns', 'dc_100ns', 'dc_1us')]
+        if len({r['history_capacity_bytes'] for r in dc}) != 1:
+            raise ValueError('history capacity grows with native internal steps')
+        if any(b['internal_steps'] <= a['internal_steps'] for a, b in zip(dc, dc[1:])):
+            raise ValueError('internal-step growth experiment did not grow')
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
