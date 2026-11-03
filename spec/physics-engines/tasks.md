@@ -1113,3 +1113,35 @@ semantics, JoSIM projection accounting and numerical acceptance. G2/G3/G4,
 backup/release gates and public physics admission remain unchanged. Existing
 credentials and unrelated workloads remain untouched. No GPU allocation is
 needed for these CPU implementation lanes.
+
+### Native runtime promotion and checklist reconciliation, 2026-11-03
+
+PR #68 reached main at `63b82a33eca17620d4f698ad7722bf6d521f485a`.
+PR #69 (TASK-013) and PR #70 (TASK-020/021 private reconciliation) were then
+merged into the temporary contract branch rather than main. This promotion
+retains their original commits and merge ancestry and brings both runtime
+changes onto main together. Their runtime files match the reviewed heads
+`a48e02413593836078b580a0fe72599279f9fe8d` and
+`7ddd71e3eed7970cae246feb675de04ce8c5f3ef` exactly.
+
+- TASK-013 deterministic SE/ME execution and the approved observable handoff are
+  implemented privately. Forty evolution tests and 440 focused tests pass.
+  Public admission and final allocation certification remain gated.
+- TASK-020 validation, bounded native projection and private workspace
+  certification are implemented. TASK-021 now checks the matching candidate
+  binary and complete reproduced plan before private execution. The four
+  JoSIM suites passed 226 tests without skips with real binaries, including
+  the constrained pinned-image repeat. The projection owner/copy bound is
+  825,262 bytes within its 1-MiB allowance; the largest plan is 622,775,052 bytes.
+  Production packaging, worker integration and public activation remain open.
+- Combined local integration of both runtime lanes passed 666 tests without
+  skips. Original PR CI passed Standpunkt tests and hosted image/tool checks;
+  the promotion requires its own current-head CI and automatic review.
+
+The next dependency-ready numerical task is TASK-014 (seeded Monte Carlo),
+followed by TASK-015 and TASK-016. TASK-019 still depends on TASK-016.
+TASK-022/023 and G2/G3/G4 remain open. This reconciliation starts no new
+implementation lane. CD acceptance remains unverified after the retained failed
+release ledger; backup gates, existing credentials and unrelated workloads
+remain unchanged. Future dependent PRs must be retargeted to main and refreshed
+after their parent merges before being described as ready to merge.
