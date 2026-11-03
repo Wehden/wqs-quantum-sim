@@ -174,7 +174,12 @@ def export(data, sha, destination, max_bytes):
 def main():
     def timeout(*_):
         global _cancelled
+        # A later alarm or termination must not interrupt plaintext cleanup
+        # after the first cancellation has already started stack unwinding.
+        if _cancelled:
+            return
         _cancelled = True
+        signal.setitimer(signal.ITIMER_REAL, 0)
         raise TimeoutError('export deadline')
     signal.signal(signal.SIGALRM, timeout)
     signal.signal(signal.SIGTERM, timeout)
