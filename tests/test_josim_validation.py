@@ -321,8 +321,8 @@ def test_certificate_matches_frozen_source_charge_and_build_identity():
     assert {key: items[key] for key in charge['components_bytes']} == charge['components_bytes']
     assert sum(charge['components_bytes'].values()) == 570708992
     assert plan.peak_bytes == sum(items.values()) < 2*1024**3
-    assert plan.policy_revision == 'josim-cpu-bounded-history-v1'
-    assert plan.algorithm == 'josim-phase-bounded-history'
+    assert plan.policy_revision == 'josim-cpu-nodev-projection-v1'
+    assert plan.algorithm == 'josim-phase-bounded-history-nodev-v1'
     assert plan.dimensions['native_dimension_upper_bound'] == 80
     assert plan.dimensions['selected_variables_upper_bound'] == 24
     assert certificate['phase_analysis'] is True
@@ -367,3 +367,106 @@ def test_plan_certificate_cannot_be_mutated_to_change_later_admission():
     altered.dimensions['native_dimension_upper_bound'] = 800
     assert request._certified_allocation_plan() == original
     assert request._certified_allocation_plan() != altered
+
+
+def test_native_projection_preserves_canonical_request_and_duplicate_trace_positions():
+    from qsim.josim_models import JoSIMRequest
+    text = minimal(traces='.print DEVV I1\n.print DEVV R1\n.print DEVI I1\n.print DEVV I2')
+    text = 'I2 0 1 DC 2u\n' + text
+    request = JoSIMRequest(netlist=text)
+    before = request.canonical_envelope()
+    normalized, info = validate_josim_netlist(request.netlist)
+    assert normalized == request.netlist
+    assert info['native_netlist'] == normalized.replace('.PRINT DEVV I1', '.PRINT NODEV 1 0').replace('.PRINT DEVV I2', '.PRINT NODEV 1 0')
+    assert info['native_trace_names'] == ['V(1,0)', 'V(R1)', 'I(I1)', 'V(1,0)']
+    assert info['trace_projection'] == [
+        {'public_name': 'V(I1)', 'native_name': 'V(1,0)', 'scale': -1, 'rewritten': True},
+        {'public_name': 'V(R1)', 'native_name': 'V(R1)', 'scale': 1, 'rewritten': False},
+        {'public_name': 'I(I1)', 'native_name': 'I(I1)', 'scale': 1, 'rewritten': False},
+        {'public_name': 'V(I2)', 'native_name': 'V(1,0)', 'scale': -1, 'rewritten': True},
+    ]
+    assert request.canonical_envelope() == before
+    plan = request._certified_allocation_plan()
+    assert dict(plan.allocation_items)['native_projection_envelope'] == 1024**2
+    assert plan.coefficient_plan['trace_projection'] == info['trace_projection']
+
+
+def test_projection_owner_and_copy_bound_fits_approved_envelope():
+    from dataclasses import asdict, replace
+    import json
+    import runpy
+    import sys
+    from qsim.josim_models import JoSIMRequest
+
+    assert sys.version_info[:2] == (3, 12)
+    assert sys.getsizeof('') <= 49
+    assert sys.getsizeof(b'') == 33
+    assert sys.getsizeof([]) == 56
+    assert sys.getsizeof({'a': 1, 'b': 2, 'c': 3, 'd': 4}) == 184
+    assert sys.getsizeof(1.0) == 24
+    proof = runpy.run_path('spec/physics-engines/probe_josim_history.py')
+    plan = JoSIMRequest(netlist=proof['_capacity_cases']()['maximum_source_storage'])._certified_allocation_plan()
+    # Worst-length permitted labels, independent of this fixture's short names.
+    table = [{'public_name': 'V('+'I'*32+')', 'native_name': 'V('+'R'*32+')',
+              'scale': -1, 'rewritten': True} for _ in range(8)]
+    assert len(json.dumps(table)) <= 2048
+    certificate = dict(plan.coefficient_plan, trace_projection=table)
+    worst = replace(plan, coefficient_plan=certificate)
+    encoded = json.dumps(asdict(worst), sort_keys=True, allow_nan=False)
+    assert encoded.isascii() and len(encoded) <= 8192
+
+    def owners(value):
+        # Counting repeated references repeatedly is conservative here.
+        size = sys.getsizeof(value)
+        if isinstance(value, dict):
+            size += sum(owners(k)+owners(v) for k, v in value.items())
+        elif isinstance(value, (list, tuple)):
+            size += sum(owners(v) for v in value)
+        return size
+
+    assert owners(asdict(worst)) <= 32768
+    # Two validator invocations can overlap during full-plan reproduction.
+    # Their generated strings/fragments include list slots and string headers.
+    # Hashing/writing ASCII is charged twice even though those stages serialize.
+    # Full-plan asdict/JSON comparisons and metadata table copies are separate.
+    components = {
+        'native_token_delta': 4*36*(65568-65536),
+        'two_generated_text_and_fragment_sets': 2*(2*(65568+49)+256*(49+8)),
+        'encoded_hash_and_write_copies': 2*(65568+33),
+        'three_projection_tables': 3*(56+8*8+8*(184+2*(49+35)+2*28)),
+        'three_native_header_lists': 3*(56+8*8),
+        'table_serialization_unicode_and_utf8': 3*5*2048,
+        'two_full_plan_asdict_trees': 2*32768,
+        'two_ascii_full_plan_comparison_strings': 2*8192,
+        'source_terminal_map': 12288,
+        'one_row_projection_float_temporaries': 9*24,
+        # The implementation edits parsed rows in place, so uses none of this
+        # permitted extra full-matrix allowance. No hidden history is retained.
+        'permitted_single_projected_matrix': 8*4096*8,
+    }
+    assert components['native_token_delta'] == 4608
+    assert sum(components.values()) <= dict(plan.allocation_items)['native_projection_envelope'] == 1024**2
+    assert plan.peak_bytes == 622775052
+
+
+def test_full_public_byte_cap_can_expand_only_into_fixed_native_byte_cap():
+    from qsim.josim_models import JoSIMRequest
+    sources = [f'I{i} 98 99 DC 1.' for i in range(1, 17)]
+    tail = ['R1 98 0 1', 'R2 99 0 1',
+            '.MODEL J JJ(RTYPE=1 VG=2mV CAP=1pF R0=100 RN=10 ICRIT=1mA)',
+            '.TRAN 1p 5p', *[f'.PRINT DEVV I{i}' for i in range(1, 9)], '.END']
+    remaining = 65536-len('\n'.join([*sources, *tail])+'\n')
+    for index, line in enumerate(sources):
+        count = min(4096-len(line), remaining)
+        sources[index] += '0'*count
+        remaining -= count
+    assert remaining == 0
+    text = '\n'.join([*sources, *tail])+'\n'
+    request = JoSIMRequest(netlist=text)
+    _, info = validate_josim_netlist(request.netlist)
+    assert len(text) == len(request.netlist) == 65536
+    assert len(info['native_netlist']) == 65568
+    assert len(info['trace_projection']) == 8
+    assert all(entry['scale'] == 1 and entry['rewritten'] for entry in info['trace_projection'])
+    with pytest.raises(ValueError):
+        JoSIMRequest(netlist='*\n'+text)
