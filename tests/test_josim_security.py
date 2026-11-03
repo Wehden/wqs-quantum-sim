@@ -21,6 +21,7 @@ BASE = ('I1 0 1 DC 1u\nR1 1 0 5\nB1 1 0 J AREA=1\n'
     'V1 1 0 PWL(0 0 1p {A})', 'V1 1 0 DC (1+1)',
     'R2 1 0 5\n+ .include private', 'R2 1 0 5\n+ FILE escaped.csv',
     'R2 1 0 5 ; .include private', 'R2 1 0 5 $ .file escaped.csv',
+    '.print NODEV 1 0', '.print NODEV 0 1',
     '.print DEVV B1 > escaped.csv', '.print "DEVV B1"', '.print V(1)',
     'I2 1 0 DC 1\n+\n+ .file private', 'R/../escape 1 0 5',
     '.include "private"', 'include /private', '.end\n.file escaped.csv',
@@ -87,7 +88,7 @@ def test_request_model_has_only_api_safe_imports():
             imports.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             imports.append(node.module)
-    assert set(imports) <= {'typing', 'pydantic', 'josim_validation', 'physics_results'}
+    assert set(imports) <= {'hashlib', 'typing', 'pydantic', 'josim_validation', 'physics_results'}
 
 
 @pytest.mark.parametrize('binary_digest', [
@@ -104,7 +105,7 @@ def test_private_candidate_certificate_does_not_enable_any_runtime_binary(binary
     monkeypatch.setattr(josim_adapter, '_BINARY_SHA256', binary_digest)
     monkeypatch.setattr(josim_adapter.subprocess, 'run',
                         lambda *a, **k: pytest.fail('uncertified runtime launched'))
-    with pytest.raises(ValueError, match='runtime binary/trace reconciliation'):
+    with pytest.raises(ValueError, match='production worker packaging'):
         josim_adapter.run_josim(request, plan, execution_context={})
 
 
@@ -115,6 +116,6 @@ def test_current_source_voltage_trace_debt_preserves_request_and_stays_gated():
     envelope = request.canonical_envelope()
     assert validate_josim_netlist(request.netlist)[1]['trace_names'] == ['V(I1)']
     assert request._certified_allocation_plan().result.arrays[1].shape[1] == 1
-    with pytest.raises(ValueError, match='runtime binary/trace reconciliation'):
+    with pytest.raises(ValueError, match='production worker packaging'):
         request.admission_plan()
     assert request.canonical_envelope() == envelope

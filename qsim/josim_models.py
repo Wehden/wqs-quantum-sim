@@ -1,5 +1,6 @@
 """Strict, solver-free JoSIM request normalization and admission boundary."""
 
+import hashlib
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -66,12 +67,19 @@ class JoSIMRequest(BaseModel):
             ('base64_bytes_and_ascii_string', 2*base64_bytes),
             ('callback_json_unicode_and_utf8', 5*result.callback_upper_bytes),
             ('parent_child_handoff', 2*result.callback_upper_bytes),
+            # Generated text/table and certificate-copy owners fit this fixed
+            # envelope, including the native token increase exactly once.
+            ('native_projection_envelope', 1024**2),
         )
         peak = sum(size for _, size in items)
         if peak > 2*1024**3:
             raise ValueError('resource_limit: certified JoSIM allocation exceeds the CPU budget')
         # Fresh nested dictionaries prevent a caller changing subsequent plans.
         certificate = {
+            'projection_revision': 'nodev-positional-sign-positive-zero-v1',
+            'native_input_bytes': 65568, 'projection_json_bytes': 2048,
+            'native_netlist_sha256': hashlib.sha256(info['native_netlist'].encode('ascii')).hexdigest(),
+            'trace_projection': info['trace_projection'],
             'binary_sha256': '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21',
             'source_commit': '02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224',
             'patch_sha256': 'eb727347b5933f7bb42c983c26ec63098e51d0d5a43fa7ceb865bfa28ce768ae',
@@ -91,7 +99,7 @@ class JoSIMRequest(BaseModel):
             'child_address_space_bytes': 3*1024**3, 'child_file_bytes': 12*1024**2,
         }
         return AllocationPlan(
-            'josim-cpu-bounded-history-v1', 'josim-phase-bounded-history',
+            'josim-cpu-nodev-projection-v1', 'josim-phase-bounded-history-nodev-v1',
             {'output_rows_upper_bound': rows, 'trace_count': traces,
              'device_count': info['device_count'], 'node_count': info['node_count'],
              'native_dimension_upper_bound': d, 'selected_variables_upper_bound': selected},
@@ -101,4 +109,4 @@ class JoSIMRequest(BaseModel):
         # Pure planning cannot verify the runtime executable or worker image.
         self._certified_allocation_plan()
         raise ValueError('resource_limit: JoSIM native workspace certificate is unavailable; '
-                         'runtime binary/trace reconciliation and worker packaging are pending')
+                         'production worker packaging and activation are pending')
