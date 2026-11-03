@@ -92,7 +92,7 @@
         {
           "name": "NativeLindbladModel",
           "kind": "type",
-          "signature": "NativeLindbladModel(hamiltonian, collapse_operators, initial_state, tensor_order, coefficient_segments, allocation_plan)"
+          "signature": "NativeLindbladModel(hamiltonian, collapse_operators, initial_state, tensor_order, coefficient_segments, allocation_plan, observables=())"
         },
         {
           "name": "build_lindblad_model",

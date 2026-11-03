@@ -129,3 +129,13 @@ Reject a general expression language, arbitrary native constructor/options passt
 ## Verification Strategy (mapping to requirements and test strategy)
 
 The complete PHY-001 through PHY-020 map is in [decisions.md](decisions.md). Preserve the 803-test baseline, subtests and console tests. New API tests prove strict schemas/semantic pointers and no job on refusal. Native tests prove units, conjugation, state/ME semantics, seeded MC, unique stationary results and propagators; work tests prove segment/trajectory/collapse-search/reset/failure accounting. Memory/result tests verify every planned boundary in the combined constrained image, including base64/Unicode/archive overhead and parent/child overlap. Every class/operator export and JoSIM SFQ/safe grammar must pass. Hardware tests are opt-in, fixed synthetic requests on SkyPilot-owned allocations only. No unavailable GPU path, mocked release or successful build is substituted for operational acceptance.
+
+## Native handoff amendment, approved 2026-11-03
+
+The owner approved [both native handoff amendments](discovery/native-handoff-amendment.md):
+a defaulted seventh observable tuple in `NativeLindbladModel`, and bounded JoSIM
+current-source voltage projection with atomic candidate-binary/certificate
+verification. The linked amendment is normative for these implementation details
+and actual allocation-owner proof. Public schemas and canonical request identity
+remain unchanged. Public physics admission and G2/G3/G4 remain gated; this approval
+authorizes only the stated scoped implementation and lease extensions.

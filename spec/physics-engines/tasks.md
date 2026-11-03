@@ -287,17 +287,20 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - **Requirements:** PHY-006, PHY-008, PHY-009, PHY-011, PHY-012, PHY-013.
 - **Recommended Mode:** executor.
 - **Risk:** High: density/ket output and retained-state memory must match the requested solver.
-- **Files/areas:** `qsim/lindblad_adapter.py`, `tests/test_lindblad_evolve.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
+- **Files/areas:** `qsim/lindblad_adapter.py`, `tests/test_lindblad_evolve.py`, `qsim/lindblad_model.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
 - **Steps:** Implement evolve for SE and ME with the native builder, bounded fixed solver options and named expectations. Implement `store_states=none/final/all` retained-state choices with the G1-12 representation and output estimator, including the explicit `state_times` axis and no hidden full history for final-only output. Return arrays and bounded provenance through physics_results. Keep runtime nonconvergence distinct from invalid requests.
 - **Verification:** Run uv run --frozen --extra worker --extra controller --extra backup pytest -q tests/test_lindblad_evolve.py. Rabi absolute error <=1e-4, T1 relative error <=1e-4 and ringdown relative error <=1e-3; test complex expectations, nonzero first time, trace preservation, output ordering and preallocation failure.
 - **Rollback / Backout:** Remove the unadvertised execution branch; existing engine paths remain unchanged.
-- **Change budget:** max_files=2, max_new_symbols=8, interface_policy=extend-only.
+- **Change budget:** max_files=3, max_new_symbols=8, interface_policy=extend-only.
 - **write_lease:**
 
 ```text
 ^qsim/lindblad_adapter\.py$
+^qsim/lindblad_model\.py$
 ^tests/test_lindblad_evolve\.py$
 ```
+
+The owner approved the [native handoff amendment](discovery/native-handoff-amendment.md) on 2026-11-03. Populate and consume the defaulted seventh native-model field, validate observable mismatches before result allocation, and repeat shared builder regressions. Final allocation admission remains gated.
 
 ### TASK-014: Implement seeded Monte Carlo evolution
 
@@ -420,11 +423,11 @@ All paths introduced below are proposed implementation paths. Existing paths and
 - **Requirements:** PHY-004, PHY-005, PHY-011, PHY-014, PHY-016, PHY-018.
 - **Recommended Mode:** executor.
 - **Risk:** High: an include alias or output directive can cross the filesystem boundary.
-- **Files/areas:** `qsim/josim_models.py`, `qsim/josim_validation.py`, `tests/test_josim_validation.py`, `tests/test_josim_security.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
+- **Files/areas:** `qsim/josim_models.py`, `qsim/josim_validation.py`, `tests/test_josim_validation.py`, `tests/test_josim_security.py`, `qsim/josim_adapter.py`, `tests/test_josim_execution.py`. Proposed new filenames may be adjusted only with a recorded lease amendment.
 - **Steps:** Implement the approved narrow netlist subset and schema without a general SPICE interpreter. Bound text, tokens, devices, model definitions, transient samples and selected traces before native launch. Normalize allowed comments/continuations/case safely. Reject all unapproved control/file constructs, expressions, external data and recursive/unsupported subcircuits. Validate optional temperature/noise only if native seed support was proven.
 - **Verification:** Run uv run --frozen --extra worker --extra controller --extra backup pytest -q tests/test_josim_validation.py tests/test_josim_security.py. Positive fixture acceptance and adversarial include/file/control aliases, continuation tricks, quotes, output paths and trace/time overflows must be exercised. Rejected input never invokes a native process.
 - **Rollback / Backout:** Keep the endpoint disconnected until positive validation and safety cases pass.
-- **Change budget:** max_files=4, max_new_symbols=14, interface_policy=extend-only.
+- **Change budget:** max_files=6, max_new_symbols=14, interface_policy=extend-only.
 - **write_lease:**
 
 ```text
@@ -432,7 +435,11 @@ All paths introduced below are proposed implementation paths. Existing paths and
 ^qsim/josim_validation\.py$
 ^tests/test_josim_validation\.py$
 ^tests/test_josim_security\.py$
+^qsim/josim_adapter\.py$
+^tests/test_josim_execution\.py$
 ```
+
+The owner approved the [native handoff amendment](discovery/native-handoff-amendment.md) on 2026-11-03. This executor also owns atomic TASK-021 projection/binary reconciliation inside the expanded lease; no concurrent TASK-021 writer is allowed. Prove actual projection owners/copies within the additional 1-MiB envelope. Public admission remains closed pending packaging, worker integration and existing acceptance gates.
 
 ### TASK-021: Implement native JoSIM transient execution
 
@@ -1087,3 +1094,22 @@ after reusable-pool entries expired, and make retirement/accounting reliable
 through SkyPilot. This observed capacity debt is separate from the physics
 feature tasks. Do not add simulation execution limits, evict unrelated work or
 relax backup/acceptance gates as a substitute.
+
+### Native-handoff approval and merged-stage reconciliation, 2026-11-03
+
+Main `1181e1da5fe182214fa35ea0a3e81e1ab485bb61` contains PR #66's durable
+SkyPilot idle-worker retirement and PR #67's private JoSIM workspace certificate.
+TASK-020 remains partial: private allocation planning is implemented, while
+projection/runtime identity reconciliation and production packaging remain open.
+The retirement code reached all four application roles at `304bea5`; that
+release's acceptance failed during CPU/memory placement saturation, so this
+receipt does not claim operational acceptance or a verified CD release.
+
+The owner explicitly approved both native-handoff interface amendments and
+parallel TASK-013/TASK-020 execution. Their runtime leases are disjoint; the
+coordinator owns shared contracts and status. See the approved
+[native-handoff amendment](discovery/native-handoff-amendment.md) for observable
+semantics, JoSIM projection accounting and numerical acceptance. G2/G3/G4,
+backup/release gates and public physics admission remain unchanged. Existing
+credentials and unrelated workloads remain untouched. No GPU allocation is
+needed for these CPU implementation lanes.
