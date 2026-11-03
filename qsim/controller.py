@@ -153,17 +153,110 @@ def advance(sky, row):
 
 
 
+
+def retire_worker(sky, row):
+    """Keep idle-worker ownership until a checked native teardown completes."""
+    cluster = row['cluster']
+    if row['retire_retry_after'] > time.time():
+        return
+    if row['retire_down_id']:
+        state = request_state(sky, row['retire_down_id'])
+        if state not in ('SUCCEEDED', 'FAILED', 'CANCELLED'):
+            return
+        try:
+            sky.get(row['retire_down_id'])
+            if state != 'SUCCEEDED':
+                raise RuntimeError('Native teardown was not acknowledged')
+        except sky.exceptions.ClusterDoesNotExist:
+            pass
+        except Exception:
+            with store.connect() as db:
+                db.execute('UPDATE worker_pool SET retire_down_id=NULL,retire_check_id=NULL,'
+                           'retire_intent_at=NULL,retire_retry_after=? WHERE cluster=?',
+                           (time.time()+30,cluster))
+            return
+        with store.connect() as db:
+            db.execute('DELETE FROM worker_pool WHERE cluster=? AND retired=1 AND job_id IS NULL '
+                       'AND retire_down_id=?',(cluster,row['retire_down_id']))
+        return
+    if row['retire_intent_at'] is not None:
+        # Recover a lost submission acknowledgement without allocating another
+        # teardown request or forgetting the cluster during controller restart.
+        requests = sky.api_status(all_status=True,cluster_name=cluster)
+        with store.connect() as db:
+            known = {r[0] for r in db.execute('SELECT retire_down_id FROM worker_pool UNION '
+                                             'SELECT down_id FROM job_dispatch') if r[0]}
+        matches = [r for r in requests if r.cluster_name == cluster and r.name == 'sky.down' and
+                   str(r.request_id) not in known and r.created_at >= row['retire_intent_at']-5]
+        if matches:
+            latest = max(matches,key=lambda r:r.created_at)
+            with store.connect() as db:
+                db.execute('UPDATE worker_pool SET retire_down_id=? WHERE cluster=?',
+                           (str(latest.request_id),cluster))
+        return
+    if not row['retire_check_id']:
+        request = sky.queue(cluster,skip_finished=False,all_users=True)
+        with store.connect() as db:
+            db.execute('UPDATE worker_pool SET retire_check_id=? WHERE cluster=?',(str(request),cluster))
+        return
+    state = request_state(sky,row['retire_check_id'])
+    if state not in ('SUCCEEDED','FAILED','CANCELLED'):
+        return
+    try:
+        queue = sky.get(row['retire_check_id'])
+        terminal = {'SUCCEEDED','FAILED','FAILED_SETUP','FAILED_DRIVER','CANCELLED'}
+        if state != 'SUCCEEDED' or not isinstance(queue,list) or any(
+                getattr(job['status'],'value',job['status']) not in terminal for job in queue):
+            raise RuntimeError('Native worker is not proven idle')
+        requests = sky.api_status(all_status=True,cluster_name=cluster)
+        if any(request.cluster_name == cluster and request.name in ('sky.launch','sky.exec') and
+               getattr(request.status,'value',request.status) not in ('SUCCEEDED','FAILED','CANCELLED')
+               for request in requests):
+            raise RuntimeError('Native dispatch is still active')
+    except sky.exceptions.ClusterDoesNotExist:
+        with store.connect() as db:
+            db.execute('DELETE FROM worker_pool WHERE cluster=? AND retired=1 AND job_id IS NULL',
+                       (cluster,))
+        return
+    except Exception:
+        with store.connect() as db:
+            db.execute('UPDATE worker_pool SET retire_check_id=NULL,retire_retry_after=? WHERE cluster=?',
+                       (time.time()+30,cluster))
+        return
+    with store.connect() as db:
+        db.execute('UPDATE worker_pool SET retire_intent_at=? WHERE cluster=?',(time.time(),cluster))
+    request = sky.down(cluster)
+    with store.connect() as db:
+        db.execute('UPDATE worker_pool SET retire_down_id=? WHERE cluster=?',(str(request),cluster))
+
+
 def tick():
     sky = sky_client()
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
-        db.execute('DELETE FROM worker_pool WHERE job_id IS NULL AND released<?', (time.time()-660,))
+        db.execute("UPDATE worker_pool SET retired=1 WHERE job_id IS NULL AND "
+                   "(released<? OR image IS NULL OR image!=?) AND NOT EXISTS "
+                   "(SELECT 1 FROM job_dispatch d JOIN jobs j ON j.id=d.job_id "
+                   "WHERE d.cluster=worker_pool.cluster AND j.cleaned=0)",
+                   (time.time()-660,settings.WORKER_IMAGE))
+        retiring = db.execute("SELECT * FROM worker_pool WHERE retired=1 AND job_id IS NULL "
+                              "AND NOT EXISTS (SELECT 1 FROM job_dispatch d JOIN jobs j "
+                              "ON j.id=d.job_id WHERE d.cluster=worker_pool.cluster AND j.cleaned=0)").fetchall()
         for old in db.execute('SELECT id FROM jobs WHERE cleaned=1 AND updated<?', (time.time()-30*86400,)).fetchall():
             shutil.rmtree(settings.DATA / old['id'], ignore_errors=True)
             db.execute('DELETE FROM job_dispatch WHERE job_id=?', (old['id'],))
             db.execute('DELETE FROM jobs WHERE id=?', (old['id'],))
         db.execute("INSERT OR IGNORE INTO job_dispatch(job_id) SELECT id FROM jobs WHERE cleaned=0")
         rows = db.execute("SELECT jobs.*,job_dispatch.* FROM jobs JOIN job_dispatch ON jobs.id=job_dispatch.job_id WHERE cleaned=0 ORDER BY (status='QUEUED'),created").fetchall()
+    for worker in retiring:
+        try:
+            retire_worker(sky,worker)
+        except sky.exceptions.ClusterDoesNotExist:
+            with store.connect() as db:
+                db.execute('DELETE FROM worker_pool WHERE cluster=? AND retired=1 AND job_id IS NULL',
+                           (worker['cluster'],))
+        except Exception as exc:
+            log.warning('Worker retirement pending for %s (%s)',worker['cluster'],type(exc).__name__)
     for row in rows:
         try:
             advance(sky, row)

@@ -49,8 +49,11 @@ def init():
             cluster TEXT PRIMARY KEY, job_id TEXT UNIQUE, created REAL NOT NULL,
             released REAL, retired INTEGER NOT NULL DEFAULT 0)""")
         columns = {r["name"] for r in db.execute("PRAGMA table_info(worker_pool)")}
-        if "image" not in columns:
-            db.execute("ALTER TABLE worker_pool ADD COLUMN image TEXT")
+        for name, declaration in {'image': 'TEXT', 'retire_check_id': 'TEXT',
+                                  'retire_down_id': 'TEXT', 'retire_intent_at': 'REAL',
+                                  'retire_retry_after': 'REAL NOT NULL DEFAULT 0'}.items():
+            if name not in columns:
+                db.execute(f'ALTER TABLE worker_pool ADD COLUMN {name} {declaration}')
         db.execute("""CREATE TABLE IF NOT EXISTS key_requests (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL,
             purpose TEXT NOT NULL, created REAL NOT NULL,

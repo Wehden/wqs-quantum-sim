@@ -179,8 +179,10 @@ already-accepted queued jobs. There is no new job concurrency cap or job deadlin
    Do not cancel jobs to make progress.
 4. Take the verified backup. Recheck the pinned release is still current main and all required Secret keys remain available.
 5. Update controller (including its new worker digest), observer, admin, then API.
-   Wait for each rollout. Old idle workers are never selected for new-image work;
-   their normal SkyPilot idle lifecycle remains unchanged.
+   Wait for each rollout. Old idle workers are never selected for new-image work.
+   The controller retires obsolete idle workers through SkyPilot after checking
+   native work, retaining ownership and request state until teardown is
+   acknowledged. Active workers remain assigned until their jobs finish.
 6. Admit only the dedicated smoke identity, run complete acceptance, and wait for
    those jobs' cleanup. Then reopen general admission and record verified status.
 
