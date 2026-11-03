@@ -1,6 +1,6 @@
 # Secret-management verification
 
-Status: implementation merged and verified; operational acceptance partially complete.
+Status: implementation and existing circuit CD/application acceptance verified; no production restore or credential rotation performed. Cluster-wide datastore encryption is not established by these application checks.
 
 ## Implementation evidence
 
@@ -45,8 +45,38 @@ template remains at zero replicas; the private release config remains unverified
 and uninstalled. Image/tool tests and configuration tests do not close the real
 deployment-identity or production recovery gates.
 
-## Current reconciliation, 2026-10-19
+## Historical reconciliation, 2026-10-19
 
 This update supersedes the earlier runner-preparation status above. PR #24 is merged at `fb47a0800f80aa96f4e8287282e65d646fda0edc`. The restricted deployment runner is registered, with infrastructure and named-resource RBAC checks completed. It remains at zero replicas and `WQS_CD_ENABLED=false`. Private configuration and hook installation, actual runner execution, and production recovery acceptance are still pending.
 
 Application acceptance source passed the full local suite (390 Python tests and three console tests) and the runner-image smoke check. These are source checks, not live acceptance. LaminarAuth has published `docs/backup-recovery-contract.md` and its v1 schema; their publication does not establish custody, trust authority or accepted recovery. Credential rotation remains deferred.
+
+## Current operational reconciliation, 2026-11-02
+
+Main `8d8b2d0486e0feba6b0cc7514836f67256d83cb5` passed
+[CI 41589604153](https://github.com/Wehden/wqs-quantum-sim/actions/runs/41589604153).
+The configured restricted deployment runner, private release configuration,
+named Secret preflights and actual backup/verification hooks are installed and
+exercised. The runner's merged permission policy preserved the locator
+directory at `0700` through replacement. These live observations supersede
+the historical uninstalled/stopped/disabled checkpoints above.
+
+[CD 41590212314](https://github.com/Wehden/wqs-quantum-sim/actions/runs/41590212314)
+created a new encrypted backup with exact-version readback and a durable private
+locator before image mutation. Placement saturation delayed acceptance past its
+normal deadline. The operator retained failed evidence, retired only 13 proven
+idle obsolete acceptance clusters through SkyPilot, waited for cleanup, checked
+the stored backup version/hash/size and unchanged role images, then invoked the
+existing verifier under the release lock. All eight circuit cases, native
+completion, controller/observer and role evidence, and cleanup passed. The
+ledger is verified, pending is zero and admission reopened. The same-SHA CD
+retry completed green and published the existing verified receipt; it does not claim a new backup
+or another acceptance run. Private before/after and retirement evidence remain
+outside the repository. See [the runbook](../../docs/cd-recovery.md).
+
+This closes installed capture and existing circuit application acceptance, not
+physics runtime acceptance or a production restore. No existing credential or
+recovery identity was changed and rotation remains deferred. Datastore
+encryption-at-rest status was not reverified here; application backup encryption
+is distinct evidence. The approved v2 creation/direct-load policy remains in
+force without reintroducing its superseded independent custody/checkpoint gates.

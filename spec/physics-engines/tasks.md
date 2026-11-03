@@ -792,7 +792,7 @@ All GPU discovery and runtime execution must be scheduled through the existing S
 
 The owner-approved test budget is $25 total. Use a test-owned SkyPilot Runpod allocation with automatic teardown and explicit cleanup through SkyPilot on provisioning/setup failure. Preserve existing local GPU consumers and credentials. Keep numerical child limits unchanged for the first hardware probes; the fixed higher-address-space initialization sweep is diagnostic only, not authorization to relax numerical isolation. Laminar PR #170 was merged and the NVIDIA resource-selection correction applied; local cards still have existing consumers.
 
-### Execution checklist reconciled, 2026-11-01
+### Execution checklist reconciled, 2026-11-02
 
 Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b62342337399b17373c3`; dependency commit `9c27fb1` contains TASK-001 before the three parallel backend executors started in the same worktree. Each executor wrote only its disjoint lease; the coordinator owns this status and README.
 
@@ -807,17 +807,17 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
 | TASK-008 | Complete, merged to main through PR #42: bounded numeric result serialization and 75 focused tests. |
 | TASK-017 | Complete request-model stage for all four classes and three operations. Schema/validation reached main through PR #42; PR #50 adds the source/algorithm allocation certificate for spectra and matrix elements. Export admission remains gated by TASK-019. Worker/API activation and final image acceptance remain open. |
-| TASK-020 | Partial: schema and positive netlist validation reached main through PR #42, with the small-output/adaptive-history regression added by PR #51. Native workspace certification waits for approved TASK-035/036; see [evidence and design](discovery/josim-workspace.md). The backend is not enabled. |
-| TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; native allocation and pulse-grid certificates remain unavailable and admission stays closed. See the execution receipt below. |
-| TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States and collapse channels are complete through TASK-011; pulses and solvers remain later tasks. |
+| TASK-020 | Partial: schema and positive netlist validation reached main through PR #42, with the small-output/adaptive-history regression added by PR #51. TASK-035/036 are complete; the remaining fixed source/binary-bound admission certificate is ready to resume; see [evidence and design](discovery/josim-workspace.md). The backend is not enabled. |
+| TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; private drive-grid error bounds are merged through TASK-012, while final native allocation/admission certificates remain unavailable and admission stays closed. See the execution receipt below. |
+| TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States, collapse channels and private drive grids are complete through TASK-011/012; solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
-| TASK-012 | In progress from main `3d8cbd6`: bounded numeric drive grids under the amended three-file lease. Implementation, numerical verification and PR acceptance are outstanding. |
-| TASK-013 through TASK-016 | Not started. Solvers follow TASK-012 in dependency order. |
+| TASK-012 | Complete private drive-grid stage, merged through PR #60 at `d35f690`. All 325 focused drives/states/operators/models tests passed, including rounded flattop boundaries, envelope/native interpolation rounding, modulation and refinement. Public admission and final allocation certification remain gated. |
+| TASK-013 through TASK-016 | Not started. TASK-013 deterministic SE/ME evolution is ready after completed TASK-012; Monte Carlo, propagators and static solvers follow in dependency order. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
 | TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
-| TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence and workspace certification remain unproven. |
-| TASK-036 | In progress from main `3d8cbd6`: bounded native history under the approved three-artifact lease. Real original/candidate equivalence, retained-capacity proof and constrained memory acceptance remain outstanding. |
+| TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence is now proven by TASK-036. Final admission certification remains separate. |
+| TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
 | TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
@@ -1031,3 +1031,59 @@ The owner authorized the next batch. TASK-012 and TASK-036 start from `3d8cbd6` 
 The existing circuit release at `00185b5` passed all eight live acceptance cases and native SkyPilot checks; CD run 41200949699 is green. This closes that operational bootstrap baseline. It does not complete physics G2, G3 or G4, or authorize physics admission. Worker/API integration, native memory certificates and final physics image/release acceptance remain required. Credentials, unrelated workloads and backup/release gates are unchanged. All GPU work remains scheduled through SkyPilot; this batch adds no GPU allocation.
 
 TASK-012 lease clarification: the existing state suite explicitly refuses all private drive construction as a placeholder for future work. Bounded drive construction supersedes that assertion. The executor may change only that adjacent assertion to verify segmented private construction while public admission remains gated. The task file budget becomes three; the production symbol budget, published interfaces and semantic scope are unchanged. This amendment is recorded before the adjacent test is edited.
+
+### Merged-stage and operational receipt, 2026-11-02
+
+This receipt supersedes the older in-progress lane status above. Main
+`8d8b2d0486e0feba6b0cc7514836f67256d83cb5` contains PR #60's TASK-012 private
+drive-grid construction and PR #61's TASK-036 bounded native history proof.
+The scope of those completed stages remains narrower than public activation.
+
+TASK-012 passed 325 focused tests, including rounded ramp tails, coefficient
+evaluation/native interpolation roundoff, absolute carrier phase and refinement.
+TASK-036 passed 182 focused tests without skips, with seven distinct real
+original/candidate comparisons and seven capacity cases. Its source-derived
+570,708,992-byte charge is below 2 GiB; final source/binary-bound admission and
+combined production packaging remain TASK-020/023 responsibilities.
+
+The next approved implementation lanes have disjoint write leases:
+
+- TASK-013: deterministic SE/ME evolution in `qsim/lindblad_adapter.py` and
+  `tests/test_lindblad_evolve.py`, with bounded state retention, expectations and
+  the existing numerical acceptance criteria.
+- TASK-020 remainder: bind JoSIM native admission to the proven patched source
+  and binary, finish its allocation certificate and reconcile the frozen
+  current-source trace capability debt. This precedes TASK-021 integration
+  reconciliation and TASK-022/023 worker/image activation.
+
+Monte Carlo, propagators and static solvers follow TASK-013 in order. TASK-019
+scqubits export still waits for TASK-016; it is not independently ready. No new
+implementation lane was started by this checklist reconciliation. G2/G3/G4
+remain open for physics. GPU execution remains scheduled through SkyPilot.
+
+Exact-main [CI 41589604153](https://github.com/Wehden/wqs-quantum-sim/actions/runs/41589604153)
+passed with local tests and hosted image/tool checks. Normal
+[CD 41590212314](https://github.com/Wehden/wqs-quantum-sim/actions/runs/41590212314)
+created a fresh encrypted readback-verified backup and deployed all four roles.
+Its first acceptance attempt exceeded the verifier deadline after genuine
+CPU/memory placement saturation; the failed ledger and job evidence were retained.
+The original eight jobs subsequently succeeded and cleaned up.
+
+Operator recovery selected 13 obsolete clusters from two previously verified
+acceptance receipts, checked every associated WQS job was succeeded/cleaned,
+verified terminal native queues and no active launch/exec request, and retired
+only those clusters through SkyPilot. All 13 teardown requests succeeded. Existing
+credentials and unrelated workloads were untouched. The original pre-rollout
+backup's exact version/hash/size and live role images were rechecked under the
+recovery procedure before the unchanged verifier was resumed. Its eight new
+cases, native completion, controller progress, role checks and cleanup passed;
+the ledger is verified, pending is zero and admission is open. The same-SHA CD
+retry completed green by replaying that verified receipt; it is not a second
+backup/acceptance cycle.
+See [the recovery runbook](../../docs/cd-recovery.md) for the operator boundary.
+
+Operational follow-up: determine why obsolete idle clusters retained resources
+after reusable-pool entries expired, and make retirement/accounting reliable
+through SkyPilot. This observed capacity debt is separate from the physics
+feature tasks. Do not add simulation execution limits, evict unrelated work or
+relax backup/acceptance gates as a substitute.
