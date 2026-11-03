@@ -215,6 +215,9 @@ retain the recovery behavior below.
 
 ## Failure and operator recovery
 
+For the recovery procedure and a verified end-to-end record, see
+[CD recovery and acceptance](cd-recovery.md).
+
 The private state directory stores `deployment.json`, prior images, stage, CI run,
 backup identity, acceptance and one immutable-by-convention `<sha>.json` receipt
 for each verified deployment. Writes use atomic replacement and fsync. Only SHA,
