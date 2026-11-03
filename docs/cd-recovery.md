@@ -87,9 +87,12 @@ private. `state_dir` below means the directory named by that configuration.
    disconnected client. The normal verifier remains bounded by its deadline.
 9. **Return to automated CD.** Require successful exact-current-main push CI.
    Allow its normal workflow-run CD trigger, or rerun the eligible failed CD run
-   for that exact SHA after recovery. Normal CD must create a new backup and run
-   acceptance again before reopening. Do not merge PRs or manually request bot
-   reviews as part of recovery.
+   for that exact SHA after recovery. Deploying a different revision creates a
+   fresh backup and runs acceptance before reopening. A retry of the same SHA
+   already recorded as verified returns that existing receipt after eligibility
+   and artifact validation; it does not create another backup or rerun acceptance.
+   A green same-SHA retry is receipt replay, not evidence of new checks. Do not
+   merge PRs or manually request bot reviews as part of recovery.
 
 This is an operator procedure using existing release primitives, not an automatic
 failed-ledger retry policy. Shell history alone is insufficient: retain the
