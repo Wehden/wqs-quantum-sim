@@ -73,6 +73,7 @@ def test_request_rejection_and_missing_certificate_never_invoke_native_process(m
         JoSIMRequest(netlist=BASE.replace('.end', '.file private\n.end'))
     request = JoSIMRequest(netlist=BASE)
     assert request.canonical_envelope()['engine'] == 'josim'
+    assert request._certified_allocation_plan().peak_bytes < 2*1024**3
     with pytest.raises(ValueError, match='resource_limit'):
         request.admission_plan()
 
@@ -87,3 +88,33 @@ def test_request_model_has_only_api_safe_imports():
         elif isinstance(node, ast.ImportFrom):
             imports.append(node.module)
     assert set(imports) <= {'typing', 'pydantic', 'josim_validation', 'physics_results'}
+
+
+@pytest.mark.parametrize('binary_digest', [
+    'b75dae95de6c4601efef4aac377104ba6b12a94c7d36f6b9b0ecde8cf9372450',
+    '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21',
+    '0'*64,
+])
+def test_private_candidate_certificate_does_not_enable_any_runtime_binary(binary_digest, monkeypatch):
+    from qsim import josim_adapter
+    from qsim.josim_models import JoSIMRequest
+
+    request = JoSIMRequest(netlist=BASE)
+    plan = request._certified_allocation_plan()
+    monkeypatch.setattr(josim_adapter, '_BINARY_SHA256', binary_digest)
+    monkeypatch.setattr(josim_adapter.subprocess, 'run',
+                        lambda *a, **k: pytest.fail('uncertified runtime launched'))
+    with pytest.raises(ValueError, match='runtime binary/trace reconciliation'):
+        josim_adapter.run_josim(request, plan, execution_context={})
+
+
+def test_current_source_voltage_trace_debt_preserves_request_and_stays_gated():
+    from qsim.josim_models import JoSIMRequest
+
+    request = JoSIMRequest(netlist=BASE.replace('.print DEVV B1', '.print DEVV I1'))
+    envelope = request.canonical_envelope()
+    assert validate_josim_netlist(request.netlist)[1]['trace_names'] == ['V(I1)']
+    assert request._certified_allocation_plan().result.arrays[1].shape[1] == 1
+    with pytest.raises(ValueError, match='runtime binary/trace reconciliation'):
+        request.admission_plan()
+    assert request.canonical_envelope() == envelope
