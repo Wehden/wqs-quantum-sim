@@ -163,7 +163,7 @@ def test_rejected_netlist_validation_error_has_field_location_without_input_echo
     assert '/private' not in errors[0]['msg']
 
 
-def test_admission_plans_numeric_result_then_fails_closed_for_missing_native_certificate(monkeypatch):
+def test_admission_plans_bound_numeric_result_and_preserves_canonical_identity(monkeypatch):
     from qsim import josim_models
     from qsim.physics_results import plan_result
     observed = []
@@ -176,9 +176,10 @@ def test_admission_plans_numeric_result_then_fails_closed_for_missing_native_cer
     monkeypatch.setattr(josim_models, 'plan_result', checked)
     request = josim_models.JoSIMRequest(netlist=minimal())
     canonical_before = request.canonical_envelope()
-    with pytest.raises(ValueError, match='resource_limit: JoSIM native workspace certificate'):
-        request.admission_plan()
-    assert len(observed) == 1
+    allocation = request._certified_allocation_plan()
+    assert allocation == request._certified_allocation_plan()
+    assert allocation.result == observed[0]
+    assert len(observed) == 2
     plan = observed[0]
     rows = validate_josim_netlist(minimal())[1]['predicted_rows']
     assert [(s.name, s.shape, s.dtype) for s in plan.arrays] == [
@@ -186,10 +187,12 @@ def test_admission_plans_numeric_result_then_fails_closed_for_missing_native_cer
     assert plan.numeric_bytes == rows * 16
     assert plan.callback_upper_bytes < 12 * 1024**2
     assert request.canonical_envelope() == canonical_before
+    with pytest.raises(ValueError, match='certificate is unavailable'):
+        request.admission_plan()
 
 
 @pytest.mark.parametrize('step,stop', [('1e-12', '1e-9'), ('1e-11', '1e-8'), ('1e-9', '1e-6')])
-def test_small_output_grid_does_not_certify_junction_internal_history(step, stop):
+def test_small_output_grid_uses_fixed_bounded_history_not_internal_step_charge(step, stop):
     from qsim.josim_models import JoSIMRequest
 
     request = JoSIMRequest(netlist=(
@@ -201,8 +204,13 @@ def test_small_output_grid_does_not_certify_junction_internal_history(step, stop
     _, info = validate_josim_netlist(request.netlist)
     assert 1000 <= info['predicted_rows'] <= 1002
     assert info['trace_names'] == ['P(B01)']
-    with pytest.raises(ValueError, match='resource_limit: JoSIM native workspace certificate'):
+    with pytest.raises(ValueError, match='certificate is unavailable'):
         request.admission_plan()
+    plan = request._certified_allocation_plan()
+    assert dict(plan.allocation_items)['history'] == 2397056
+    assert plan.peak_bytes < 2*1024**3
+    assert plan.coefficient_plan['binary_sha256'] == (
+        '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21')
 
 
 def test_numeric_node_labels_are_not_silently_merged():
@@ -263,6 +271,8 @@ def test_finite_physical_and_resource_refusals_follow_canonicalization(before, a
     with pytest.raises(ValueError):
         request.admission_plan()
     with pytest.raises(ValueError):
+        request._certified_allocation_plan()
+    with pytest.raises(ValueError):
         validate_josim_netlist(request.netlist)
 
 
@@ -289,3 +299,71 @@ def test_current_admission_policy_does_not_change_normalized_request_identity(mo
     assert replay.canonical_envelope() == original
     with pytest.raises(ValueError, match='new policy'):
         replay.admission_plan()
+
+
+def test_certificate_matches_frozen_source_charge_and_build_identity():
+    import runpy
+    from qsim.josim_models import JoSIMRequest
+
+    proof = runpy.run_path('spec/physics-engines/probe_josim_history.py')
+    plan = JoSIMRequest(netlist=minimal())._certified_allocation_plan()
+    receipt = proof['BUILD_PROVENANCE']
+    certificate = plan.coefficient_plan
+    assert certificate['binary_sha256'] == receipt['candidate_binary_sha256']
+    assert certificate['source_commit'] == receipt['upstream_commit']
+    for key in ('patch_sha256', 'patched_source_sha256', 'source_date_epoch', 'compiler', 'build_type'):
+        assert certificate[key] == receipt[key]
+    assert certificate['build_image'] == receipt['image']
+    assert certificate['binary_sha256'] != receipt['original_binary_sha256']
+    assert certificate['binary_sha256'] != receipt['instrumented_binary_sha256']
+    charge = proof['_workspace_charge']()
+    items = dict(plan.allocation_items)
+    assert {key: items[key] for key in charge['components_bytes']} == charge['components_bytes']
+    assert sum(charge['components_bytes'].values()) == 570708992
+    assert plan.peak_bytes == sum(items.values()) < 2*1024**3
+    assert plan.policy_revision == 'josim-cpu-bounded-history-v1'
+    assert plan.algorithm == 'josim-phase-bounded-history'
+    assert plan.dimensions['native_dimension_upper_bound'] == 80
+    assert plan.dimensions['selected_variables_upper_bound'] == 24
+    assert certificate['phase_analysis'] is True
+    assert certificate['startup'] is True
+    assert certificate['print_start_seconds'] == 0
+    assert certificate['fir_window_seconds'] == 0
+    assert not any('deadline' in key or 'iteration' in key or 'internal_steps' in key
+                   for key in certificate)
+    assert certificate['cpu_count'] == 2
+    assert certificate['scheduler_memory_bytes'] == 4*1024**3
+    assert certificate['child_address_space_bytes'] == 3*1024**3
+    assert certificate['child_file_bytes'] == 12*1024**2
+    assert 'worker_image' not in certificate
+
+
+def test_largest_certified_grammar_shapes_include_output_and_parent_child_overlap():
+    import runpy
+    from qsim.josim_models import JoSIMRequest
+
+    proof = runpy.run_path('spec/physics-engines/probe_josim_history.py')
+    for text in proof['_capacity_cases']().values():
+        plan = JoSIMRequest(netlist=text)._certified_allocation_plan()
+        items = dict(plan.allocation_items)
+        assert plan.peak_bytes == sum(items.values()) < 2*1024**3
+        assert items['csv_payload_and_text'] >= 6*6*1024**2
+        assert items['parsed_python_rows'] >= 4096*(256 + 32*9)
+        assert items['numeric_result_arrays'] >= 2*plan.result.numeric_bytes
+        assert items['npz_serialization_buffers'] >= 4*plan.result.npz_upper_bytes
+        assert items['base64_bytes_and_ascii_string'] >= 8*((plan.result.npz_upper_bytes+2)//3)
+        assert items['callback_json_unicode_and_utf8'] >= 5*plan.result.callback_upper_bytes
+        assert items['parent_child_handoff'] >= 2*plan.result.callback_upper_bytes
+
+
+def test_plan_certificate_cannot_be_mutated_to_change_later_admission():
+    from qsim.josim_models import JoSIMRequest
+
+    request = JoSIMRequest(netlist=minimal())
+    original = request._certified_allocation_plan()
+    altered = request._certified_allocation_plan()
+    altered.coefficient_plan['binary_sha256'] = '0'*64
+    altered.coefficient_plan['patched_source_sha256']['src/Simulation.cpp'] = '0'*64
+    altered.dimensions['native_dimension_upper_bound'] = 800
+    assert request._certified_allocation_plan() == original
+    assert request._certified_allocation_plan() != altered
