@@ -109,7 +109,7 @@ def test_locator_refuses_overwrite_and_propagates_sync_failure(tmp_path, monkeyp
     assert not (tmp_path / 'backup-locators/other.json').exists()
 
 
-@pytest.mark.parametrize('failure', ['deadline', 'disconnect', 'terminate'])
+@pytest.mark.parametrize('failure', ['deadline', 'disconnect', 'terminate', 'terminate_then_deadline'])
 def test_exporter_failure_releases_sqlite_and_removes_plaintext(source, tmp_path, failure):
     snapshot, _ = source
     # Large enough to block stdout without reading, but no large allocation.
@@ -119,7 +119,24 @@ def test_exporter_failure_releases_sqlite_and_removes_plaintext(source, tmp_path
     (fake / 'qsim/settings.py').write_text('from pathlib import Path\nDATA=Path(' + repr(str(snapshot.data)) + ')\n')
     scratch = tmp_path / 'scratch'; scratch.mkdir()
     env = {**os.environ, 'PYTHONPATH': str(fake), 'TMPDIR': str(scratch)}
-    process = subprocess.Popen([sys.executable, str(Path(remote_data.__file__))], stdin=subprocess.PIPE,
+    command = [sys.executable, str(Path(remote_data.__file__))]
+    if failure == 'terminate_then_deadline':
+        # Deliver a second cancellation after TemporaryDirectory has detached
+        # its finalizer, exactly where an expiring alarm can interrupt cleanup.
+        wrapper = '''import os, runpy, signal, tempfile
+original = tempfile.TemporaryDirectory._rmtree.__func__
+fired = False
+def interrupted_cleanup(cls, name, *args, **kwargs):
+    global fired
+    if not fired and os.path.basename(name).startswith('wqs-export-'):
+        fired = True
+        os.kill(os.getpid(), signal.SIGALRM)
+    return original(cls, name, *args, **kwargs)
+tempfile.TemporaryDirectory._rmtree = classmethod(interrupted_cleanup)
+runpy.run_path(%r, run_name='__main__')
+''' % str(Path(remote_data.__file__))
+        command = [sys.executable, '-c', wrapper]
+    process = subprocess.Popen(command, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=fake, env=env)
     try:
         ready = json.loads(process.stdout.readline())['ready']
@@ -129,7 +146,7 @@ def test_exporter_failure_releases_sqlite_and_removes_plaintext(source, tmp_path
         assert process.stdout.read(512)
         if failure == 'disconnect':
             process.stdout.close()
-        elif failure == 'terminate':
+        elif failure in ('terminate', 'terminate_then_deadline'):
             process.send_signal(signal.SIGTERM)
         assert process.wait(timeout=5) != 0
         assert not list(scratch.iterdir())
