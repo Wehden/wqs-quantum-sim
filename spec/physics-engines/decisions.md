@@ -177,3 +177,13 @@ The proposal is complete when these documents agree; implementation remains bloc
 | PHY-020 | Durable server-owned profile, exact-image reuse and explicit queue/fallback policy; TASK-026/027 |
 
 Review status: artifact structure, local links, numerical envelope arithmetic and requirement coverage are checked before publication. No pending work-accounting or interface choice is concealed as an implementation TODO. The remaining largest-shape, pulse-convergence, native seed, cancellation and combined-image checks are named G2/G3 acceptance obligations.
+
+## Native handoff amendment, approved 2026-11-03
+
+The owner approved [both native handoff amendments](discovery/native-handoff-amendment.md):
+a defaulted seventh observable tuple in `NativeLindbladModel`, and bounded JoSIM
+current-source voltage projection with atomic candidate-binary/certificate
+verification. The linked amendment is normative for these implementation details
+and actual allocation-owner proof. Public schemas and canonical request identity
+remain unchanged. Public physics admission and G2/G3/G4 remain gated; this approval
+authorizes only the stated scoped implementation and lease extensions.
