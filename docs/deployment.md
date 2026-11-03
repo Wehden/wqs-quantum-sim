@@ -88,7 +88,7 @@ the console explicitly reports placement data as unavailable.
 
 ### Active job lifetime
 
-Active simulations have no pod lifetime, controller dispatch deadline, simulator wall-clock alarm, or CPU-time budget. Explicit cancellation still tears down the assigned worker. SkyPilot's ten-minute idle autodown remains enabled and waits for running/pending native jobs to finish. Worker reuse depends on idle time and image compatibility, not worker age.
+Active simulations have no pod lifetime, controller dispatch deadline, simulator wall-clock alarm, or CPU-time budget. Explicit cancellation still tears down the assigned worker. SkyPilot's ten-minute idle autodown remains enabled and waits for running/pending native jobs to finish. Worker reuse depends on idle time and image compatibility, not worker age. The controller also retires idle workers after the existing eleven-minute pool expiry, or immediately when their image is obsolete. It excludes them from reuse, checks the native queue and dispatch requests, and retains durable SkyPilot teardown state until removal is acknowledged. Active, pending or unknown native work defers retirement. Failed teardown is retried; ambiguous acknowledgements are reconciled after restart. Pool ownership is not discarded just because an idle timer elapsed, and job-history deletion does not erase it.
 
 Roll out the worker image, controller, and SkyPilot pod configuration together when removing the old deadlines. Existing pods and old worker images retain their original limits; drain idle old workers through SkyPilot before accepting new work with the updated image. Do not restart active simulations to apply this change.
 
