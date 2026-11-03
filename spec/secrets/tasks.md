@@ -1,5 +1,10 @@
 # Secret-management implementation tasks
 
+Current reconciliation: existing circuit CD and application acceptance are verified
+through exact-main `8d8b2d0`; the run IDs and operator recovery are recorded below.
+Dated checkpoints retain their historical scope. Credential rotation remains
+explicitly deferred, and no production restore was performed.
+
 ## Task Graph Overview (short)
 
 TASK-001 discovery precedes TASK-002 preflight and TASK-003 operating procedures. TASK-004 verifies their combined result. No parallel executors are required.
@@ -59,8 +64,11 @@ TASK-001 discovery precedes TASK-002 preflight and TASK-003 operating procedures
 - [x] Live synthetic projection/revocation and named Secret access/denial drill passed (46.65 seconds observed projection delay).
 - [x] Synthetic encrypted recovery and historical archive database-integrity drills passed within their documented scopes.
 - [x] Restricted deployment runner registered; zero-replica infrastructure and named-resource RBAC checks completed.
-- [ ] Install the private release configuration and hooks, and verify the real runner execution path. Registration alone does not close deployment acceptance.
-- [ ] Current complete encrypted backup, encryption-at-rest/key-custody evidence and production recovery acceptance remain pending.
+- [x] Private release configuration and hooks installed; actual restricted runner execution verified through successful circuit CD.
+- [x] Complete encrypted backup creation, exact-version readback and durable private locator verified by normal CD.
+- [x] Existing circuit application acceptance passed all eight cases, including native completion, role identity and cleanup.
+- [ ] Cluster-wide encryption-at-rest status was not reverified in this reconciliation; application backup encryption does not establish datastore encryption. This remains external infrastructure evidence, not a replacement for the approved v2 backup policy.
+- [ ] An explicit native restore destination and real production restore are deferred until requested; creation/readback evidence is not a restore claim.
 - [ ] Credential rotation explicitly deferred by owner; no rotation performed or required to close the non-rotation checks.
 
 ## Execution Notes (tooling, environment, checkpoints)
@@ -98,10 +106,23 @@ The authorized v2 policy supersedes independent checkpoint/authority, per-route
 proof, custody-mapping approval, staging restore, and owner-acceptance gates.
 See [the implementation contract](../../docs/backup-recovery-v2.md).
 
-- [ ] Merge reviewed v2 contract pin and WQS consumer changes.
-- [ ] Install actual v2 capture integration; creation must match the CD-requested set ID.
+- [x] V2 contract pin and WQS consumer changes merged, including PR #31.
+- [x] Actual v2 capture integration installed; normal CD verifies creation against each newly requested set ID.
 - [ ] Configure an explicit native destination for operational recovery when requested.
-- [ ] Complete unrelated protocol, runtime-parity and application acceptance gates.
+- [x] Existing circuit release-control protocol and eight-case application acceptance verified.
+- [ ] Other protocol/runtime-parity obligations remain with their own specs; this circuit acceptance does not close them. Physics runtime acceptance remains in `spec/physics-engines`.
 
 Source tests use disposable destinations and existing test-created identities;
 no production restore, credential rotation, or bootstrap/CD change is implied.
+
+## Operational reconciliation, 2026-11-02
+
+The installed runner and hooks, encrypted capture/readback/locator, release-control
+protocol and eight-case circuit acceptance are now operational. The current
+release receipt and run IDs are recorded in [verification.md](verification.md).
+The earlier stopped-runner, uninstalled-hook and disabled-CD checkpoints above
+are historical. The approved v2 amendment still supersedes independent custody,
+checkpoint and owner-acceptance gates; this reconciliation does not reintroduce
+them. No recovery key, existing credential, rotation policy or unrelated workload
+was changed. Actual production restore and cluster-wide encryption evidence are
+not inferred from successful application CD.
