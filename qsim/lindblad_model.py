@@ -18,6 +18,7 @@ class NativeLindbladModel:
     tensor_order: tuple[str, ...]
     coefficient_segments: tuple
     allocation_plan: AllocationPlan
+    observables: tuple = ()
 
 
 def _tensor_operators(modes, factors):
@@ -455,8 +456,9 @@ def _build_model(request, plan):
         state = _initial_state(request)
         channels = _collapse_operators(request)
         segments = _coefficient_segments(request, hamiltonian)
+        observables = tuple(_operator(request, item.operator) for item in request.observables)
     return NativeLindbladModel(hamiltonian, channels, state,
-                               tuple(mode.name for mode in request.model.modes), segments, plan)
+                               tuple(mode.name for mode in request.model.modes), segments, plan, observables)
 
 
 def build_lindblad_model(request: LindbladRequest, plan: AllocationPlan) -> NativeLindbladModel:

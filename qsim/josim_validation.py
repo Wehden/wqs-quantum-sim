@@ -81,6 +81,7 @@ def _validate_netlist(text: str, *, admission: bool) -> tuple[str, Mapping[str, 
     """
     lines = _normalize_lines(text, admission=admission)
     devices, nodes, model_refs, models, traces, transient, normalized = {}, set(), [], {}, [], [], []
+    device_nodes = {}
     for line in lines[:-1]:
         element = re.fullmatch(rf'([RLBIV][A-Z0-9_]{{1,31}}) (\d{{1,2}}) (\d{{1,2}}) (.+)', line)
         if element:
@@ -103,6 +104,7 @@ def _validate_netlist(text: str, *, admission: bool) -> tuple[str, Mapping[str, 
             else:
                 tail = _waveform(tail, 'A' if kind == 'I' else 'V', admission=admission)
             devices[name] = kind
+            device_nodes[name] = (a, b)
             nodes.update((a, b))
             if admission and (len(devices) > 32 or len(nodes) > 16):
                 raise ValueError('JoSIM accepts at most 32 devices and 16 nodes')
@@ -165,7 +167,32 @@ def _validate_netlist(text: str, *, admission: bool) -> tuple[str, Mapping[str, 
     result = '\n'.join(normalized) + '\n'
     if len(result) > 65536:
         raise ValueError('Normalized JoSIM netlist exceeds its byte boundary')
+    projection_info = {}
+    if admission:
+        native_lines, native_names, projection = [], [], []
+        for line in normalized:
+            if line.startswith('.PRINT '):
+                _, kind, name = line.split()
+                public_name = f'{dict(DEVV="V", DEVI="I", PHASE="P")[kind]}({name})'
+                rewritten = kind == 'DEVV' and devices[name] == 'I'
+                native_name, scale = public_name, 1
+                if rewritten:
+                    a, b = device_nodes[name]
+                    if a == '0':
+                        a, b, scale = b, a, -1
+                    line = f'.PRINT NODEV {a} {b}'
+                    native_name = f'V({a},{b})'
+                native_names.append(native_name)
+                projection.append({'public_name': public_name, 'native_name': native_name,
+                                   'scale': scale, 'rewritten': rewritten})
+            native_lines.append(line)
+        native_text = '\n'.join(native_lines) + '\n'
+        if len(native_text) > 65568:
+            raise ValueError('resource_limit: JoSIM generated native text exceeds its byte boundary')
+        projection_info = {'native_netlist': native_text, 'native_trace_names': native_names,
+                           'trace_projection': projection}
     return result, {
+        **projection_info,
         **transient[0], 'device_count': len(devices), 'node_count': len(nodes),
         'trace_names': [f'{dict(DEVV="V", DEVI="I", PHASE="P")[kind]}({name})' for kind, name in traces],
         'trace_units': [dict(DEVV='V', DEVI='A', PHASE='rad')[kind] for kind, _ in traces],
