@@ -304,6 +304,7 @@ The owner approved the [native handoff amendment](discovery/native-handoff-amend
 
 ### TASK-014: Implement seeded Monte Carlo evolution
 
+- **Implementation status:** Private execution implemented in this change on 2026-11-04; final allocation certification and production integration remain pending. Public admission stays closed.
 - **Goal:** Implement seeded Monte Carlo evolution.
 - **Dependencies:** TASK-013.
 - **Requirements:** PHY-008, PHY-009, PHY-011, PHY-012, PHY-019.
@@ -1145,3 +1146,54 @@ implementation lane. CD acceptance remains unverified after the retained failed
 release ledger; backup gates, existing credentials and unrelated workloads
 remain unchanged. Future dependent PRs must be retargeted to main and refreshed
 after their parent merges before being described as ready to merge.
+
+
+### TASK-014 private execution receipt, 2026-11-04
+
+This receipt supersedes the older deployment and next-task status above.
+
+The owner resumed TASK-014 from main `d9f5c88f652f17d571b1fdf06e84588ec6712545`
+and requested implementation, tests and checklist in one PR. PR #71's complete
+ancestry, including the reviewed TASK-013 and JoSIM runtime commits, is on main.
+The existing circuit-service release at that revision passed normal
+[CD run 41734189279, attempt 2](https://github.com/Wehden/wqs-quantum-sim/actions/runs/41734189279)
+after operator recovery: a fresh encrypted readback-verified backup, all four
+roles, eight live/native acceptance cases, open admission and zero pending jobs.
+That receipt covers Clifft, Google qsim and Aer. It does not activate physics.
+
+TASK-014 now implements private serial QuTiP Monte Carlo stepping, preserving
+all seed bits through NumPy SeedSequence children and an explicit PCG64 generator.
+The exact effective seed is recorded as a decimal string, avoiding JSON integer
+precision loss. Requested/completed trajectories, native entries, output points,
+completed segments and jumps are counted across the whole job. The existing
+source-derived RHS bound includes failed calls. No job-wide work or time cutoff,
+parallel trajectory allocation, improved sampling or partial success is added.
+
+At pulse-segment boundaries the adapter transfers the native unnormalized state,
+pending norm threshold and generator without drawing another random threshold.
+Only requested ensemble expectation/density outputs are accumulated. Native jump
+history is replaced by a constant-size count-only list. The retired solver's
+options callback is disconnected before discarding it so native workspaces do
+not accumulate until cyclic collection. Native solver mathematics are unchanged.
+QuTiP/NumPy versions and native MC, seed-mapping and RK source identities are
+checked before output allocation. Public exports and frozen interfaces are
+unchanged; runtime changes stay in the two leased files with four new production
+class/function declarations, below the budget of six. This shared checklist is
+the coordinator's requested update in the same PR.
+
+Verification: the exact MC task command passes 46 tests; the combined MC,
+deterministic evolution, operator, drive, state, model and result suites pass
+486 tests. The fixed 1,000-trajectory T1 case agrees with ME within three analytic
+standard errors at the declared time points. Tests cover high seed bits, exact
+repeats and native seed mapping, segmented RNG preservation, a separate native
+hard-pulse reference, complex observable order, ensemble retention, constant jump
+storage, prompt workspace release, source/certificate refusals, failed native
+advances, cancellation propagation and native-setting restoration. Numerical
+checks use the real pinned native libraries; no mocked solver substitutes for
+numerical acceptance.
+
+Final algorithm-specific allocation certification, largest-admitted-shape and
+combined-image proofs, worker/API integration and G2/G3/G4 remain open. TASK-015
+is next after this implementation reaches main; no further task starts here.
+Existing credentials, backup/release gates and unrelated workloads are unchanged.
+No model, GPU or cluster allocation was launched for local verification.
