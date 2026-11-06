@@ -820,9 +820,9 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States, collapse channels and private drive grids are complete through TASK-011/012; solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
 | TASK-012 | Complete private drive-grid stage, merged through PR #60 at `d35f690`. All 325 focused drives/states/operators/models tests passed, including rounded flattop boundaries, envelope/native interpolation rounding, modulation and refinement. Public admission and final allocation certification remain gated. |
-| TASK-013 through TASK-016 | TASK-013 through TASK-015 are merged. TASK-016 private static numerics are implemented in the receipt below and await review, CI and merge. |
+| TASK-013 through TASK-016 | Private evolution, Monte Carlo, propagators and static solvers are merged through PR #74. Native allocation certification and worker/API activation remain gated. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
-| TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
+| TASK-019 | Private same-eigensystem numeric export is implemented in the receipt below and awaits review, CI and merge. Export allocation certification and worker/API activation remain gated. |
 | TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
 | TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence is now proven by TASK-036. Final admission certification remains separate. |
 | TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
@@ -1290,3 +1290,61 @@ TASK-016 awaits review, CI and merge. TASK-019 (same-basis scqubits export) beco
 dependency-ready after that merge. TASK-022/023 and G2/G3/G4 remain open. No GPU,
 model or cluster allocation was launched for local tests. Existing credentials,
 backup/release gates and unrelated workloads are unchanged.
+
+
+### TASK-019 private execution receipt, 2026-11-05
+
+This receipt supersedes earlier next-task status. PR #74 merged at main
+`f8068c331bea86319978e12a0ec217ff6183c934`; its full static-solver commit
+`4f1abbea2d90e0ce5df694d7aca28eb1f826b479` is an ancestor of main. Exact-main
+[CI 42170818833](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42170818833)
+passed its local test attempt and hosted image lane. Normal
+[CD 42171316698](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42171316698)
+is in progress at this checkpoint, so this receipt does not claim acceptance
+for that revision. The preceding revision `fced6ef` passed
+[CD 42168243656](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42168243656).
+
+TASK-019 implements private numeric export for all four scqubits classes.
+One native eigensystem supplies every selected operator and the diagonal
+Hamiltonian. Export eigenvalues and Hamiltonian are ground-referenced linear
+GHz; metadata records the removed absolute ground energy and its units. Raw
+basis, selected energy-basis dimension/order, arbitrary native phase/degenerate
+subspace conventions, selected operator order and operator units remain explicit.
+The exported eigenbasis is defined by these numeric Hamiltonian/operator arrays.
+No eigenvector phase is independently changed for an operator.
+
+The result contains `eigenvalues`, `hamiltonian` and the ordered selected operator
+arrays. Its `metadata_json` includes a version-1 `lindblad_request`: a complete
+spectrum request with one numeric matrix mode and named operator matrices.
+Real/imaginary components use finite JSON numbers, with no executable/native
+objects. Clients can submit that body or adapt its model for evolution; the
+adapter never submits another job. Production imports remain inside the frozen
+scqubits boundary and do not import a Lindblad runtime or request model. Tests
+validate the emitted body using the real Lindblad schema and native adapter.
+
+The existing conservative JSON-duplication/result reservation runs before native
+construction. Actual finite UTF-8 metadata, including work observations, is
+checked against 64 KiB; the shared serializer enforces the complete NPZ/callback
+budget. Unrepresentable ground-energy differences and invalid native operators
+fail without producing an export. Public export admission still refuses the
+missing algorithm-specific allocation certificate. This private numerical stage
+does not certify constructor, eigenvector, JSON duplication and serialization
+workspace coexistence or activate API traffic.
+
+Verification: 27 export tests and 832 combined scqubits/Lindblad/result tests
+pass with the pinned native CPU libraries. All four classes round-trip their
+exported spectra within 1e-9 GHz. Tests compare every operator to the same
+captured eigensystem, phase changes and degenerate-subspace rotations, safe NPZ
+metadata, malformed handoffs, empty/single-level output, exact numeric
+reservations, preconstruction JSON refusals, the largest all-operator JSON
+family, and real cross-engine complex expectations with GHz converted to
+angular units exactly once. All 148 installed packages pass compatibility
+checks. Three new functions are within the five-symbol budget; implementation
+and tests use the two leased files. This coordinator checklist update is in the
+same PR. Existing spectrum/matrix-elements execution tests remain unchanged.
+
+TASK-019 awaits review, CI and merge. Before TASK-022 worker integration, close
+or verify its remaining native admission-certificate dependencies; TASK-023
+combined-image acceptance and G2/G3/G4 remain required. No GPU, model or cluster
+allocation was launched for local tests. Existing credentials, backup/release
+gates and unrelated workloads are unchanged.
