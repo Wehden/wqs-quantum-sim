@@ -1,4 +1,4 @@
-"""Fixed remote worker. Circuit text is data, never executable Python or shell."""
+"""Fixed remote worker. Circuit and physics inputs are data, never executable code."""
 import base64
 import collections
 import io
@@ -14,11 +14,136 @@ import urllib.error
 import urllib.request
 
 
+_PHYSICS_FORMATS = {'lindblad': 'lindblad_model', 'scqubits': 'scqubits_model', 'josim': 'josim_netlist'}
+_PHYSICS_ERRORS = {
+    'physical_validation': 'check the versioned model schema, units and parameters',
+    'invalid_model': 'check the versioned model schema, units and parameters',
+    'resource_limit': 'request exceeds the current certified execution or result envelope',
+    'execution_policy_mismatch': 'worker policy or runtime does not match certified execution',
+    'nonunique_stationary_state': 'stationary state is nonunique or numerically ambiguous',
+    'invalid_result': 'simulation did not produce a complete valid numeric result',
+    'native_nonconvergence': 'native solver did not converge to a valid result',
+    'native_failure': 'native execution did not produce a valid result',
+    'execution_failed': 'physics execution failed; check the supported model and service limits',
+}
+
+
+def _is_physics(request):
+    return ((type(request.get('engine')) is str and request['engine'] in _PHYSICS_FORMATS)
+            or request.get('input_format') in _PHYSICS_FORMATS.values())
+
+
+def _physics_failure(error):
+    category = (str(error).partition(':')[0] if isinstance(error, (ValueError, RuntimeError))
+                else 'resource_limit' if isinstance(error, MemoryError) else 'execution_failed')
+    if category not in _PHYSICS_ERRORS:
+        category = 'execution_failed'
+    payload = {'status': 'FAILED', 'error': category+': '+_PHYSICS_ERRORS[category]}
+    work = getattr(error, 'work', None)
+    counters = {'set_state_calls', 'integrate_calls', 'mcstep_calls', 'completed_segments',
+        'output_points', 'rhs_evaluations_upper_bound', 'trajectories_requested',
+        'trajectories_completed', 'collapse_events', 'eigensolver_calls', 'svd_calls',
+        'stationary_solver_calls', 'eigensystem_calls', 'operator_transforms',
+        'raw_basis_dimension', 'requested_levels'}
+    if (type(work) is dict and work and set(work) <= counters
+            and all(type(v) is str and v.isascii() and v.isdecimal() for v in work.values())
+            and len(json.dumps({'work': work}).encode()) <= 65536):
+        payload['summary'] = {'work': dict(work)}
+    return payload
+
+
+def simulate_physics(request, output):
+    """Reproduce admission and serialize numeric results inside the fresh child."""
+    result = None
+    try:
+        if os.geteuid() == 0:
+            raise ValueError('execution_policy_mismatch: nonroot physics child required')
+        engine = request.get('engine')
+        if type(engine) is not str or engine not in _PHYSICS_FORMATS:
+            raise ValueError('invalid_model: unsupported physics engine')
+        if engine == 'lindblad':
+            from qsim.lindblad_models import LindbladRequest as Model
+        elif engine == 'scqubits':
+            from qsim.scqubits_models import ScqubitsRequest as Model
+        else:
+            from qsim.josim_models import JoSIMRequest as Model
+        normalized = Model.model_validate(request)
+        plan = normalized.admission_plan()
+        if engine == 'lindblad':
+            from qsim.lindblad_adapter import run_lindblad as execute
+        elif engine == 'scqubits':
+            from qsim.scqubits_adapter import run_scqubits as execute
+        else:
+            from qsim.josim_adapter import run_josim as execute
+        from qsim.physics_results import ArraySpec, plan_result, serialize_physics_result
+        result = execute(normalized, plan, execution_context={'backend': 'cpu'})
+        exact = plan.result
+        if engine == 'josim':
+            # Native adaptive integration may emit fewer rows than the reserved ceiling.
+            times, traces = result.arrays['times'], result.arrays['traces']
+            if (times.ndim != 1 or traces.ndim != 2 or not 0 < times.size <= exact.arrays[0].shape[0]
+                    or traces.shape != (times.size, exact.arrays[1].shape[1])):
+                raise ValueError('invalid_result: native transient shape differs from reservation')
+            exact = plan_result(tuple(ArraySpec(spec.name, spec.dtype, result.arrays[spec.name].shape, spec.units)
+                                      for spec in exact.arrays),
+                                metadata_characters=65536, summary_bytes=65536)
+            if any(getattr(exact, key) > getattr(plan.result, key) for key in
+                   ('numeric_bytes', 'npz_upper_bytes', 'callback_upper_bytes')):
+                raise ValueError('resource_limit: native transient result exceeds reservation')
+        summary, artifact = serialize_physics_result(result, exact)
+        payload = {'status': 'SUCCEEDED', 'summary': summary, 'artifact': artifact}
+        if len(json.dumps(payload, allow_nan=False).encode()) > exact.callback_upper_bytes:
+            raise ValueError('resource_limit: actual physics callback exceeds reservation')
+    except Exception as error:
+        if result is not None and getattr(error, 'work', None) is None:
+            error.work = getattr(result, 'work', None)
+        payload = _physics_failure(error)
+    output.write_text(json.dumps(payload, allow_nan=False), encoding='utf-8')
+
+
+def _read_physics_payload(output):
+    try:
+        if output.is_symlink() or not output.is_file() or output.stat().st_size > 12*1024**2:
+            raise ValueError
+        payload = json.loads(output.read_text(encoding='utf-8'))
+        if type(payload) is not dict:
+            raise ValueError
+        if payload.get('status') == 'SUCCEEDED':
+            if (set(payload) != {'status', 'summary', 'artifact'} or type(payload['summary']) is not dict
+                    or type(payload['artifact']) is not str or not payload['artifact']
+                    or len(base64.b64decode(payload['artifact'], validate=True)) > 9*1024**2):
+                raise ValueError
+        elif payload.get('status') == 'FAILED':
+            if (set(payload) not in ({'status', 'error'}, {'status', 'error', 'summary'})
+                    or payload['error'] not in {k+': '+v for k, v in _PHYSICS_ERRORS.items()}):
+                raise ValueError
+            if 'summary' in payload:
+                error = ValueError('execution_failed')
+                if type(payload['summary']) is not dict or set(payload['summary']) != {'work'}:
+                    raise ValueError
+                error.work = payload['summary']['work']
+                safe = _physics_failure(error)
+                if safe.get('summary') != payload['summary']:
+                    raise ValueError
+        else:
+            raise ValueError
+        if ('summary' in payload and len(json.dumps(payload['summary'], allow_nan=False).encode()) > 65536):
+            raise ValueError
+        if len(json.dumps(payload, allow_nan=False).encode()) > 12*1024**2:
+            raise ValueError
+        return payload
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError, RecursionError):
+        return _physics_failure(ValueError('invalid_result'))
+
+
 def simulate(source: Path, output: Path):
     # Bound native compiler/sampler allocations as well as Python allocations.
     resource.setrlimit(resource.RLIMIT_AS, (3 * 1024**3, 3 * 1024**3))
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     request = json.loads(source.read_text())
+    if _is_physics(request):
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        return simulate_physics(request, output)
     if request.get("engine") == "aer":
         return simulate_aer(request, output)
     if request.get("engine", "clifft") == "qsim":
@@ -283,16 +408,29 @@ def remote():
         raise RuntimeError("Result service unreachable")
 
     request = call()
+    physics = _is_physics(request)
     call({"status": "RUNNING"})
     with tempfile.TemporaryDirectory() as directory:
         source, output = Path(directory) / "input.json", Path(directory) / "output.json"
         source.write_text(json.dumps(request))
         # Do not give the native simulator job credentials or controller environment.
         env = {"PATH": os.environ["PATH"], "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
-        process = subprocess.run([sys.executable, "-m", "qsim.worker", "simulate", str(source), str(output)],
-                                 cwd=Path(__file__).resolve().parent.parent,
-                                 env=env, capture_output=True)
-        if process.returncode:
+        if physics:
+            env = {'PATH': '/usr/bin:/bin', 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}
+        streams = ({'stdin': subprocess.DEVNULL, 'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
+                   if physics else {'capture_output': True})
+        try:
+            process = subprocess.run([sys.executable, "-m", "qsim.worker", "simulate", str(source), str(output)],
+                                     cwd=Path(__file__).resolve().parent.parent,
+                                     env=env, **streams)
+        except OSError:
+            if not physics:
+                raise
+            process = None
+        if physics:
+            payload = (_physics_failure(RuntimeError()) if process is None or process.returncode
+                       else _read_physics_payload(output))
+        elif process.returncode:
             message = "Circuit simulation failed; check the circuit and service limits"
             if request['input_format'] in ('qasm2', 'qasm3') and request.get('operation') == 'sample':
                 version = '2' if request['input_format'] == 'qasm2' else '3'
