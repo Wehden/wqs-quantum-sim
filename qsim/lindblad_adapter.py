@@ -1,10 +1,11 @@
-"""Native CPU evolution inside the isolated numerical child."""
+"""Native CPU Lindblad numerics inside the isolated numerical child."""
 from collections.abc import Mapping
 import hashlib
 import math
 
 import numpy as np
 import qutip as qt
+from scipy import linalg as la
 from qutip.solver.integrator import IntegratorException
 from qutip.solver.integrator.qutip_integrator import IntegratorVern7
 
@@ -398,6 +399,124 @@ def _run_propagator(request, model):
     return PhysicsExecutionResult(arrays, metadata, _work_ledger(work))
 
 
+def _static_spectrum(request, hamiltonian, work):
+    # Native dense LAPACK works in GHz; the model stores angular GHz.
+    matrix = hamiltonian.full() / (2*math.pi)
+    work['eigensolver_calls'] += 1
+    native = la.eigh(matrix, eigvals_only=not request.return_vectors, driver='evd')
+    energies, vectors = native if request.return_vectors else (native, None)
+    dimension, count = matrix.shape[0], request.evals_count
+    if (energies.shape != (dimension,) or np.iscomplexobj(energies)
+            or not np.isfinite(energies).all() or np.any(np.diff(energies) < 0)):
+        raise ValueError('invalid_result: native spectrum values or order')
+    arrays = {'eigenvalues': np.array(energies[:count], dtype=np.float64, copy=True)}
+    if vectors is not None:
+        if vectors.shape != (dimension, dimension) or not np.isfinite(vectors).all():
+            raise ValueError('invalid_result: native eigenvector shape or values')
+        scale = max(1., float(np.max(np.abs(matrix))))
+        if (la.norm(vectors.conj().T@vectors-np.eye(dimension), ord=np.inf) > 1e-9
+                or la.norm((matrix/scale)@vectors-vectors*(energies/scale), ord=np.inf) > 1e-9):
+            raise ValueError('invalid_result: native eigenpair residual or orthogonality')
+        arrays['eigenvectors'] = np.array(vectors[:, :count], dtype=np.complex128, copy=True)
+    return arrays, {'energy_units': 'GHz', 'energy_reference': 'absolute',
+                    'native_algorithm': 'scipy-eigh-evd'}
+
+
+def _static_stationary(request, model, work):
+    dimension = math.prod(mode.dimension for mode in request.model.modes)
+    generator = qt.liouvillian(model.hamiltonian, model.collapse_operators)
+    matrix = generator.full()
+    size = dimension**2
+    if matrix.shape != (size, size) or not np.isfinite(matrix).all():
+        raise ValueError('invalid_result: native Liouvillian shape or values')
+    work['svd_calls'] += 1
+    singular = la.svdvals(matrix)
+    if (singular.shape != (size,) or not np.isfinite(singular).all()
+            or np.any(singular < 0) or np.any(np.diff(singular) > 0)):
+        raise ValueError('invalid_result: native singular values')
+    tau = (100*np.finfo(np.float64).eps*size)*max(float(singular[0]), np.finfo(np.float64).tiny)
+    if np.count_nonzero(singular <= tau) != 1 or (size > 1 and singular[-2] <= 10*tau):
+        raise ValueError('nonunique_stationary_state: nullspace is nonunique or numerically ambiguous')
+    if dimension == 1:
+        # There is exactly one trace-one density in a scalar Hilbert space.
+        state = qt.qeye(1)
+    else:
+        work['stationary_solver_calls'] += 1
+        state = qt.steadystate(generator, method='direct', solver='solve',
+                               sparse=False, weight=float(singular[0]))
+    if not isinstance(state, qt.Qobj):
+        raise ValueError('invalid_result: native stationary state type')
+    density = _validate_state(request, state)
+    vector = density.reshape(size, order='F')
+    residual = float(la.norm(matrix@vector))
+    limit = 10*tau*max(1., float(la.norm(vector)))
+    if not math.isfinite(residual) or residual > limit:
+        raise ValueError('invalid_result: native stationary residual')
+    arrays = {}
+    if model.observables:
+        values = np.array([np.trace(operator.full()@density) for operator in model.observables],
+                          dtype=np.complex128)
+        if not np.isfinite(values).all():
+            raise ValueError('invalid_result: native stationary expectations')
+        arrays['expectations'] = values
+    if request.return_state:
+        arrays['steady_state'] = density
+    return arrays, {'native_algorithm': ('svd-uniqueness-qutip-dense-direct' if dimension > 1
+                                        else 'svd-unique-scalar-density'),
+        'stationary_nullity': 1, 'stationary_tau': float(tau),
+        'stationary_residual': residual, 'stationary_residual_limit': float(limit),
+        'vectorization': 'column-stacking'}
+
+
+def _run_static(request, model):
+    """Private static numerics; public admission requires workspace certificates."""
+    if (not isinstance(request, LindbladRequest) or request.operation not in ('spectrum', 'steadystate')
+            or not isinstance(model, NativeLindbladModel)):
+        raise ValueError('invalid_model: expected static Lindblad operation')
+    dimension = request._physical_checks()
+    if model.allocation_plan.result != request._result_plan(dimension):
+        raise ValueError('invalid_model: allocation result reservation differs from request')
+    if (model.tensor_order != tuple(mode.name for mode in request.model.modes)
+            or model.initial_state is not None or model.coefficient_segments
+            or len(model.observables) != len(request.observables)
+            or (request.operation == 'spectrum' and model.collapse_operators)):
+        raise ValueError('invalid_model: native static controls or tensor dimensions')
+    dims = [mode.dimension for mode in request.model.modes]
+    for operator in (model.hamiltonian, *model.collapse_operators, *model.observables):
+        if (not isinstance(operator, qt.Qobj) or operator.shape != (dimension, dimension)
+                or (dimension != 1 and operator.dims != [dims, dims])
+                or not np.isfinite(operator.full()).all()):
+            raise ValueError('invalid_model: native static operator shape or values')
+    matrix = model.hamiltonian.full()
+    scale = max(1., float(np.max(np.abs(matrix))))
+    if la.norm(matrix/scale-matrix.conj().T/scale, ord=np.inf) > 1e-10:
+        raise ValueError('invalid_model: native static Hamiltonian is not Hermitian')
+    _verify_runtime(None)
+    work = dict(eigensolver_calls=0, svd_calls=0, stationary_solver_calls=0)
+    try:
+        with qt.CoreOptions(auto_tidyup=False, auto_tidyup_dims=False):
+            if request.operation == 'spectrum':
+                arrays, details = _static_spectrum(request, model.hamiltonian, work)
+            else:
+                arrays, details = _static_stationary(request, model, work)
+    except (ValueError, RuntimeError, np.linalg.LinAlgError) as cause:
+        if isinstance(cause, ValueError) and str(cause).startswith(('invalid_result:', 'nonunique_stationary_state:')):
+            error = ValueError(str(cause))
+        else:
+            error = RuntimeError('native_nonconvergence: Lindblad static solver failed')
+        error.work = {key: str(value) for key, value in work.items()}
+        raise error from None
+    metadata = {'engine': 'lindblad', 'operation': request.operation, 'schema_version': 1,
+        'engine_version': qt.__version__, 'numpy_version': np.__version__,
+        'precision': 'complex128', 'backend': 'cpu', 'tensor_order': list(model.tensor_order),
+        'dimensions': [mode.dimension for mode in request.model.modes],
+        'policy_revision': model.allocation_plan.policy_revision,
+        'algorithm': model.allocation_plan.algorithm, **details}
+    if request.observables:
+        metadata['observable_names'] = [item.name for item in request.observables]
+    return PhysicsExecutionResult(arrays, metadata, {key: str(value) for key, value in work.items()})
+
+
 def run_lindblad(request: LindbladRequest, plan: AllocationPlan, *,
                  execution_context: Mapping) -> PhysicsExecutionResult:
     """Reproduce certified admission before constructing any native object."""
@@ -411,4 +530,6 @@ def run_lindblad(request: LindbladRequest, plan: AllocationPlan, *,
         return _run_evolve(normalized, build_lindblad_model(normalized, plan))
     if normalized.operation == 'propagator' and normalized.solver in ('se', 'me'):
         return _run_propagator(normalized, build_lindblad_model(normalized, plan))
+    if normalized.operation in ('spectrum', 'steadystate'):
+        return _run_static(normalized, build_lindblad_model(normalized, plan))
     raise ValueError('invalid_model: native operation is not implemented')

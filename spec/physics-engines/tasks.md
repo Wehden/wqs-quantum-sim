@@ -820,7 +820,7 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States, collapse channels and private drive grids are complete through TASK-011/012; solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
 | TASK-012 | Complete private drive-grid stage, merged through PR #60 at `d35f690`. All 325 focused drives/states/operators/models tests passed, including rounded flattop boundaries, envelope/native interpolation rounding, modulation and refinement. Public admission and final allocation certification remain gated. |
-| TASK-013 through TASK-016 | TASK-013 and TASK-014 are merged. TASK-015 private propagators are implemented in the receipt below; TASK-016 static solvers follow after merge. |
+| TASK-013 through TASK-016 | TASK-013 through TASK-015 are merged. TASK-016 private static numerics are implemented in the receipt below and await review, CI and merge. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
 | TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
@@ -1238,3 +1238,55 @@ native allocation certification, largest-admitted-shape and constrained-image
 proofs, worker/API integration and G2/G3/G4 remain open. No GPU, model or cluster
 allocation was launched for local tests. Backup/release gates, existing
 credentials and unrelated workloads are unchanged.
+
+
+### TASK-016 private execution receipt, 2026-11-05
+
+This receipt supersedes earlier next-task status. PR #73 merged at main
+`fced6ef0e0b23c8883ddf626d4cd0cdfc95c4f10`; its complete propagator commit
+`eb3220b0f79ff3e91ebdef0d1ebce8ea90858e59` is an ancestor of main. Exact-main
+[CI 42167573121](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42167573121)
+is still running at this checkpoint, with its local attempt successful and the
+hosted image lane in progress. CD/acceptance for this revision is not yet
+verified. The previous verified circuit release remains `c79532c`; physics
+admission remains disabled by the missing native allocation certificates.
+
+TASK-016 implements sorted static spectra in absolute linear GHz with optional
+column eigenvectors using SciPy's dense `eigh` / `evd` path. It validates finite
+ordered values and returned eigenpair residuals/orthogonality. Unique stationary
+states use an explicit static Liouvillian, dense SVD uniqueness check and QuTiP's
+dense direct solver. The singular-value threshold and next-value gap follow the
+approved scale-relative rule exactly. Nonunique or ambiguous states are refused
+before solving. Scalar Hilbert space has exactly one trace-one density and is
+handled explicitly after the same uniqueness check.
+
+Every stationary density is computed and validated internally for shape,
+trace, Hermiticity, positivity and stationary residual, even when `return_state`
+is false. Ordered complex named expectations have shape (O,); omitted output
+controls add no extra arrays. Native call counts include failed eigensolver,
+SVD and stationary solver entries and are decimal strings. Native errors are
+sanitized; core options are restored on success and failure. Static drives and
+inapplicable controls remain rejected by the existing request contract.
+
+Verification: all 44 static tests and 558 combined Lindblad/result tests pass
+using the real pinned native CPU libraries. This includes the thermal occupation
+error below 1e-6 and dispersive shift within 5% of the declared perturbative
+reference, complex eigenpairs/expectations, tensor order, optional outputs,
+nonunique and weakly connected stationary states, exact threshold boundaries,
+scale-relative residuals, invalid native outputs and failure accounting. Tests
+exercise the structural D256 spectrum and D32 stationary density, including a
+nonreturned internal density; these local tests are not constrained-image
+workspace certificates. All 148 installed packages pass compatibility checks.
+
+Three new production functions are within the eight-symbol budget. Runtime and
+tests stay in the two leased files; this coordinator checklist update is in the
+same PR. Public exports and admission signatures are unchanged. Existing result
+reservations are reproduced before numerical solver allocation. Final dense
+LAPACK workspace-query certificates, simultaneous buffer/serialization proofs
+and largest-admitted-shape testing under the constrained combined image remain
+mandatory before admission; no universal workspace multiplier is introduced.
+
+TASK-016 awaits review, CI and merge. TASK-019 (same-basis scqubits export) becomes
+dependency-ready after that merge. TASK-022/023 and G2/G3/G4 remain open. No GPU,
+model or cluster allocation was launched for local tests. Existing credentials,
+backup/release gates and unrelated workloads are unchanged.
