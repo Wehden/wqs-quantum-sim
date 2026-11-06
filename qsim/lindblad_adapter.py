@@ -139,6 +139,33 @@ def _run_trajectories(request, model, arrays, segments, work):
         _validate_state(request, qt.Qobj(density, dims=[dims, dims]), ensemble=True)
 
 
+def _verify_runtime(solver):
+    # This source-derived bound is valid only for the frozen native tableau.
+    if qt.__version__ != '5.3.1' or np.__version__ != '2.5.4':
+        raise ValueError('execution_policy_mismatch: Lindblad runtime version')
+    source = qt.__file__.rsplit('/', 1)[0] + '/solver/integrator/explicit_rk.pyx'
+    try:
+        with open(source, 'rb') as stream:
+            digest = hashlib.sha256(stream.read(131073)).hexdigest()
+    except OSError:
+        raise ValueError('execution_policy_mismatch: Lindblad integrator source') from None
+    if (digest != 'a2b6f7d8e1c4cdce982d8d11f8a4bcfd353ee9bcd833c4c7fa5eace763c7b01e'
+            or IntegratorVern7.tableau['a'].shape != (16, 16)
+            or len(IntegratorVern7.tableau['b']) != 10):
+        raise ValueError('execution_policy_mismatch: Lindblad integrator source/tableau')
+    if solver == 'mc':
+        for filename, expected_hash in (
+                ('mcsolve.py', '68c1810dc3f8d48e5edf6a7b5eaea47c40442be0ee5e431469e607cfb217b7bf'),
+                ('multitraj.py', 'a2f2f2e77b9d95e7653042dceff27d9b5d01184cf1c293cd679f8842e07ec8f6')):
+            try:
+                with open(qt.__file__.rsplit('/', 1)[0]+'/solver/'+filename, 'rb') as stream:
+                    native_hash = hashlib.sha256(stream.read(131073)).hexdigest()
+            except OSError:
+                raise ValueError('execution_policy_mismatch: Monte Carlo native source') from None
+            if native_hash != expected_hash:
+                raise ValueError('execution_policy_mismatch: Monte Carlo native source')
+
+
 def _run_evolve(request, model):
     """Private numerical stage; its caller supplies a separately certified model."""
     if (not isinstance(request, LindbladRequest) or request.operation != 'evolve'
@@ -168,30 +195,7 @@ def _run_evolve(request, model):
                 or not any(np.any(op.full()) for op in model.collapse_operators)):
             raise ValueError('invalid_model: mc requires pure input and nonzero collapse operators')
         _validate_state(request, model.initial_state)
-    # This source-derived bound is valid only for the frozen native tableau.
-    if qt.__version__ != '5.3.1' or np.__version__ != '2.5.4':
-        raise ValueError('execution_policy_mismatch: Lindblad runtime version')
-    source = qt.__file__.rsplit('/', 1)[0] + '/solver/integrator/explicit_rk.pyx'
-    try:
-        with open(source, 'rb') as stream:
-            digest = hashlib.sha256(stream.read(131073)).hexdigest()
-    except OSError:
-        raise ValueError('execution_policy_mismatch: Lindblad integrator source') from None
-    if (digest != 'a2b6f7d8e1c4cdce982d8d11f8a4bcfd353ee9bcd833c4c7fa5eace763c7b01e'
-            or IntegratorVern7.tableau['a'].shape != (16, 16)
-            or len(IntegratorVern7.tableau['b']) != 10):
-        raise ValueError('execution_policy_mismatch: Lindblad integrator source/tableau')
-    if request.solver == 'mc':
-        for filename, expected_hash in (
-                ('mcsolve.py', '68c1810dc3f8d48e5edf6a7b5eaea47c40442be0ee5e431469e607cfb217b7bf'),
-                ('multitraj.py', 'a2f2f2e77b9d95e7653042dceff27d9b5d01184cf1c293cd679f8842e07ec8f6')):
-            try:
-                with open(qt.__file__.rsplit('/', 1)[0]+'/solver/'+filename, 'rb') as stream:
-                    native_hash = hashlib.sha256(stream.read(131073)).hexdigest()
-            except OSError:
-                raise ValueError('execution_policy_mismatch: Monte Carlo native source') from None
-            if native_hash != expected_hash:
-                raise ValueError('execution_policy_mismatch: Monte Carlo native source')
+    _verify_runtime(request.solver)
     arrays = {spec.name: np.empty(spec.shape, dtype=spec.dtype) for spec in result_plan.arrays}
     times = arrays['times']
     times[:] = request.canonical_envelope()['times']
@@ -275,6 +279,125 @@ def _run_evolve(request, model):
     return PhysicsExecutionResult(arrays, metadata, _work_ledger(work))
 
 
+def _validate_propagator(request, propagator):
+    dims = [mode.dimension for mode in request.model.modes]
+    dimension = math.prod(dims)
+    me = request.solver == 'me'
+    size = dimension**2 if me else dimension
+    expected_dims = [[dims, dims], [dims, dims]] if me else [dims, dims]
+    if (not isinstance(propagator, qt.Qobj) or propagator.shape != (size, size)
+            or (dimension != 1 and (propagator.dims != expected_dims
+                or (me and (not propagator.issuper or propagator.superrep != 'super'))
+                or (not me and not propagator.isoper)))):
+        raise ValueError('invalid_result: native propagator representation or shape')
+    values = propagator.full()
+    if not np.isfinite(values).all():
+        raise ValueError('invalid_result: native propagator is not finite')
+    if me:
+        trace = np.eye(dimension).reshape(size, order='F')
+        if np.max(np.abs(trace@values-trace)) > 1e-7:
+            raise ValueError('invalid_result: native propagator does not preserve trace')
+        tensor = values.reshape((dimension,)*4, order='F')
+        if np.max(np.abs(tensor-tensor.transpose(1, 0, 3, 2).conj())) > 1e-7:
+            raise ValueError('invalid_result: native propagator does not preserve Hermiticity')
+    elif np.max(np.abs(values.conj().T@values-np.eye(dimension))) > 1e-7:
+        raise ValueError('invalid_result: native propagator is not unitary')
+    return values
+
+
+def _run_propagator(request, model):
+    """Private operator evolution; public admission needs a certified workspace."""
+    if (not isinstance(request, LindbladRequest) or request.operation != 'propagator'
+            or request.solver not in ('se', 'me')
+            or not isinstance(model, NativeLindbladModel)):
+        raise ValueError('invalid_model: expected deterministic propagator')
+    dimension = request._physical_checks()
+    result_plan = request._result_plan(dimension)
+    if model.allocation_plan.result != result_plan:
+        raise ValueError('invalid_model: allocation result reservation differs from request')
+    dims = [mode.dimension for mode in request.model.modes]
+    if (model.tensor_order != tuple(mode.name for mode in request.model.modes)
+            or model.initial_state is not None or model.observables != ()
+            or (request.solver == 'se' and model.collapse_operators)
+            or any(not isinstance(op, qt.Qobj) or op.shape != (dimension, dimension)
+                   or (dimension != 1 and (not op.isoper or op.dims != [dims, dims]))
+                   or not np.isfinite(op.full()).all()
+                   for op in model.collapse_operators)):
+        raise ValueError('invalid_model: native propagator controls or tensor dimensions')
+    _verify_runtime(request.solver)
+    arrays = {spec.name: np.empty(spec.shape, dtype=spec.dtype) for spec in result_plan.arrays}
+    times = arrays['times']
+    times[:] = request.canonical_envelope()['times']
+    segments = model.coefficient_segments or ({'start': times[0], 'stop': times[-1],
+        'hamiltonian': model.hamiltonian, 'max_step': 0., 'coefficient_error_bound': 0.},)
+    work = dict(set_state_calls=0, integrate_calls=0, mcstep_calls=0,
+                completed_segments=0, output_points=0)
+    cls = qt.SESolver if request.solver == 'se' else qt.MESolver
+    method = '_wqs_accounted_vern7'
+    previous = cls._avail_integrators.get(method)
+    cls.add_integrator(_AccountedVern7, method)
+    solver = None
+    try:
+        with qt.CoreOptions(auto_tidyup=False, auto_tidyup_dims=False):
+            state = None
+            index = 0
+            for segment in segments:
+                if solver is not None:
+                    solver._options._feedback = None
+                    solver = None
+                generator = (segment['hamiltonian'] if request.solver == 'se' else
+                             qt.liouvillian(segment['hamiltonian'], model.collapse_operators))
+                options = dict(method=method, atol=1e-10, rtol=1e-9, nsteps=100000,
+                    max_step=segment['max_step'], first_step=0., min_step=0.,
+                    interpolate=True, normalize_output=False, store_states=False,
+                    store_final_state=False, progress_bar='')
+                solver = cls(generator, options=options)
+                solver._integrator._ledger = work
+                if state is None:
+                    # Use the native solver's identity space, including scalar spaces.
+                    state = qt.qeye(solver._sys_dims)
+                solver.start(state, segment['start'])
+                last_time = segment['start']
+                while index < times.size and times[index] <= segment['stop']:
+                    if times[index] > last_time:
+                        state = solver.step(times[index])
+                        last_time = times[index]
+                    arrays['propagators'][index] = _validate_propagator(request, state)
+                    work['output_points'] += 1
+                    index += 1
+                if last_time < segment['stop']:
+                    state = solver.step(segment['stop'])
+                    _validate_propagator(request, state)
+                work['completed_segments'] += 1
+            if index != times.size:
+                raise ValueError('invalid_result: native propagator is missing output points')
+    except (IntegratorException, RuntimeError):
+        error = RuntimeError('native_nonconvergence: Lindblad propagator failed')
+        error.work = _work_ledger(work)
+        raise error from None
+    finally:
+        if solver is not None:
+            solver._options._feedback = None
+            solver = None
+        if previous is None:
+            cls._avail_integrators.pop(method, None)
+        else:
+            cls._avail_integrators[method] = previous
+    metadata = {'engine': 'lindblad', 'operation': 'propagator', 'solver': request.solver,
+        'schema_version': 1, 'engine_version': qt.__version__, 'numpy_version': np.__version__,
+        'precision': 'complex128', 'backend': 'cpu', 'tensor_order': list(model.tensor_order),
+        'dimensions': dims, 'reference_time': float(times[0]),
+        'representation': 'hilbert-unitary' if request.solver == 'se' else 'liouville-superoperator',
+        'policy_revision': model.allocation_plan.policy_revision,
+        'algorithm': model.allocation_plan.algorithm, 'integrator': 'vern7',
+        'atol': 1e-10, 'rtol': 1e-9, 'nsteps': 100000,
+        'coefficient_error_bound': math.fsum(s['coefficient_error_bound'] for s in segments),
+        'rhs_bound_kind': 'source-derived upper bound'}
+    if request.solver == 'me':
+        metadata['vectorization'] = 'column-stacking'
+    return PhysicsExecutionResult(arrays, metadata, _work_ledger(work))
+
+
 def run_lindblad(request: LindbladRequest, plan: AllocationPlan, *,
                  execution_context: Mapping) -> PhysicsExecutionResult:
     """Reproduce certified admission before constructing any native object."""
@@ -284,6 +407,8 @@ def run_lindblad(request: LindbladRequest, plan: AllocationPlan, *,
         raise ValueError('execution_policy_mismatch: Lindblad allocation plan')
     if execution_context.get('backend', 'cpu') != 'cpu':
         raise ValueError('execution_policy_mismatch: unsupported Lindblad backend')
-    if normalized.operation != 'evolve' or normalized.solver not in ('se', 'me', 'mc'):
-        raise ValueError('invalid_model: only native evolution is implemented')
-    return _run_evolve(normalized, build_lindblad_model(normalized, plan))
+    if normalized.operation == 'evolve' and normalized.solver in ('se', 'me', 'mc'):
+        return _run_evolve(normalized, build_lindblad_model(normalized, plan))
+    if normalized.operation == 'propagator' and normalized.solver in ('se', 'me'):
+        return _run_propagator(normalized, build_lindblad_model(normalized, plan))
+    raise ValueError('invalid_model: native operation is not implemented')

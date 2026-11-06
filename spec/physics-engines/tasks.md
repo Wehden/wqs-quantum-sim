@@ -820,7 +820,7 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States, collapse channels and private drive grids are complete through TASK-011/012; solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
 | TASK-012 | Complete private drive-grid stage, merged through PR #60 at `d35f690`. All 325 focused drives/states/operators/models tests passed, including rounded flattop boundaries, envelope/native interpolation rounding, modulation and refinement. Public admission and final allocation certification remain gated. |
-| TASK-013 through TASK-016 | Not started. TASK-013 deterministic SE/ME evolution is ready after completed TASK-012; Monte Carlo, propagators and static solvers follow in dependency order. |
+| TASK-013 through TASK-016 | TASK-013 and TASK-014 are merged. TASK-015 private propagators are implemented in the receipt below; TASK-016 static solvers follow after merge. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
 | TASK-019 | Not started. Numeric export waits for TASK-016 and TASK-018. |
 | TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
@@ -1197,3 +1197,44 @@ combined-image proofs, worker/API integration and G2/G3/G4 remain open. TASK-015
 is next after this implementation reaches main; no further task starts here.
 Existing credentials, backup/release gates and unrelated workloads are unchanged.
 No model, GPU or cluster allocation was launched for local verification.
+
+
+### TASK-015 private execution receipt, 2026-11-05
+
+This receipt supersedes earlier next-task and deployment status. TASK-014 PR #72
+is merged at main `c79532cb2d85163718ed9678c713c30216cd2526`. Exact-main
+[CI 42048299196](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42048299196)
+and normal [CD 42049290634](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42049290634)
+passed. The deployment ledger records that exact SHA as verified with a completed
+backup and verified acceptance. The physics API remains unadmitted.
+
+TASK-015 implements private Hilbert unitary and explicit-Liouvillian ME
+propagators using the pinned native Vern7 solver. Both start at identity at the
+first supplied time and carry the cumulative operator across pulse boundaries.
+ME remains a column-stacked Liouville superoperator with an empty collapse list.
+Metadata records representation, reference time, tensor order and dimensions.
+Scalar Hilbert spaces use the native solver identity space with dimension
+simplification disabled inside the restored CoreOptions context.
+
+The existing result plan checks every D^2/D^4 output before allocation. Public
+admission still requires the unavailable algorithm-specific allocation
+certificate; synthetic test plans do not establish workspace admission. Native
+runtime/source pins and work accounting are shared with evolution. No native
+result history is retained; solver workspaces are released between segments.
+Invalid maps and incomplete output fail without repair or partial success.
+
+Verification: 28 propagator tests and 514 combined Lindblad/result tests pass
+with the real pinned CPU libraries. Tests cover analytic Rabi and damping,
+empty-collapse ME against sprepost, column stacking, tensor order, absolute
+carrier time, hidden pulse boundaries, scalar spaces, finite/physical map
+validation, exact output boundaries, certificate/runtime refusals, failed-call
+accounting, prompt workspace release and native-setting restoration. All 148
+installed packages pass compatibility checks. Three new production functions
+are within the six-symbol budget; implementation and tests use the two leased
+files. This coordinator checklist update accompanies them in the same PR.
+
+TASK-015 awaits PR review, CI and merge. TASK-016 is next after merge. Final
+native allocation certification, largest-admitted-shape and constrained-image
+proofs, worker/API integration and G2/G3/G4 remain open. No GPU, model or cluster
+allocation was launched for local tests. Backup/release gates, existing
+credentials and unrelated workloads are unchanged.
