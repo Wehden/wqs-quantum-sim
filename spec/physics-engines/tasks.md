@@ -815,18 +815,19 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
 | TASK-008 | Complete, merged to main through PR #42: bounded numeric result serialization and 75 focused tests. |
 | TASK-017 | Complete request-model stage for all four classes and three operations. Schema/validation reached main through PR #42; PR #50 adds the source/algorithm allocation certificate for spectra and matrix elements. Export admission remains gated by TASK-019. Worker/API activation and final image acceptance remain open. |
-| TASK-020 | Partial: schema and positive netlist validation reached main through PR #42, with the small-output/adaptive-history regression added by PR #51. TASK-035/036 are complete; the remaining fixed source/binary-bound admission certificate is ready to resume; see [evidence and design](discovery/josim-workspace.md). The backend is not enabled. |
+| TASK-020 | Private validation, bounded native projection and workspace certification are merged, as recorded in the native runtime promotion receipt. Production packaging and public activation remain gated. See [evidence and design](discovery/josim-workspace.md). |
 | TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; private drive-grid error bounds are merged through TASK-012, while final native allocation/admission certificates remain unavailable and admission stays closed. See the execution receipt below. |
 | TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States, collapse channels and private drive grids are complete through TASK-011/012; solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
 | TASK-012 | Complete private drive-grid stage, merged through PR #60 at `d35f690`. All 325 focused drives/states/operators/models tests passed, including rounded flattop boundaries, envelope/native interpolation rounding, modulation and refinement. Public admission and final allocation certification remain gated. |
 | TASK-013 through TASK-016 | Private evolution, Monte Carlo, propagators and static solvers are merged through PR #74. Native allocation certification and worker/API activation remain gated. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
-| TASK-019 | Private same-eigensystem numeric export is implemented in the receipt below and awaits review, CI and merge. Export allocation certification and worker/API activation remain gated. |
-| TASK-021 | Native transient stage merged in PR #46. Real pinned-binary SFQ and hostile-output tests passed. Public execution remains blocked by missing native workspace certification; worker shape reconciliation and production packaging remain pending. |
+| TASK-019 | Private same-eigensystem numeric export merged through PR #75. Export allocation certification and worker/API activation remain gated. |
+| TASK-021 | Private native transient execution, bounded projection and matching binary/certificate verification are merged. Worker row-shape reconciliation is implemented through TASK-022 below; production packaging and public admission remain gated. |
 | TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence is now proven by TASK-036. Final admission certification remains separate. |
 | TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
-| TASK-022 through TASK-034 | Not started. Worker/API integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
+| TASK-022 | Private isolated-worker integration is implemented in the receipt below and awaits review, CI and merge. |
+| TASK-023 through TASK-034 | Production packaging, remaining worker/API/profile integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
 
@@ -1348,3 +1349,88 @@ or verify its remaining native admission-certificate dependencies; TASK-023
 combined-image acceptance and G2/G3/G4 remain required. No GPU, model or cluster
 allocation was launched for local tests. Existing credentials, backup/release
 gates and unrelated workloads are unchanged.
+
+
+### TASK-022 private worker receipt, 2026-11-05
+
+This receipt supersedes earlier next-task and deployment status. PR #75 merged
+at main `94d090710886e553eb31dd848964847c3075e8c1`; its export commit
+`5e88a3ff0d0b895bf90fd05e244970ec2dddfb70` is an ancestor of main. Exact-main
+[CI 42175900332](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42175900332)
+and normal [CD 42176589691](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42176589691)
+passed. The deployment ledger records that exact revision as verified, with a
+completed backup and verified acceptance. This covers the existing circuit
+service, not physics activation.
+
+TASK-022 adds lazy physics dispatch to the existing fresh numerical child.
+Strict engine models reproduce admission before importing the selected native
+adapter. Adapters revalidate the plan and runtime through their existing public
+entrypoints, with a fixed CPU execution context. Client policy/resource overrides
+remain invalid. Missing Lindblad, export and production JoSIM admission
+certificates still refuse execution; this task adds no production bypass.
+
+The child requires nonroot execution, retains 3-GiB AS and 12-MiB file limits,
+and disables core dumps for physics. It receives only the fixed PATH and
+single-thread OpenBLAS/OpenMP environment. Callback credentials remain in the
+parent. Physics stdin/stdout/stderr use DEVNULL so native logs neither leak nor
+accumulate in parent memory. Existing transport retries, cancellation and
+unlimited simulation duration remain unchanged; no CPU-second or job-work cap
+is added. The four existing circuit numerical functions are unchanged.
+
+Shared serialization verifies predictive and actual numeric/NPZ/callback bounds.
+JoSIM's actual adaptive row count may reduce its reserved ceiling, with matching
+time/trace rows and no larger dimensions or transport envelope. The parent
+checks file type/size, complete JSON status/member shape, finite bounded summary,
+base64/decoded size and actual callback JSON bytes before sending a completion.
+Missing, malformed or oversized output and child launch/exit failures become a
+bounded FAILED callback. Fixed error guidance excludes native details; only
+allowlisted decimal work counters can accompany a failure. Parent/adapter
+scratch cleanup is preserved on success, failure and cancellation.
+
+Verification: the exact TASK-022 pytest group passes 56 tests with the pinned
+JoSIM executable present. A combined backend/worker run passes 1,113 tests with
+original/candidate/instrumented JoSIM binaries and source fixtures present, with
+no skips. That run predates the additional import-refusal test included in the
+final 56-test group. All 148 installed packages pass compatibility checks.
+Real fresh children exercise certified scqubits spectrum/matrix-elements and
+private Lindblad evolve SE/ME/MC, propagator SE/ME, spectrum/steady-state,
+scqubits export and pinned JoSIM SFQ results. Synthetic test-only admission
+plans exercise still-gated numerical families; they do not certify admission.
+The JoSIM test uses its real private allocation certificate and verifies the
+candidate binary hash, shorter native row count and SFQ integral within 2%.
+That test explicitly skips when its pinned binary is unavailable; such a skip
+is not native/image acceptance.
+
+Legacy verification found an Aer static-TLS import failure on this host and
+reproduced it with the unchanged main worker. The existing pinned CPU test image
+passes all 111 selected worker/circuit checks, including Aer and QASM. Its
+nonroot, 2-CPU/4-GiB, network-disabled, read-only-root run uses only read-only
+code/package/binary mounts and ephemeral `/tmp` and user-home mounts. The latter
+is required for existing QASM tests whose child environment omits HOME and
+whose stderr contract rejects Matplotlib's cache warning. No production TLS,
+library or environment workaround is introduced. This is selected-fixture
+wrapper evidence, not acceptance of a deployable production physics image.
+
+Repeat the host worker group using the standard frozen worker/controller/backup
+extras and `WQS_TEST_JOSIM_BINARY` pointing to the previously verified candidate.
+For the selected container repeat use CPU test image
+`sha256:30465f32041d36dc6f3d0ac1e20fe5b856f72a25943f74829683cfc7fea61b79`,
+user 1001:1001, `--cpus 2 --memory 4g --memory-swap 4g --network none --read-only
+--cap-drop ALL --security-opt no-new-privileges`, `/tmp` tmpfs 128 MiB mode1777,
+and `/home/runner` tmpfs 16 MiB uid/gid1001 mode0700. Mount `qsim`, `tests` and
+`pyproject.toml` read-only under `/workspace`, frozen CPython3.12 site-packages
+read-only at `/usr/local/lib/python3.12/dist-packages`, and the candidate read-only
+at `/candidate`. Set HOME=/tmp, OMP/OPENBLAS/MKL threads=1,
+PYTHONDONTWRITEBYTECODE=1 and WQS_TEST_JOSIM_BINARY=/candidate. From `/workspace`
+run `/usr/bin/python3.12 -m pytest -q -p no:cacheprovider --basetemp=/tmp/pytest`
+against `test_physics_worker.py`, `test_worker_lifecycle.py`,
+`test_physics_compatibility_baseline.py`, `test_qasm_sampling.py`,
+`test_aer_worker.py` and `test_aer_sampling.py` under `tests/`.
+
+Four new functions and two fixed dispatch/error tables fit the eight-symbol
+budget. Runtime/tests use the three leased files; this coordinator checklist is
+in the same PR. TASK-022 awaits review, CI and merge. TASK-023 production
+packaging/image checks follow after merge. Final native allocation certificates,
+durable profile/API integration and G2/G3/G4 remain mandatory before physics
+activation. No GPU/model/cluster allocation was launched for these local tests.
+Existing credentials, backup/release gates and unrelated workloads are unchanged.

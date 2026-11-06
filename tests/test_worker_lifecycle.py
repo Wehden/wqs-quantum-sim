@@ -70,3 +70,93 @@ def test_native_child_failure_guidance_matches_operation(monkeypatch,capsys,inpu
         assert 'bindings' in error
     assert 'PRIVATE_NATIVE_CIRCUIT' not in error
     assert 'PRIVATE_NATIVE_CIRCUIT' not in capsys.readouterr().err
+
+
+def test_physics_real_child_gets_no_callback_credentials_and_cleans_scratch(monkeypatch):
+    callbacks, scratch = [], []
+    monkeypatch.setenv('QSIM_JOB_URL', 'http://example.invalid/internal/jobs/test')
+    monkeypatch.setenv('QSIM_JOB_TOKEN', 'TEST_ONLY_PRIVATE_TOKEN')
+    monkeypatch.setenv('AWS_SECRET_ACCESS_KEY', 'TEST_ONLY_PRIVATE_AWS')
+    monkeypatch.setenv('PYTHONPATH', '/PRIVATE_UNTRUSTED_IMPORT_PATH')
+    body = {'engine': 'scqubits', 'input_format': 'scqubits_model', 'schema_version': 1,
+        'operation': 'spectrum', 'evals_count': 2,
+        'model': {'qubit': 'Transmon', 'params': {'EJ': 15., 'EC': .3, 'ng': 0., 'ncut': 30}}}
+    def response(request, **kwargs):
+        if request.data:
+            callbacks.append(json.loads(request.data))
+            return io.BytesIO(b'{}')
+        return io.BytesIO(json.dumps(body).encode())
+    monkeypatch.setattr(worker.urllib.request, 'urlopen', response)
+    original = worker.subprocess.run
+    def execute(args, **kwargs):
+        assert kwargs['env'] == {'PATH': '/usr/bin:/bin', 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}
+        assert kwargs['stdin'] == kwargs['stdout'] == kwargs['stderr'] == worker.subprocess.DEVNULL
+        assert 'capture_output' not in kwargs and 'timeout' not in kwargs and 'shell' not in kwargs
+        scratch.append(Path(args[-1]).parent)
+        assert scratch[-1].stat().st_mode & 0o777 == 0o700
+        code = '''
+import os,sys,resource
+from pathlib import Path
+from qsim import worker
+assert not any(key in os.environ for key in ('QSIM_JOB_TOKEN','QSIM_JOB_URL','AWS_SECRET_ACCESS_KEY','PYTHONPATH'))
+worker.simulate(Path(sys.argv[1]), Path(sys.argv[2]))
+assert resource.getrlimit(resource.RLIMIT_AS) == (3*1024**3,)*2
+assert resource.getrlimit(resource.RLIMIT_FSIZE) == (12*1024**2,)*2
+assert resource.getrlimit(resource.RLIMIT_CORE) == (0,0)
+'''
+        return original([args[0], '-c', code, *args[-2:]], **kwargs)
+    monkeypatch.setattr(worker.subprocess, 'run', execute)
+    assert worker.remote() == 0
+    assert callbacks[0] == {'status': 'RUNNING'}
+    assert callbacks[1]['status'] == 'SUCCEEDED'
+    assert 'TEST_ONLY_PRIVATE' not in json.dumps(callbacks)
+    assert all(not path.exists() for path in scratch)
+
+
+@pytest.mark.parametrize('failure', ['killed', 'missing', 'malformed', 'spawn'])
+def test_physics_child_failures_complete_once_and_clean_scratch(monkeypatch, failure, capsys):
+    callbacks, scratch = [], []
+    monkeypatch.setenv('QSIM_JOB_URL', 'http://example.invalid/internal/jobs/test')
+    monkeypatch.setenv('QSIM_JOB_TOKEN', 'TEST_ONLY_PRIVATE_TOKEN')
+    def response(request, **kwargs):
+        if request.data:
+            callbacks.append(json.loads(request.data))
+            return io.BytesIO(b'{}')
+        return io.BytesIO(b'{"engine":"scqubits","input_format":"scqubits_model"}')
+    monkeypatch.setattr(worker.urllib.request, 'urlopen', response)
+    def execute(args, **kwargs):
+        assert 'timeout' not in kwargs
+        output = Path(args[-1])
+        scratch.append(output.parent)
+        if failure == 'spawn':
+            raise OSError('PRIVATE_PATH_AND_TOKEN')
+        if failure == 'malformed':
+            output.write_text('PRIVATE_MODEL_NOT_JSON')
+        return SimpleNamespace(returncode=-9 if failure == 'killed' else 0, stderr=b'PRIVATE_NATIVE_LOG')
+    monkeypatch.setattr(worker.subprocess, 'run', execute)
+    assert worker.remote() == 1
+    assert callbacks[0] == {'status': 'RUNNING'}
+    assert callbacks[1]['status'] == 'FAILED'
+    assert len(callbacks) == 2
+    assert 'PRIVATE' not in json.dumps(callbacks)+capsys.readouterr().err
+    assert all(not path.exists() for path in scratch)
+
+
+def test_physics_cancellation_propagates_without_false_completion(monkeypatch):
+    callbacks, scratch = [], []
+    monkeypatch.setenv('QSIM_JOB_URL', 'http://example.invalid/internal/jobs/test')
+    monkeypatch.setenv('QSIM_JOB_TOKEN', 'test-only')
+    def response(request, **kwargs):
+        if request.data:
+            callbacks.append(json.loads(request.data))
+            return io.BytesIO(b'{}')
+        return io.BytesIO(b'{"engine":"lindblad","input_format":"lindblad_model"}')
+    monkeypatch.setattr(worker.urllib.request, 'urlopen', response)
+    def interrupted(args, **kwargs):
+        scratch.append(Path(args[-1]).parent)
+        raise KeyboardInterrupt
+    monkeypatch.setattr(worker.subprocess, 'run', interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        worker.remote()
+    assert callbacks == [{'status': 'RUNNING'}]
+    assert all(not path.exists() for path in scratch)
