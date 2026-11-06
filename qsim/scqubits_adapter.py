@@ -1,6 +1,7 @@
 """CPU scqubits numerics for isolated execution, gated by certified admission."""
 from collections.abc import Mapping
 import hashlib
+import json
 
 import numpy as np
 
@@ -98,10 +99,11 @@ def _eigensystem(native, request: ScqubitsRequest):
     return energies, vectors
 
 
-def _operator_matrices(native, request: ScqubitsRequest, eigensystem):
-    if request.operator not in _OPERATORS[request.model.qubit]:
+def _operator_matrices(native, request: ScqubitsRequest, eigensystem, *, operator=None):
+    selected = request.operator if operator is None else operator
+    if selected not in _OPERATORS[request.model.qubit]:
         raise ValueError('physical_validation: unsupported scqubits operator')
-    raw = np.asarray(getattr(native, request.operator)())
+    raw = np.asarray(getattr(native, selected)())
     dimension = request._physical_checks()
     if raw.shape != (dimension, dimension) or not np.isfinite(raw).all():
         raise ValueError('invalid_result: invalid native operator')
@@ -113,6 +115,21 @@ def _operator_matrices(native, request: ScqubitsRequest, eigensystem):
     if not np.isfinite(transformed).all():
         raise ValueError('invalid_result: nonfinite operator matrix elements')
     return transformed
+
+
+def _native_metadata(request, units):
+    dimension = request._physical_checks()
+    basis = {'native': ('harmonic oscillator' if request.model.qubit == 'Fluxonium'
+                         else 'tensor charge' if request.model.qubit == 'FluxQubit' else 'charge'),
+             'phase_convention': 'native arbitrary phases',
+             'degenerate_vectors': 'arbitrary basis within degenerate subspaces',
+             'ordering': 'ascending energy', 'operator_basis': 'same native eigensystem'}
+    return {'engine': 'scqubits', 'engine_version': '4.3.1', 'schema_version': 1,
+                'operation': request.operation, 'solver': 'esys_scipy_dense',
+                'precision': 'float64/complex128', 'backend': 'cpu',
+                'qubit': request.model.qubit, 'parameters': request.model.params.model_dump(),
+                'raw_basis_dimension': dimension, 'evals_count': request.evals_count,
+                'energy_reference': 'native absolute', 'units': units, 'basis': basis}
 
 
 def _run_native(request: ScqubitsRequest) -> PhysicsExecutionResult:
@@ -132,22 +149,61 @@ def _run_native(request: ScqubitsRequest) -> PhysicsExecutionResult:
         units['matrix_elements'] = ('radians' if request.operator == 'phi_operator'
                                      else 'dimensionless')
     dimension = request._physical_checks()
-    basis = {'native': ('harmonic oscillator' if request.model.qubit == 'Fluxonium'
-                         else 'tensor charge' if request.model.qubit == 'FluxQubit' else 'charge'),
-             'phase_convention': 'native arbitrary phases',
-             'degenerate_vectors': 'arbitrary basis within degenerate subspaces',
-             'ordering': 'ascending energy', 'operator_basis': 'same returned eigensystem'}
-    metadata = {'engine': 'scqubits', 'engine_version': '4.3.1', 'schema_version': 1,
-                'operation': request.operation, 'solver': 'esys_scipy_dense',
-                'precision': 'float64/complex128', 'backend': 'cpu',
-                'qubit': request.model.qubit, 'parameters': request.model.params.model_dump(),
-                'raw_basis_dimension': dimension, 'evals_count': request.evals_count,
-                'energy_reference': 'native absolute', 'units': units, 'basis': basis}
+    metadata = _native_metadata(request, units)
     if request.operator is not None:
         metadata['operator'] = request.operator
     work = {'eigensystem_calls': '1', 'raw_basis_dimension': str(dimension),
             'requested_levels': str(request.evals_count),
             'operator_transforms': str(int(request.operation == 'matrix_elements'))}
+    return PhysicsExecutionResult(arrays, metadata, work)
+
+
+def _json_matrix(matrix):
+    return [[{'re': float(value.real), 'im': float(value.imag)} for value in row]
+            for row in matrix]
+
+
+def _run_export(request: ScqubitsRequest) -> PhysicsExecutionResult:
+    """Private numeric handoff; public export admission is separately certified."""
+    request = ScqubitsRequest.model_validate(request.canonical_envelope())
+    if request.operation != 'export_for_lindblad':
+        raise ValueError('physical_validation: expected scqubits export')
+    dimension = request._physical_checks()
+    request._result_plan(dimension)
+    native = _native_constructor(request)
+    energies, vectors = _eigensystem(native, request)
+    removed = float(energies[0])
+    with np.errstate(over='ignore', invalid='ignore'):
+        shifted = energies-removed
+        angular = shifted*(2*np.pi)
+    if not np.isfinite(shifted).all() or not np.isfinite(angular).all():
+        raise ValueError('invalid_result: exported ground-referenced energies are unrepresentable')
+    arrays = {'eigenvalues': shifted, 'hamiltonian': np.diag(shifted).astype(np.complex128)}
+    units = {'eigenvalues': 'GHz', 'hamiltonian': 'GHz', 'removed_ground_energy': 'GHz'}
+    matrices = {}
+    for operator in request.operators:
+        matrix = _operator_matrices(native, request, (energies, vectors), operator=operator)
+        arrays[operator] = matrix
+        matrices[operator] = _json_matrix(matrix)
+        units[operator] = 'radians' if operator == 'phi_operator' else 'dimensionless'
+    body = {'engine': 'lindblad', 'input_format': 'lindblad_model', 'schema_version': 1,
+        'operation': 'spectrum', 'evals_count': request.evals_count,
+        'model': {'modes': [{'name': 'qubit', 'kind': 'matrix', 'dimension': request.evals_count,
+                            'hamiltonian': _json_matrix(arrays['hamiltonian'])}],
+                  'matrices': matrices}}
+    metadata = {**_native_metadata(request, units), 'energy_reference': 'ground',
+        'removed_ground_energy': removed, 'operators': list(request.operators),
+        'lindblad_request': body,
+        'export_basis': {'mode': 'qubit', 'dimension': request.evals_count,
+                         'representation': 'selected energy eigenbasis', 'ordering': 'ascending energy',
+                         'operator_basis': 'same eigensystem as diagonal Hamiltonian'}}
+    work = {'eigensystem_calls': '1', 'raw_basis_dimension': str(dimension),
+            'requested_levels': str(request.evals_count),
+            'operator_transforms': str(len(request.operators))}
+    encoded = json.dumps({**metadata, 'work': work}, allow_nan=False, ensure_ascii=False,
+                         separators=(',', ':'))
+    if len(encoded.encode('utf-8')) > 65536:
+        raise ValueError('resource_limit: exported metadata exceeds the metadata envelope')
     return PhysicsExecutionResult(arrays, metadata, work)
 
 
@@ -161,7 +217,8 @@ def run_scqubits(request: ScqubitsRequest, plan: AllocationPlan, *,
     if execution_context.get('backend', 'cpu') != 'cpu':
         raise ValueError('execution_policy_mismatch: unsupported scqubits backend')
     _verify_runtime_identity()
-    result = _run_native(normalized)
+    result = (_run_export(normalized) if normalized.operation == 'export_for_lindblad'
+              else _run_native(normalized))
     return PhysicsExecutionResult(result.arrays,
                                   {**result.metadata, 'policy_revision': plan.policy_revision,
                                    'algorithm': plan.algorithm}, result.work)
