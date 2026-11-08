@@ -9,6 +9,7 @@ import time
 import uuid
 import ipaddress
 import hashlib
+from dataclasses import asdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
@@ -25,6 +26,7 @@ from .qasm_adapter import SUPPORTED_COMBINATIONS
 from .auth import digest, identity
 from .physics_submission import (NormalizedPhysicsRequest, normalize_physics_submission,
     canonical_physics_request, admit_physics_request, physics_schema, physics_capabilities)
+from .physics_results import validate_physics_callback, validate_execution_context, make_execution_context
 from .models import Submission, StimSubmission, QasmSubmission, Qasm3Submission, Completion, KeyRequest
 
 
@@ -357,16 +359,30 @@ def callback_job(job_id, authorization):
 
 
 @app.get("/internal/jobs/{job_id}")
-def input_job(job_id: str, authorization: str = Header(default="")):
+def input_job(job_id: str, authorization: str = Header(default=""),
+              execution_protocol: str = Header(default="", alias="X-WQSIM-Execution-Context")):
     row = callback_job(job_id, authorization)
     if row["status"] in settings.TERMINAL:
         raise HTTPException(409, "Job has ended")
-    return json.loads(row["request"])
+    request = json.loads(row['request'])
+    if request.get('engine') in ('lindblad','scqubits','josim'):
+        if execution_protocol not in ('', '2'):
+            raise HTTPException(400, 'Unsupported physics execution protocol')
+        with store.connect() as db:
+            dispatch = db.execute('SELECT profile_json FROM job_dispatch WHERE job_id=?',(job_id,)).fetchone()
+        if dispatch is None or dispatch['profile_json'] is None:
+            raise HTTPException(503,'Physics execution context unavailable')
+        context = json.loads(dispatch['profile_json'])
+        # Previously accepted jobs retain their pinned worker's flat transport.
+        if context.get('version') == 1 and not execution_protocol:
+            return request
+        return {'request':request,'execution_context':context}
+    return request
 
 
 @app.post("/internal/jobs/{job_id}")
 def complete(job_id: str, body: Completion, authorization: str = Header(default="")):
-    callback_job(job_id, authorization)
+    accepted = callback_job(job_id, authorization)
     if body.summary is not None and len(json.dumps(body.summary).encode()) > 2 * 1024 * 1024:
         raise HTTPException(422, "Result summary too large")
     artifact = None
@@ -379,6 +395,24 @@ def complete(job_id: str, body: Completion, authorization: str = Header(default=
             raise HTTPException(422, "Invalid result encoding")
         if not artifact.startswith(b"PK"):
             raise HTTPException(422, "Result must be an NPZ archive")
+        if accepted['status'] in settings.TERMINAL:
+            if accepted['status'] == body.status:
+                return {'status':accepted['status']}
+            raise HTTPException(409,'Job has ended')
+        physics_request = json.loads(accepted['request'])
+        if physics_request.get('engine') in ('lindblad','scqubits','josim'):
+            try:
+                with store.connect() as db:
+                    context = json.loads(db.execute('SELECT profile_json FROM job_dispatch WHERE job_id=?',(job_id,)).fetchone()[0])
+                if context.get('version') == 1:
+                    # A legacy context can be upgraded for validation only if its exact plan still exists.
+                    plan = normalize_physics_submission(physics_request).request.admission_plan()
+                    validate_execution_context(context,plan,expected_profile=settings._certified_physics_profiles['worker'])
+                    context = {**context,'result_plan':asdict(plan.result),
+                               'native_identity':make_execution_context(plan,context['worker_profile'])['native_identity']}
+                validate_physics_callback(artifact,body.summary,physics_request,context)
+            except (ValueError,TypeError,KeyError,IndexError):
+                raise HTTPException(422,'Invalid physics result contract') from None
     with store.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         row = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()

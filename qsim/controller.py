@@ -30,8 +30,10 @@ def _execution_profile(row):
         return None
     try:
         context = json.loads(raw)
-        if (not physics or set(context) != {'version', 'worker_profile', 'admission_policy_revision',
-                                           'allocation_plan_digest', 'algorithm'} or type(context['version']) is not int or context['version'] != 1):
+        fields = {'version','worker_profile','admission_policy_revision','allocation_plan_digest','algorithm'}
+        if context.get('version') == 2:
+            fields.update(('result_plan','native_identity'))
+        if (not physics or set(context) != fields or type(context['version']) is not int or context['version'] not in (1,2)):
             raise ValueError()
         revision = settings._certified_physics_profiles['operations'].get(request['engine'], {}).get(request.get('operation'))
         if not revision or context['admission_policy_revision'] != revision:
@@ -113,8 +115,52 @@ def recover_intent(sky, row, kind):
         save_dispatch(row['id'], **{kind + '_id': str(latest.request_id), 'intent': None})
 
 
+def reconcile_native_job(sky, row, launched):
+    """Observe owned native completion; time alone never terminates a simulation."""
+    if not isinstance(launched,(tuple,list)) or len(launched) != 2 or type(launched[0]) is not int:
+        return None
+    try:
+        if row['native_job_id'] is not None and row['native_job_id'] != launched[0]:
+            raise ValueError('Native ownership differs')
+        if row['native_job_id'] is None:
+            save_dispatch(row['id'],native_job_id=launched[0])
+        if not row['native_check_id']:
+            check = sky.queue(row['cluster'],skip_finished=False,all_users=True)
+            save_dispatch(row['id'],native_check_id=str(check))
+            return None
+        state = request_state(sky,row['native_check_id'])
+        if state not in ('SUCCEEDED','FAILED','CANCELLED'):
+            return None
+        queue = sky.get(row['native_check_id'])
+        if state != 'SUCCEEDED':
+            raise RuntimeError('Native observation is not acknowledged')
+        if not isinstance(queue,list):
+            raise ValueError()
+        matches = [job for job in queue if job.get('job_id') == launched[0]]
+        if len(matches) != 1:
+            raise ValueError()
+        status = getattr(matches[0]['status'],'value',matches[0]['status'])
+    except sky.exceptions.ClusterDoesNotExist:
+        status = 'ABSENT'
+    except Exception:
+        save_dispatch(row['id'],native_check_id=None,retry_after=time.time()+30)
+        with store.connect() as db:
+            db.execute("UPDATE jobs SET error=? WHERE id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED')",
+                       ('Native physics completion unverified; reconciliation pending',row['id']))
+        return None
+    if status not in ('SUCCEEDED','FAILED','FAILED_SETUP','FAILED_DRIVER','CANCELLED','ABSENT'):
+        save_dispatch(row['id'],native_check_id=None)
+        with store.connect() as db:
+            db.execute("UPDATE jobs SET error=NULL WHERE id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED')",(row['id'],))
+        return None
+    if row['status'] not in settings.TERMINAL:
+        mark_failed(row['id'],'Native physics job ended without a committed result')
+    return status
+
+
 def cleanup_job(sky, row):
-    if row['launch_id'] and request_state(sky, row['launch_id']) not in ('SUCCEEDED', 'FAILED', 'CANCELLED'):
+    acknowledged = row['profile_json'] is not None and row['native_job_id'] is not None
+    if row['launch_id'] and not acknowledged and request_state(sky, row['launch_id']) not in ('SUCCEEDED', 'FAILED', 'CANCELLED'):
         if row['status'] == 'SUCCEEDED':
             return
         # Cancellation is asynchronous too. Wait until it is settled before down.
@@ -124,7 +170,18 @@ def cleanup_job(sky, row):
     if row['cluster'] and row['status'] in ('SUCCEEDED', 'FAILED') and not row['retry_pending']:
         # Reuse only an acknowledged, finished submission. A fresh worker process
         # and temporary directory are used for every simulation.
-        healthy = row['launch_id'] and request_state(sky, row['launch_id']) == 'SUCCEEDED'
+        healthy = acknowledged or (row['launch_id'] and request_state(sky, row['launch_id']) == 'SUCCEEDED')
+        if healthy and row['profile_json'] is not None:
+            native = reconcile_native_job(sky,row,(row['native_job_id'],None) if acknowledged else sky.get(row['launch_id']))
+            if native is None:
+                return
+            if native == 'ABSENT':
+                with store.connect() as db:
+                    db.execute('DELETE FROM worker_pool WHERE cluster=?',(row['cluster'],))
+                    db.execute('UPDATE jobs SET cleaned=1 WHERE id=?',(row['id'],))
+                (settings.DATA/row['id']/'callback-token').unlink(missing_ok=True)
+                return
+            healthy = native not in ('FAILED_SETUP','FAILED_DRIVER')
         if healthy:
             with store.connect() as db:
                 db.execute('UPDATE worker_pool SET job_id=NULL,released=? WHERE cluster=?', (time.time(),row['cluster']))
@@ -151,7 +208,7 @@ def cleanup_job(sky, row):
         current = db.execute('SELECT status FROM jobs WHERE id=?', (row['id'],)).fetchone()
         if row['retry_pending'] and current['status'] not in settings.TERMINAL:
             db.execute("UPDATE jobs SET status='QUEUED', started=NULL, error=NULL, updated=? WHERE id=?", (time.time(), row['id']))
-            db.execute("UPDATE job_dispatch SET launch_id=NULL,down_id=NULL,cancel_id=NULL,cluster=NULL,method='launch',retry_pending=0,retry_after=? WHERE job_id=?", (time.time()+30, row['id']))
+            db.execute("UPDATE job_dispatch SET launch_id=NULL,down_id=NULL,cancel_id=NULL,cluster=NULL,method='launch',native_check_id=NULL,native_job_id=NULL,retry_pending=0,retry_after=? WHERE job_id=?", (time.time()+30, row['id']))
         else:
             db.execute('UPDATE jobs SET cleaned=1 WHERE id=?', (row['id'],))
             for name in ('task.yaml', 'callback-token'):
@@ -167,12 +224,17 @@ def advance(sky, row):
     if row['status'] in settings.TERMINAL or row['retry_pending']:
         cleanup_job(sky, row)
         return
+    if row['profile_json'] is not None and row['native_job_id'] is not None:
+        reconcile_native_job(sky,row,(row['native_job_id'],None))
+        return
     if row['launch_id']:
         state = request_state(sky, row['launch_id'])
         if state not in ('SUCCEEDED', 'FAILED', 'CANCELLED'):
             return
         try:
-            sky.get(row['launch_id'])
+            launched = sky.get(row['launch_id'])
+            if row['profile_json'] is not None:
+                reconcile_native_job(sky,row,launched)
         except (sky.exceptions.ResourcesUnavailableError, sky.exceptions.ClusterNotUpError, sky.exceptions.ClusterDoesNotExist):
             # Tear down any partial placement before retrying the same job.
             # Preserve its identity, callback token and idempotency record.

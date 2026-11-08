@@ -154,7 +154,7 @@ def test_no_observables_is_valid():
 def test_public_mc_entry_stays_closed_before_native_construction(monkeypatch):
     req = request()
     monkeypatch.setattr(adapter, 'build_lindblad_model', lambda *a: pytest.fail('native construction'))
-    with pytest.raises(ValueError, match='certificate'):
+    with pytest.raises(ValueError, match='execution_policy_mismatch.*allocation plan'):
         adapter.run_lindblad(req, model_for(req).allocation_plan, execution_context={})
 
 

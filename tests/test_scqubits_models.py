@@ -55,11 +55,9 @@ def test_all_class_operation_schemas_and_defaults(qubit, operation):
     assert ScqubitsRequest(**canonical).canonical_envelope() == canonical
     jsonschema.validate(body, ScqubitsRequest.model_json_schema())
     jsonschema.validate(canonical, ScqubitsRequest.model_json_schema())
-    if operation == 'export_for_lindblad':
-        with pytest.raises(ValueError, match='resource_limit: frozen scqubits'):
-            request.admission_plan()
-    else:
-        assert request.admission_plan().algorithm == 'scipy-dsyevr-zheevr-subset'
+    plan = request.admission_plan()
+    assert plan.algorithm == 'scipy-dsyevr-zheevr-subset'
+    assert ('export_certificate' in plan.coefficient_plan) == (operation == 'export_for_lindblad')
 
 
 @pytest.mark.parametrize('qubit,operator', [(q, o) for q, names in OPERATORS.items() for o in names])

@@ -13,6 +13,24 @@ import unittest
 
 @unittest.skipUnless(os.environ.get('WQS_IMAGE_TEST') == '1', 'Run tools/ci/check-worker.sh for actual image checks')
 class PhysicsWorkerImage(unittest.TestCase):
+    def _envelope(self, body):
+        from dataclasses import asdict
+        from qsim import worker
+        from qsim.physics_results import make_execution_context
+        runtime = worker._runtime_policy()
+        if body['engine'] == 'lindblad':
+            from qsim.lindblad_models import LindbladRequest as Model
+        elif body['engine'] == 'scqubits':
+            from qsim.scqubits_models import ScqubitsRequest as Model
+        else:
+            from qsim.josim_models import JoSIMRequest as Model
+        normalized = Model.model_validate(body)
+        plan = normalized.admission_plan()
+        profile = json.loads(json.dumps(runtime['worker']))
+        profile['image'] = 'registry.example.invalid/worker@sha256:'+'a'*64
+        profile['resources']['infra'] = 'k8s'
+        return {'request':normalized.canonical_envelope(),'execution_context':make_execution_context(plan,profile)}
+
     def test_package_boundary_and_distribution_notices(self):
         import pwd
         self.assertEqual(pwd.getpwuid(os.geteuid()).pw_name, 'qsim')
@@ -34,7 +52,7 @@ class PhysicsWorkerImage(unittest.TestCase):
             self.assertTrue(all(Path(importlib.metadata.distribution(distribution).locate_file(f)).is_file()
                                 for f in notices))
 
-    def test_real_certified_scqubits_child_and_closed_admission(self):
+    def test_real_certified_scqubits_child_and_export(self):
         import numpy as np
         env = {'PATH': '/usr/bin:/bin', 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}
         body = {'engine': 'scqubits', 'input_format': 'scqubits_model', 'schema_version': 1,
@@ -42,7 +60,7 @@ class PhysicsWorkerImage(unittest.TestCase):
             'model': {'qubit': 'Transmon', 'params': {'EJ': 15., 'EC': .3, 'ng': 0., 'ncut': 30}}}
         with tempfile.TemporaryDirectory() as directory:
             source, output = Path(directory)/'input.json', Path(directory)/'output.json'
-            source.write_text(json.dumps(body))
+            source.write_text(json.dumps(self._envelope(body)))
             subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
                            env=env, check=True)
             payload = json.loads(output.read_text())
@@ -52,12 +70,13 @@ class PhysicsWorkerImage(unittest.TestCase):
                 self.assertTrue(np.isfinite(result['eigenvalues']).all())
             body['operation'] = 'export_for_lindblad'
             body['operators'] = ['n_operator']
-            source.write_text(json.dumps(body))
+            source.write_text(json.dumps(self._envelope(body)))
             subprocess.run([sys.executable, '-m', 'qsim.worker', 'simulate', str(source), str(output)],
                            env=env, check=True)
             payload = json.loads(output.read_text())
-            self.assertEqual(payload['status'], 'FAILED')
-            self.assertTrue(payload['error'].startswith('resource_limit:'))
+            self.assertEqual(payload['status'], 'SUCCEEDED',payload)
+            with np.load(io.BytesIO(base64.b64decode(payload['artifact'])),allow_pickle=False) as result:
+                self.assertEqual(result['hamiltonian'].shape,(4,4))
 
     def test_josim_provenance_and_corresponding_source(self):
         from qsim.josim_adapter import _BINARY, _BINARY_SHA256
@@ -101,7 +120,7 @@ class PhysicsWorkerImage(unittest.TestCase):
                               'evals_count':32,'model':{'qubit':qubit,'params':params}}
                         if operation=='spectrum': body['return_vectors']=True
                         else: body['operator']='n_1_operator' if qubit=='FluxQubit' else 'n_operator'
-                        source.write_text(json.dumps(body))
+                        source.write_text(json.dumps(self._envelope(body)))
                         subprocess.run([sys.executable,'-m','qsim.worker','simulate',str(source),str(output)],
                             env={'PATH':'/usr/bin:/bin','OMP_NUM_THREADS':'1','OPENBLAS_NUM_THREADS':'1'},
                             stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True)
@@ -178,22 +197,8 @@ int main() {
             subprocess.run(['c++', '-std=c++17', '-I'+str(source/'josim/include'), str(unit), '-o', str(executable)], check=True)
             subprocess.run([str(executable)], check=True)
 
-    def test_real_private_lindblad_and_export_families(self):
+    def test_real_certified_lindblad_and_export_families(self):
         import numpy as np
-        code = '''
-import sys
-from pathlib import Path
-from qsim import worker,scqubits_models,lindblad_models,josim_models
-from qsim.physics_results import AllocationPlan
-
-def fixture_plan(self):
- d=self._physical_checks()
- return AllocationPlan('synthetic-image-test-only','private-image-numerics',{'hilbert':d},(),0,{},self._result_plan(d))
-lindblad_models.LindbladRequest.admission_plan=fixture_plan
-scqubits_models.ScqubitsRequest.admission_plan=fixture_plan
-josim_models.JoSIMRequest.admission_plan=josim_models.JoSIMRequest._certified_allocation_plan
-worker.simulate(Path(sys.argv[1]),Path(sys.argv[2]))
-'''
         cases = []
         for operation, solver in [('evolve','se'),('evolve','me'),('evolve','mc'),
                                   ('propagator','se'),('propagator','me'),('spectrum',None),('steadystate',None)]:
@@ -221,8 +226,8 @@ worker.simulate(Path(sys.argv[1]),Path(sys.argv[2]))
             source, output = Path(directory)/'input.json', Path(directory)/'output.json'
             for body in cases:
                 with self.subTest(engine=body['engine'],operation=body.get('operation'),solver=body.get('solver')):
-                    source.write_text(json.dumps(body))
-                    subprocess.run([sys.executable,'-c',code,str(source),str(output)],
+                    source.write_text(json.dumps(self._envelope(body)))
+                    subprocess.run([sys.executable,'-m','qsim.worker','simulate',str(source),str(output)],
                         env={'PATH':'/usr/bin:/bin','OMP_NUM_THREADS':'1','OPENBLAS_NUM_THREADS':'1'},check=True,
                         stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
                     payload=json.loads(output.read_text())

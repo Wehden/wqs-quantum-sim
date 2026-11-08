@@ -5,6 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from qsim import worker
+from test_physics_worker import (host_execution_context, host_runtime_policy,
+    installed_provenance_fixture, scqubits)
 
 
 def test_long_simulation_returns_result_without_execution_timeout(monkeypatch):
@@ -72,6 +74,15 @@ def test_native_child_failure_guidance_matches_operation(monkeypatch,capsys,inpu
     assert 'PRIVATE_NATIVE_CIRCUIT' not in capsys.readouterr().err
 
 
+def remote_physics_context(monkeypatch, body=None):
+    # Unit-only installed-manifest fixture; native admission and profile checks
+    # remain real. Mandatory image tests establish actual manifest provenance.
+    body = scqubits() if body is None else body
+    context = host_execution_context(body)
+    monkeypatch.setenv('QSIM_EXECUTION_CONTEXT',json.dumps(context,sort_keys=True))
+    return {'request':body,'execution_context':context}
+
+
 def test_physics_real_child_gets_no_callback_credentials_and_cleans_scratch(monkeypatch):
     callbacks, scratch = [], []
     monkeypatch.setenv('QSIM_JOB_URL', 'http://example.invalid/internal/jobs/test')
@@ -81,11 +92,13 @@ def test_physics_real_child_gets_no_callback_credentials_and_cleans_scratch(monk
     body = {'engine': 'scqubits', 'input_format': 'scqubits_model', 'schema_version': 1,
         'operation': 'spectrum', 'evals_count': 2,
         'model': {'qubit': 'Transmon', 'params': {'EJ': 15., 'EC': .3, 'ng': 0., 'ncut': 30}}}
+    envelope = remote_physics_context(monkeypatch,body)
     def response(request, **kwargs):
+        assert request.get_header('X-wqsim-execution-context') == '2'
         if request.data:
             callbacks.append(json.loads(request.data))
             return io.BytesIO(b'{}')
-        return io.BytesIO(json.dumps(body).encode())
+        return io.BytesIO(json.dumps(envelope).encode())
     monkeypatch.setattr(worker.urllib.request, 'urlopen', response)
     original = worker.subprocess.run
     def execute(args, **kwargs):
@@ -94,7 +107,9 @@ def test_physics_real_child_gets_no_callback_credentials_and_cleans_scratch(monk
         assert 'capture_output' not in kwargs and 'timeout' not in kwargs and 'shell' not in kwargs
         scratch.append(Path(args[-1]).parent)
         assert scratch[-1].stat().st_mode & 0o777 == 0o700
-        code = '''
+        assert set(json.loads(Path(args[-2]).read_text())) == {'request','execution_context'}
+        assert 'TEST_ONLY_PRIVATE' not in Path(args[-2]).read_text()
+        code = f'from qsim import worker; worker._runtime_policy = lambda: {host_runtime_policy()!r}\n' + '''
 import os,sys,resource
 from pathlib import Path
 from qsim import worker
@@ -106,7 +121,7 @@ assert resource.getrlimit(resource.RLIMIT_CORE) == (0,0)
 '''
         return original([args[0], '-c', code, *args[-2:]], **kwargs)
     monkeypatch.setattr(worker.subprocess, 'run', execute)
-    assert worker.remote() == 0
+    assert worker.remote() == 0, callbacks
     assert callbacks[0] == {'status': 'RUNNING'}
     assert callbacks[1]['status'] == 'SUCCEEDED'
     assert 'TEST_ONLY_PRIVATE' not in json.dumps(callbacks)
@@ -118,11 +133,12 @@ def test_physics_child_failures_complete_once_and_clean_scratch(monkeypatch, fai
     callbacks, scratch = [], []
     monkeypatch.setenv('QSIM_JOB_URL', 'http://example.invalid/internal/jobs/test')
     monkeypatch.setenv('QSIM_JOB_TOKEN', 'TEST_ONLY_PRIVATE_TOKEN')
+    envelope = remote_physics_context(monkeypatch)
     def response(request, **kwargs):
         if request.data:
             callbacks.append(json.loads(request.data))
             return io.BytesIO(b'{}')
-        return io.BytesIO(b'{"engine":"scqubits","input_format":"scqubits_model"}')
+        return io.BytesIO(json.dumps(envelope).encode())
     monkeypatch.setattr(worker.urllib.request, 'urlopen', response)
     def execute(args, **kwargs):
         assert 'timeout' not in kwargs
@@ -146,11 +162,12 @@ def test_physics_cancellation_propagates_without_false_completion(monkeypatch):
     callbacks, scratch = [], []
     monkeypatch.setenv('QSIM_JOB_URL', 'http://example.invalid/internal/jobs/test')
     monkeypatch.setenv('QSIM_JOB_TOKEN', 'test-only')
+    envelope = remote_physics_context(monkeypatch)
     def response(request, **kwargs):
         if request.data:
             callbacks.append(json.loads(request.data))
             return io.BytesIO(b'{}')
-        return io.BytesIO(b'{"engine":"lindblad","input_format":"lindblad_model"}')
+        return io.BytesIO(json.dumps(envelope).encode())
     monkeypatch.setattr(worker.urllib.request, 'urlopen', response)
     def interrupted(args, **kwargs):
         scratch.append(Path(args[-1]).parent)
@@ -160,3 +177,29 @@ def test_physics_cancellation_propagates_without_false_completion(monkeypatch):
         worker.remote()
     assert callbacks == [{'status': 'RUNNING'}]
     assert all(not path.exists() for path in scratch)
+
+
+@pytest.mark.parametrize('mismatch',['missing_launch','changed_launch','changed_download'])
+def test_physics_context_disagreement_refuses_before_running_or_spawn(monkeypatch,mismatch):
+    callbacks=[]
+    monkeypatch.setenv('QSIM_JOB_URL','http://example.invalid/internal/jobs/test')
+    monkeypatch.setenv('QSIM_JOB_TOKEN','test-only')
+    envelope=remote_physics_context(monkeypatch)
+    if mismatch=='missing_launch':
+        monkeypatch.delenv('QSIM_EXECUTION_CONTEXT')
+    elif mismatch=='changed_launch':
+        launched=json.loads(json.dumps(envelope['execution_context']))
+        launched['allocation_plan_digest']='0'*64
+        monkeypatch.setenv('QSIM_EXECUTION_CONTEXT',json.dumps(launched))
+    else:
+        envelope['execution_context']['allocation_plan_digest']='0'*64
+    def response(request,**kwargs):
+        if request.data:
+            callbacks.append(json.loads(request.data))
+            return io.BytesIO(b'{}')
+        return io.BytesIO(json.dumps(envelope).encode())
+    monkeypatch.setattr(worker.urllib.request,'urlopen',response)
+    monkeypatch.setattr(worker.subprocess,'run',lambda *a,**k:pytest.fail('unowned native context executed'))
+    assert worker.remote()==1
+    assert len(callbacks)==1 and callbacks[0]['status']=='FAILED'
+    assert callbacks[0]['error'].startswith('execution_policy_mismatch:')

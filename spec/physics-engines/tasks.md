@@ -6,6 +6,8 @@ Prepared with System2 1.1.1 `task-planner`, scoped to the existing `spec/physics
 
 ## Task Graph Overview (short)
 
+The owner approved the outcome-based [Integrated delivery tranches](#integrated-delivery-tranches-approved-2026-11-08) on 2026-11-08. Original task IDs remain traceability units; combined leases and private context integration are authorized. Tranche A implementation and evidence are recorded below; production activation remains closed.
+
 ```mermaid
 flowchart TD
   A[001 compatibility baseline] --> B[002 Lindblad discovery]
@@ -820,22 +822,23 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-007 | Complete, merged to main through PR #41: pinned combined CPU dependencies, dependency compatibility and constrained native import evidence. See [dependency evidence](discovery/dependencies.md). |
 | TASK-008 | Complete, merged to main through PR #42: bounded numeric result serialization and 75 focused tests. |
 | TASK-017 | Complete request-model stage for all four classes and three operations. Schema/validation reached main through PR #42; PR #50 adds the source/algorithm allocation certificate for spectra and matrix elements. Export admission remains gated by TASK-019. Worker/API activation and final image acceptance remain open. |
-| TASK-020 | Private validation, bounded native projection and workspace certification are merged, as recorded in the native runtime promotion receipt. Production packaging and public activation remain gated. See [evidence and design](discovery/josim-workspace.md). |
+| TASK-020 | Private validation, bounded native projection and workspace certification are merged, as recorded in the native runtime promotion receipt. Production packaging is merged; final admission and joined integration are implemented in Tranche A, pending review/CI/merge. Public activation remains gated. See [evidence and design](discovery/josim-workspace.md). |
 | TASK-009 | Strict Lindblad request models and bounded validation merged through PR #47; private drive-grid error bounds are merged through TASK-012, while final native allocation/admission certificates remain unavailable and admission stays closed. See the execution receipt below. |
 | TASK-010 | Complete native static Hamiltonian/operator stage, merged in PR #49. All 32 operator tests passed, including tiny-coefficient preservation and settings restoration. States, collapse channels and private drive grids are complete through TASK-011/012; solvers remain later tasks. |
 | TASK-011 | Complete, merged through PR #55 at `2310ca9`. Native initial states and collapse channels pass 363 focused/regression tests. Public admission remains certificate-gated. |
 | TASK-012 | Complete private drive-grid stage, merged through PR #60 at `d35f690`. All 325 focused drives/states/operators/models tests passed, including rounded flattop boundaries, envelope/native interpolation rounding, modulation and refinement. Public admission and final allocation certification remain gated. |
-| TASK-013 through TASK-016 | Private evolution, Monte Carlo, propagators and static solvers are merged through PR #74. Native allocation certification and worker/API activation remain gated. |
+| TASK-013 through TASK-016 | Private evolution, Monte Carlo, propagators and static solvers are merged through PR #74. Native allocation certification and joined API/worker evidence are implemented in Tranche A; production activation remains gated. |
 | TASK-018 | Complete native spectra/matrix-elements stage: PR #45 adds numerical execution; merged PR #50 binds admission and runtime identity to the allocation certificate. All four classes and 16 operators are tested, including maximum bases. The focused models/execution/result suite passed 322 tests. Worker/API integration and final image acceptance remain gated. |
-| TASK-019 | Private same-eigensystem numeric export merged through PR #75. Export allocation certification and worker/API activation remain gated. |
+| TASK-019 | Private same-eigensystem numeric export merged through PR #75. Export allocation certification and the joined numeric handoff are implemented in Tranche A; production activation remains gated. |
 | TASK-021 | Private native transient execution, bounded projection and matching binary/certificate verification are merged. Worker row-shape reconciliation is implemented through TASK-022 below; production packaging and public admission remain gated. |
 | TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence is now proven by TASK-036. Final admission certification remains separate. |
 | TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
 | TASK-022 | Complete private isolated-worker integration, merged through PR #76 at `439c94d`. Main CI and existing-service CD/backup/acceptance passed; public physics admission remains closed. |
 | TASK-023 | Complete CPU worker packaging and approved Bookworm JoSIM repin, merged through PR #77 at `f18253a`; the constrained-image and frozen-reference receipt below remains authoritative. |
 | TASK-026 | Complete durable CPU profile and pool integration, merged through PR #78 at `c4cdb55`. Historical pending-review labels below are superseded by this merge. |
-| TASK-024 | Additive physics routes, normalization, schemas and atomic admission/context persistence are implemented in the receipt below; awaiting review, CI and merge. Production physics admission remains off. |
-| TASK-025 and TASK-027 through TASK-034 | Shared lifecycle/backup safety, final certificates, GPU decisions and G2/G3/G4 acceptance remain required before activation. TASK-025 follows TASK-024. |
+| TASK-024 | Complete gated API integration, merged through PR #79 at `410f062`; production physics admission remains off. |
+| TASK-025 | Joined all-three CPU lifecycle, result/context safety and encrypted native backup/restore are implemented in Tranche A with mandatory image evidence; awaiting PR review, canonical CI and merge. |
+| TASK-027 through TASK-034 | Tranche B owns the CPU-only GPU disposition, mandatory CI/release qualification, tested docs and combined audit; exact live rollout and backup gates remain required. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
 
@@ -1691,3 +1694,437 @@ PR. TASK-024 awaits review, CI and merge. TASK-025 is the next dependency-ready
 shared lifecycle/backup certification task after merge; final missing admission
 certificates and G2/G3/G4 remain open. Credentials, existing backup/release gates
 and unrelated workloads are unchanged. No cluster resources are allocated.
+
+
+### Integrated delivery tranches, approved 2026-11-08
+
+**Status: owner approved on 2026-11-08.** PR #79 is
+merged at `410f0627057da79b6d588515b9cbe3fe10b72e17`; its implementation head
+`e6611b365e9f9bf4d6939e86bcba35ee35483b72` is an ancestor of main. This amendment
+starts from that main. Original requirements, physical semantics, numerical
+limits and G2/G3/G4 obligations remain in force. Historical task IDs identify
+requirements/evidence, rather than prescribing one PR each.
+
+The delivery target is **two substantial implementation PRs**, followed by one
+consolidated rollout receipt if repository evidence needs a post-rollout change.
+Do not create a PR per certificate, test family, lease or status correction.
+A material unexpected design/security problem can change this plan only with
+an explicit report of its effect on the complete outcome. A failing backend
+blocks the all-three outcome; it does not silently become a smaller release.
+
+#### Main baseline and integration gaps
+
+The API now normalizes requests, replays durable reservations and persists a
+sealed dispatch context. The controller validates that context, uses its pinned
+image/resources and fingerprints the complete worker compatibility tuple.
+CPU packaging includes all three native backends and the reproducible Bookworm
+JoSIM binary. Existing code is staged; none of this proves public physics
+acceptance or enables admission.
+
+Read-only source inspection on this baseline found these remaining seams:
+
+| Seam | Current state | Required completion |
+| --- | --- | --- |
+| Admission | Lindblad and scqubits export unconditionally refuse missing native certificates; JoSIM computes its private plan then refuses final admission. Settings resolves only scqubits spectra/matrix elements. | Source/algorithm/image-bound certificates and maximum-owner proofs for every approved CPU family, then matching policy registration. |
+| Worker context | The controller sends `QSIM_EXECUTION_CONTEXT`; `remote()` does not consume it. The child recomputes admission but passes only `{'backend':'cpu'}` to adapters. | Compare the admitted context with the authenticated job, current installed runtime and recomputed plan before native execution. |
+| Callback archive | `api.complete` validates base64 and the `PK` prefix. The outer physics payload reader bounds sizes but does not prove archive members match the admitted result schema. | Physics-specific bounded NPZ/member/dtype/shape/metadata validation before durable success; preserve circuit compatibility. |
+| Lost final callback | The controller reconciles SkyPilot API requests and launch intents. This is not by itself proof of native job completion or final-result delivery. | Exercise unrecoverable callback loss against acknowledged native terminal state without duplicating execution or leaving an unobserved RUNNING record. |
+| Recovery | Backup native loading checks NPZ safety, including object dtype refusal. No full all-three result/context lifecycle round trip is yet recorded. | Restore test data to an isolated destination and verify results, reservations, dispatch metadata and pending invitations. |
+| Release | Acceptance currently selects eight circuit jobs; the read-only release probe bounds the job inventory at eight. | Versioned all-three physics inventory, math/result checks and matching native/image/source receipts. |
+
+The host's broad pytest run has a previously reproduced OpenMP static-TLS
+failure baseline. It cannot qualify integration. Fresh green execution on the
+configured Standpunkt runner or its existing hosted fallback, plus mandatory
+built-image tests, is required. No dependency/TLS workaround or test waiver is
+part of this plan.
+
+#### TRANCHE-A: Complete the all-three CPU service path
+
+- **Outcome / PR boundary:** One API-to-worker-to-result integration PR. All
+  required CPU families use real admission certificates and the production
+  isolated entrypoint. Lifecycle, security and backup tests accompany the code.
+  Production activation remains off when this PR merges.
+- **Traceability:** Finish the certificate remainders of TASK-009/013-020, the
+  context remainders of TASK-022/024/026, and TASK-025. Reuse TASK-023's accepted
+  native build and frozen references; do not redo JoSIM's numerical patch.
+- **Risk:** High. Incorrect ownership/workspace accounting or a trusted-context
+  gap can defeat isolation even when numerical unit tests pass.
+- **Change budget:** max_files=27 including four spec/evidence files;
+  max_new_symbols=20; interface_policy=extend-only for the private contract
+  below. No new production Python module, public route, scheduler or store.
+
+**A1. Certify the existing numerical paths.** Build a per-operation allocation
+ledger covering simultaneously live input/model/solver/workspace/output and
+serialization owners. Bind the final algorithm, native dependency/source hashes
+and policy revision to the exact combined worker. Prove largest admitted
+combinations under 2 CPU/4 GiB, nonroot, 3-GiB child AS and 12-MiB files, with
+charged allocation <=2 GiB. RSS alone is insufficient. Include dense ME and
+propagator D^4 ownership, MC serial trajectories/ensemble state, drive grids,
+static eigensystem/unique-state workspaces and scqubits export overlap.
+
+The existing source and binary-bound JoSIM ledger must be reconciled with the
+accepted Bookworm build and all frozen/capacity comparisons, not replaced by an
+RSS guess. Remove a refusal only after its proof passes. Do not narrow the
+approved subset, change tolerances, relax limits, approximate output or add a
+job/work/time cap to make a proof pass. A required unprovable family returns
+for a design decision and keeps this tranche incomplete.
+
+**A2. Close the context contract.** Proposed private transport amendment:
+
+1. For physics only, the existing callback-authenticated internal input endpoint
+   returns `{'request': <canonical request>, 'execution_context': <stored context>}`.
+   Circuit input responses remain byte/shape compatible. Public bodies/hashes
+   never contain this envelope or a caller resource/context selector.
+2. The outer worker compares the stored context with its trusted launch context
+   before reporting RUNNING, then writes a private bounded input envelope for
+   the fresh numerical child. No URL, callback token, user credential or general
+   controller environment enters that file or the child's environment.
+3. Reuse pure plan-digest/context validation in the existing `physics_results`
+   boundary where needed by API and worker. Do not import API/store/controller
+   or deployment settings into the numerical child. Amend `interfaces.json`
+   and the import boundary explicitly for any new pure helper exports.
+4. The child normalizes the original request, recomputes its certified plan and
+   compares plan digest, algorithm, admission revision, CPU profile/precision
+   and installed native provenance before importing the execution adapter.
+   Missing, changed, unknown or obsolete identities fail closed. Existing
+   direct physics tests must use the same context path, without admission
+   monkeypatches or a production test switch.
+5. Image identity needs a chain of evidence: the immutable scheduled digest,
+   effective SkyPilot allocation/handle and release/build provenance must agree.
+   A supplied environment string is not proof of the actual image, and an image
+   cannot embed its own final digest. Use build/source/native manifests plus
+   native allocation evidence; do not claim self-attestation from string equality.
+
+**A3. Finish lifecycle and result boundaries.** Validate physics callbacks
+against the stored admitted contract using bounded archive header/member checks
+before loading arrays. Cover expected names, numeric/complex and bounded Unicode
+metadata, shapes/units, duplicate/traversal members, object arrays, compression
+expansion and complete-result byte budgets. Use `allow_pickle=False` throughout.
+Do not impose a new incompatible result format on existing circuit callbacks.
+
+Exercise controller/native/HTTP failure ordering: restart before submission,
+lost launch/exec acknowledgement, capacity teardown/retry, cancellation during
+launch and execution, lost final callback and duplicate/late callbacks. Reuse
+the existing native-job-id/queue status mechanism for terminal reconciliation.
+For unrecoverable delivery, define and test a bounded terminal failure with an
+atomic terminal-state recheck; never infer failure from elapsed simulation time,
+rerun an ambiguous execution or overwrite an already committed success. Unknown
+native state retains ownership and is reported as unknown, not a verified pass.
+
+**A4. Prove the joined path.** Add a repeatable harness exercising authenticated
+HTTP submission, the real controller task configuration, packaged outer worker,
+real native child, real HTTP callback, polling/SSE and NPZ download. In ordinary
+PR CI only the SkyPilot placement transport may be faked; native computation,
+auth, admission plans, store, callbacks and downloaded arrays must be real.
+The harness uses owned disposable containers and isolated synthetic data.
+Container transport is not represented as proof of live SkyPilot placement.
+
+| Family | Joined success evidence | Required refusal/failure evidence |
+| --- | --- | --- |
+| Lindblad | SE/ME/MC evolve, SE/ME propagators, spectrum, unique steady state; analytic phase/decay, density/state conventions and repeatable seeded MC. | Zero-collapse MC, nonunique stationary state, native convergence exhaustion with retained counters, result/owner bounds, invalid density and drive semantics. |
+| scqubits | All four classes for spectra/matrix elements; exported numeric Hamiltonian/operators submitted to Lindblad by the test client, with independent physical checks. | Invalid constructor/operator/conditioning, export/result limits, native nonfinite/residual failures. No server-side batch/state manager is introduced. |
+| JoSIM | SFQ units/integral, selected trace order/projection and frozen native waveforms through the ordinary API/worker path. | Unsupported/file/code statements before enqueue; native convergence failure without partial success; provenance and bounded-history mismatches. |
+| Shared service | Route/default replay, concurrent conflicts, owner isolation, warm compatible reuse and cold mismatch, SSE cursor resume, terminal immutability, cleanup/deletion and mixed circuit/physics traffic. | Alter one context field at a time; confirm refusal before native execution. Test unavailable/corrupt results, retries across policy/image changes and callback-loss reconciliation without duplicates. |
+| Recovery | Completed real results from all three, complex and Unicode NPZ members, durable reservations/context and synthetic pending invitation material restored to a separate destination. | Object arrays, hostile archives, incomplete backup/restore and receipt mismatches remain refusals. Existing key custody and rotation are untouched. |
+
+**Concurrent write lanes, one integration PR.** Lindblad certificates,
+scqubits export certificates and JoSIM final admission can proceed in disjoint
+model/test files. A context/lifecycle executor owns the shared worker/API/result
+boundary; a test executor can build the lifecycle/backup harness in its disjoint
+test lease. The coordinator exclusively owns settings registration, shared image
+check script and spec/evidence reconciliation. Name a single writer per path
+before execution; transfer shared leases sequentially. Merge all lane work into
+one integration branch and rerun the joined suite before opening the PR ready.
+Do not issue partially integrated backend PRs merely because a lane finishes.
+
+**Union write lease, proposed:**
+
+```text
+^qsim/(lindblad_models|scqubits_models|josim_models|physics_results|physics_submission|worker|settings|controller|api)\.py$
+^deploy/Dockerfile$
+^tests/test_(lindblad_models|scqubits_export|josim_validation|worker_lifecycle)\.py$
+^tests/test_physics_(cpu_admission|lifecycle|backup|security|worker|api|placement|image)\.py$
+^tests/check_worker_image\.sh$
+^spec/physics-engines/(interfaces\.json|module-boundaries\.json|tasks\.md|discovery/cpu-acceptance\.md)$
+```
+
+**Verification / exit:** Existing native-model suites plus the planned
+`tests/test_physics_cpu_admission.py`, `test_physics_lifecycle.py`,
+`test_physics_backup.py` and `test_physics_security.py` must pass. Those four
+filenames are proposed tests, not currently runnable evidence. Run existing
+`bash tools/ci/check.sh`, `bash tools/ci/check-worker.sh` and
+`bash tools/ci/check-release.sh` in the configured environments. Mandatory image
+checks must execute final certificates and the joined child path without mocks
+or skips. Publish a requirement/operation/evidence ledger in
+`discovery/cpu-acceptance.md`. No unresolved correctness/security defect or
+missing required CPU family can be labeled complete.
+
+**Backout:** Keep public physics activation off, preserve circuit behavior,
+stored contexts/results and owned native resources. Do not stop unrelated
+workers, rotate credentials or weaken release/recovery checks.
+
+#### TRANCHE-B: Qualify one releasable, documented engine matrix
+
+- **Outcome / PR boundary:** One release-qualification PR combining CI coverage,
+  exact-release mathematical acceptance, tested developer/agent documentation
+  and the combined security/evidence audit. This PR makes promotion enforceable;
+  a green PR still does not prove a deployed release.
+- **Traceability:** TASK-030/031/032/033, plus the explicit disposition of
+  conditional TASK-027/028/029. Depends on merged TRANCHE-A and green current-main
+  CI, not an unmerged feature-branch base.
+- **Risk:** High. A circuit-only acceptance receipt must never certify physics;
+  a mocked hardware path must never be reported as real placement or recovery.
+- **Change budget:** max_files=25 including six spec/evidence files;
+  max_new_symbols=16; interface_policy=extend-only, versioned acceptance receipts.
+
+**B1. Dispose of GPU scope explicitly.** For this bounded first release, retain
+CPU for every cell. The already accepted SkyPilot discovery demonstrated native
+scqubits eigensolvers but no useful benefit at the measured sizes; tested QuTiP
+paths performed host fallback, and JoSIM has no established GPU implementation.
+Record an empty enabled-GPU matrix with those exact limits on the conclusion.
+TASK-027/028 have no artifact/runtime branch to implement for this matrix;
+TASK-029 records that conditional outcome, not a passing unexecuted GPU test.
+Larger-problem crossover and other native backends remain future evidence work,
+not claims of universal GPU inefficiency. No new GPU spend/allocation is needed
+for this disposition. Adding a production GPU cell later requires the approved
+measured profile and actual SkyPilot/device proof before it is advertised.
+
+**B2. Make integration mandatory in CI.** Preserve Standpunkt-first execution,
+existing hosted fallback, path reporting and protected checks. Run the all-three
+joined CPU harness and largest-shape image proofs as mandatory jobs; missing
+binaries/certificates may not turn into optional skips. Keep PR CI free of
+cluster/deployment credentials. Device-free image builds do not count as GPU
+execution. Resolve any failures on the actual selected runner before requesting
+merge; the host TLS baseline is not a CI exception.
+
+**B3. Extend existing CD acceptance.** Version the acceptance contract and
+explicit case inventory rather than only increasing the old eight-job number.
+Retain all eight circuit cases. Add named Lindblad analytic/seeded/ME cases,
+scqubits spectrum/export-to-Lindblad and JoSIM SFQ cases sufficient to cover the
+enabled matrix. For each, check owner/request identity, arrays/units/math,
+immutable worker/source/profile identity, native job completion and cleanup.
+Derive the bounded job selection from that inventory; do not remove ownership
+checks or enable arbitrary probe job lists. Historical circuit receipts remain
+valid for their original scope and cannot satisfy physics acceptance.
+
+Deploy staged code under the existing release hold. Enable the certified matrix
+only in the restricted dedicated-smoke admission phase; general users remain
+held. Failure, missing evidence or partial completion retains the hold and
+failed receipt. Reopen general admission only after the full matrix, real fresh
+backup gates and native cleanup succeed. Use the existing deployment runner and
+release-control protocol, without a parallel manual deployment path.
+
+**B4. Documentation and combined audit.** Extract examples from executed
+fixtures and cover all three APIs, schemas, units, result arrays, limits,
+errors, retry/queue behavior and the scqubits numeric export round trip. Keep
+API-key/developer focus and the downloadable agent instructions. Reconcile the
+stale spec README and operation/status tables. Record author audit honestly;
+automatic Codex review does not substitute for executed numerical/recovery
+proof. Audit every PHY-001 through PHY-020 requirement against a named passing
+receipt, with unknowns/failures still visible.
+
+**Union write lease, proposed:**
+
+```text
+^tools/ci/(check\.sh|check-worker\.sh)$
+^\.github/workflows/ci\.yml$
+^tests/check_worker_image\.sh$
+^tools/cd/(acceptance|release)\.py$
+^qsim/release_probe\.py$
+^tests/test_cd_(acceptance|acceptance_flow|release)\.py$
+^tests/test_physics_(ci_contract|examples)\.py$
+^README\.md$
+^qsim/static/(index\.html|agents\.md)$
+^docs/physics-engines\.md$
+^spec/physics-engines/(README\.md|security\.md|validation\.md|tasks\.md|discovery/gpu-acceptance\.md|discovery/cpu-acceptance\.md)$
+```
+
+**Verification / exit:** Run the existing CI/worker/release scripts, CD acceptance
+and release suites, planned CI-contract/example tests and complete TRANCHE-A
+regressions. Inject each missing/incorrect acceptance member and prove promotion
+fails closed. The configured CI runner, hosted image jobs and automatic review
+must match the current PR head. Two automatic review rounds remain the default;
+ask before an additional corrective push. The owner merges.
+
+**Backout:** Keep new physics activation off and preserve existing receipts,
+backup gates and circuit service. Never rewrite a failed receipt as verified.
+
+#### Operational checkpoint: controlled all-three rollout
+
+This is TASK-034 after the owner merges TRANCHE-B, not another partially
+implemented feature PR. Verify every implementation head reached current main
+and use its exact green push-CI artifacts. Run the existing authorized CD flow:
+owned release hold/drain, fresh encrypted backup/readback and durable locator,
+exact image promotion, restricted smoke matrix through real SkyPilot, native
+results/cleanup, verified ledger, then general admission. Existing accepted
+jobs drain without forced cancellation; credentials and unrelated workloads
+remain untouched. No backup gate is bypassed to finish this tranche.
+
+Operational evidence must separate source merge, successful CI, deployed image,
+application/native acceptance and verified backup/recovery. Any unknown stage
+is reported as unknown and keeps its gate open. Retain private locators and
+sensitive deployment details outside public docs. Consolidate the final public
+validation/checklist receipt into one follow-up evidence PR if needed after
+rollout, rather than producing a PR per operational step.
+
+#### Owner approval and execution boundary
+
+The owner approved the two implementation-PR boundaries, combined leases and
+private context amendment on 2026-11-08. Tranche A uses disjoint executor leases
+and one integration PR. Tranche B follows its merge and current-main CI; it
+does not need this approval repeated unless material scope or safety changes.
+The existing CPU-only decision remains in force. Production rollout still
+requires all backup/release and exact-native acceptance gates.
+
+
+### Tranche A execution authorization and matching-test reconciliation, 2026-11-08
+
+The owner approved the integrated delivery amendment with “Go for it.” Execution
+starts from main `410f062`; the private context contract and combined leases
+are approved. Production activation remains off.
+
+The Lindblad audit found three existing companion tests whose only admission
+expectation is the historical unconditional certificate refusal. Completing the
+approved certificate necessarily supersedes that placeholder. Record these
+narrow matching-test additions before editing, with the union file ceiling 30:
+
+```text
+^tests/test_lindblad_evolve\.py$
+^tests/test_lindblad_propagator\.py$
+^tests/test_lindblad_static\.py$
+```
+
+Only the placeholder admission assertions are added to that lane. Native math,
+source identity, resource limits and numerical assertions remain unchanged.
+This is matching coverage for the approved outcome, not an extra numerical
+policy or scope change. The coordinator retains shared runtime and evidence
+files; the three certificate lanes have exclusive model/companion-test leases.
+
+
+Tranche A private-context reconciliation: new jobs use context version 2 with
+`result_plan` containing the admitted numeric/metadata/transport reservation.
+A digest alone cannot reconstruct the callback contract after policy changes.
+This implements the approved stored-result validation requirement. Public bodies
+and canonical hashes are unchanged. Existing version-1 records are preserved;
+the controller retains their original tuple, and compatibility validation may
+use only an exactly matching original plan digest, never silently replace it
+with a newer plan. No jobs-table rewrite is added.
+
+
+JoSIM matching-test reconciliation: the accepted public certificate supersedes
+five admission-refusal placeholders in `tests/test_josim_security.py` and one in
+`tests/test_josim_execution.py`. Add those two companion-test paths to the JoSIM
+lane and union ceiling 32 before editing. Preserve every source/binary identity
+refusal, frozen trace, tolerance and security subset assertion. No native code
+or resource boundary changes are authorized by this test reconciliation.
+
+
+Scqubits matching-test reconciliation: add `tests/test_scqubits_models.py` and
+`tests/test_scqubits_execution.py` to that lane for the five old unconditional
+export-refusal assertions only, preserving class/operator/numerical/security
+assertions. Union file ceiling becomes 34. These companion expectations are
+necessarily superseded by the approved certified-export outcome; no numerical
+or resource policy is relaxed.
+
+
+Native callback-loss reconciliation needs one additive `native_check_id` in the
+existing job_dispatch row so a controller restart resumes its asynchronous
+SkyPilot queue-status request instead of dropping ownership or blocking the
+single dispatcher. Add `qsim/store.py` to the coordinator lease (ceiling35).
+No jobs-table rewrite, deadline, retry quota or new scheduler is introduced.
+
+
+The existing schema/capability test in `tests/test_physics_schemas.py` describes
+the old scqubits-only registry. Add this companion path for matching the now
+certified engine/operation matrix and retaining all strict-schema assertions;
+union ceiling36. Production activation is unchanged.
+
+
+Final Lindblad companion-test reconciliation adds only the stale certificate-
+unavailable assertions in `tests/test_lindblad_monte_carlo.py`,
+`tests/test_lindblad_drives.py` and `tests/test_lindblad_states.py`. These now
+must verify a supplied synthetic/mismatched plan is rejected before native
+construction. The union ceiling is39; source algorithms, tolerances, shapes,
+limits and all existing numerical assertions remain unchanged.
+
+
+Version-2 stored context also carries `native_identity`, derived solely from
+sealed certificate binary/source/projection fields (empty for other engines).
+The shared factory prevents transport/test constructors from drifting. Worker
+revalidation binds it to the recomputed plan; callback validation binds emitted
+native headers to this admitted identity, without applying newer policy to an
+older result. Version-1 callback bridging is allowed only after exact original
+plan verification, and terminal callback replay preserves the prior outcome.
+
+
+Matching coverage reconciliation adds `tests/test_lindblad_operators.py` for its
+single old unavailable-certificate assertion and `tests/test_physics_results.py`
+for the explicitly approved additional pure exports, retaining safe-import and
+numerical checks. Union ceiling41. Native acknowledgement now also persists
+`native_job_id` in job_dispatch alongside its async observation ID, so SkyPilot
+API-request retention does not erase already acknowledged native ownership.
+No accepted job is re-executed merely because an old API request expires.
+
+
+The Lindblad decoder now applies an equivalent certificate lower-bound precheck:
+raw typed complex-cell positions cost at least4*1328bytes each in the existing
+canonical/model/handoff term. Inputs whose lower bound alone exceeds2GiB are
+refused before Pydantic expands their complex leaf models. No separate cell,
+language, job or time cap is introduced; every previously admissible request
+passes this lower-bound precheck unchanged. A ~4MiB raw maximum-matrix payload
+now proves refusal before leaf construction/native arrays, alongside lower-
+bound<=canonical-owner and JSON-revalidation tests.
+
+
+### Tranche A joined CPU integration receipt, 2026-11-08
+
+The approved combined outcome is implemented in one branch from verified main
+`410f062`. All three production CPU admission paths have source/algorithm-bound
+plans; the worker enforces stored context and installed native/source identity.
+Physics callbacks enforce the admitted archive/header/resource contract. Native
+acknowledgements and queue observations survive restart; lost callbacks,
+infrastructure failures and absent allocations have distinct tested cleanup.
+Public physics activation remains off. No deployment configuration, credential,
+backup gate, unrelated workload or GPU allocation was changed.
+
+`bash tools/ci/check-worker.sh` passed its complete mandatory path on the final
+local image `sha256:ab72787f156c56c1436000142e72be002b59cf473d24af6c892f668eed9f4ffb`:
+legacy startup/circuit checks, six packaged physics checks (including all frozen
+JoSIM/capacity cases), offline native source rebuild/ABI verification, three
+CPU admission/workspace/raw-input tests containing 15 native boundary cases,
+and **23 joined HTTP/native/recovery tests with zero skips**. The final CPU
+repeat's maximum charge is 1,684,075,944 bytes and measured peak RSS 1,285,020 KiB.
+Actual nonroot 2-CPU/4-GiB container and 3-GiB AS/12-MiB file limits were verified.
+The local image ID and synthetic scheduler ref are distinct JUnit properties;
+this is not live SkyPilot/registry attestation.
+
+The broad host run reports 1,947 passes, 62 skips, 36 failures and 4 import errors.
+Its 40 failing identifiers exactly match the reproduced unchanged-main native
+OpenMP/TLS baseline. It is not claimed green; canonical configured-runner CI
+and hosted image checks must still pass. Three console tests, all 148 installed
+dependency compatibility checks and diff/syntax checks pass. No numerical test
+or safety assertion was weakened to accommodate the host environment.
+
+Parallel executors owned disjoint certificate and harness files. A read-only
+peer audit of the shared runtime found four concrete cases which were fixed
+before publication: setup/driver failure warm reuse, cleanup on confirmed
+absence, self-consistent incompatible result metadata and unknown/corrupt
+stored context acceptance. Targeted regressions cover each. This scoped peer
+pass is not the complete TASK-033 release audit.
+
+The companion-test reconciliations above cover obsolete unconditional-refusal
+and export-list assertions only. The combined diff uses 41 files including the
+coordinator/evidence/interface documents and 12 new production definitions,
+within the reconciled ceilings 41/20. No new production module or public HTTP
+path is added. [CPU acceptance evidence](discovery/cpu-acceptance.md) contains
+the source ledgers, exact identities, commands and scope boundaries.
+
+Tranche A awaits current-head CI, automatic review and owner merge. Next is the
+already-approved Tranche B qualification PR. G2/G3/G4 and the final all-three live
+rollout are not marked complete by local tests or this source receipt.
+
+Final compatibility reconciliation: private protocol negotiation preserves flat
+input for older pinned version-1 workers and returns sealed context to new
+workers. A regression covers both shapes and unsupported protocol rejection.
+The focused API/worker/lifecycle run passes 96 tests with one host-only native
+skip. This uses existing files within the same tranche budget.

@@ -106,7 +106,6 @@ class JoSIMRequest(BaseModel):
             items, peak, certificate, result)
 
     def admission_plan(self) -> AllocationPlan:
-        # Pure planning cannot verify the runtime executable or worker image.
-        self._certified_allocation_plan()
-        raise ValueError('resource_limit: JoSIM native workspace certificate is unavailable; '
-                         'production worker packaging and activation are pending')
+        # The accepted source/build proof seals the plan. The native adapter
+        # still hashes the installed executable before starting the solver.
+        return self._certified_allocation_plan()

@@ -252,7 +252,7 @@ def test_private_drives_are_segmented_and_public_builder_stays_gated():
     req = LindbladRequest(**body)
     assert len(native._build_model(req, plan_for(req)).coefficient_segments) == 1
     req = request(state=factor('fock', index=1), collapse=[relaxation()])
-    with pytest.raises(ValueError, match='native allocation certificate is unavailable'):
+    with pytest.raises(ValueError, match='native allocation plan differs from admission'):
         native.build_lindblad_model(req, plan_for(req))
 
 

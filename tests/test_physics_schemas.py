@@ -34,8 +34,8 @@ def test_structural_schema_and_runtime_agree_on_controls():
 def test_capabilities_only_advertise_enabled_certified_cells(client,monkeypatch):
     enabled(monkeypatch)
     engines=client.get('/api/capabilities',headers=auth()).json()['engines']
-    assert engines['scqubits']['input_formats']=={'scqubits_model':['spectrum','matrix_elements']}
-    assert 'lindblad' not in engines and 'josim' not in engines
+    assert engines['scqubits']['input_formats']=={'scqubits_model':['spectrum','matrix_elements','export_for_lindblad']}
+    assert engines['josim']['input_formats']=={'josim_netlist':['transient']}
     assert engines['scqubits']['device']=='CPU'
 
 

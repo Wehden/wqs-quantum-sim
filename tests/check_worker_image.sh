@@ -71,7 +71,8 @@ PY
 # Source-matched diagnostics and offline source rebuild are test-only artifacts.
 audit_image="wqs-physics-audit:${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-$$"
 audit_dir=$(mktemp -d)
-trap 'docker image rm "$audit_image" >/dev/null 2>&1 || true; rm -rf "$audit_dir"' EXIT
+uv_container=''
+trap 'if [ -n "${uv_container:-}" ]; then docker rm "$uv_container" >/dev/null 2>&1 || true; fi; docker image rm "$audit_image" >/dev/null 2>&1 || true; rm -rf "$audit_dir"' EXIT
 docker build --target josim-build --tag "$audit_image" --file deploy/Dockerfile .
 docker run --rm --network none --read-only --entrypoint cat "$audit_image" /build/audit/josim-cli > "$audit_dir/audit"
 chmod 755 "$audit_dir/audit"
@@ -94,8 +95,41 @@ docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
     --mount "type=bind,src=$PWD/tests/fixtures/physics/josim,dst=/proof/tests/fixtures/physics/josim,readonly" \
     --env HOME=/tmp --env WQS_IMAGE_TEST=1 --env PYTHONDONTWRITEBYTECODE=1 \
     --entrypoint /opt/qsim-venv/bin/python "$image" - PhysicsWorkerImage.test_package_boundary_and_distribution_notices \
-    PhysicsWorkerImage.test_real_certified_scqubits_child_and_closed_admission \
+    PhysicsWorkerImage.test_real_certified_scqubits_child_and_export \
     PhysicsWorkerImage.test_josim_provenance_and_corresponding_source \
     PhysicsWorkerImage.test_maximum_certified_scqubits_shapes \
     PhysicsWorkerImage.test_frozen_native_equivalence_and_bounded_capacity \
-    PhysicsWorkerImage.test_real_private_lindblad_and_export_families < tests/test_physics_image.py
+    PhysicsWorkerImage.test_real_certified_lindblad_and_export_families < tests/test_physics_image.py
+
+
+# Mandatory maximum-owner native admission and frozen workspace-query proof.
+docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
+    --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --tmpfs /tmp:rw,nosuid,nodev,size=128m,mode=1777 \
+    --tmpfs /home/qsim:rw,nosuid,nodev,size=16m,uid=1000,gid=1000,mode=700 \
+    --env WQS_IMAGE_TEST=1 --env HOME=/home/qsim --env PYTHONDONTWRITEBYTECODE=1 \
+    --entrypoint /opt/qsim-venv/bin/python "$image" - PhysicsCPUAdmission < tests/test_physics_cpu_admission.py
+
+
+# Mandatory joined HTTP/native proof. Only placement is synthetic; the selected
+# local image ID and synthetic scheduler ref are recorded separately in JUnit.
+if uv_bin=$(command -v uv); then
+    :
+else
+    uv_container="wqs-ci-uv-${GITHUB_RUN_ID:-local}-$$"
+    docker create --name "$uv_container" ghcr.io/astral-sh/uv:0.11.6 >/dev/null
+    docker cp "$uv_container:/uv" "$audit_dir/uv"
+    docker rm "$uv_container" >/dev/null
+    uv_container=''
+    chmod 755 "$audit_dir/uv"
+    uv_bin="$audit_dir/uv"
+fi
+age_dir=$(bash tools/ci/install-age.sh)
+export PATH="$age_dir:$PATH"
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export WQS_JOINED_WORKER_IMAGE="$image"
+image_id=$(docker image inspect "$image" --format '{{.Id}}')
+export WQS_JOINED_WORKER_REF="registry.example.invalid/worker@$image_id"
+mkdir -p test-results
+"$uv_bin" run --frozen --extra worker --extra controller --extra backup pytest -q \
+    -o junit_family=legacy --junitxml=test-results/physics-joined.xml tests/test_physics_lifecycle.py

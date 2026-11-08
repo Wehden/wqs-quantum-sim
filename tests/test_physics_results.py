@@ -277,7 +277,7 @@ def test_engine_shape_plans_round_trip_without_reinterpretation(arrays):
     assert {name: value.shape for name, value in actual.items()} == {name: value.shape for name, value in values.items()}
 
 
-def test_api_safe_imports_and_six_public_exports():
+def test_api_safe_imports_and_approved_public_exports():
     source = Path(__file__).resolve().parents[1]/"qsim"/"physics_results.py"
     tree = ast.parse(source.read_text())
     imports = {node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
@@ -285,4 +285,5 @@ def test_api_safe_imports_and_six_public_exports():
     assert not imports & {"qutip", "scqubits", "scipy", "cupy", "jax", "sky", "subprocess"}
     import qsim.physics_results as module
     assert set(module.__all__) == {"ArraySpec", "ResultPlan", "AllocationPlan", "PhysicsExecutionResult",
-                                   "plan_result", "serialize_physics_result"}
+                                   "plan_result", "serialize_physics_result", "allocation_plan_digest",
+        "validate_execution_context", "validate_physics_callback", "make_execution_context"}

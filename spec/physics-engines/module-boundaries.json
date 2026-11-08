@@ -52,7 +52,8 @@
         "operator",
         "pydantic",
         "numpy",
-        "qsim.physics_results"
+        "qsim.physics_results",
+        "sys"
       ],
       "forbidden_imports_from": [
         "qutip",

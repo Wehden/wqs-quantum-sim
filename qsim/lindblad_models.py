@@ -1,6 +1,7 @@
 """Strict declarative Lindblad requests; no native solver or scheduling authority."""
 import json
 import math
+import sys
 import re
 from typing import Annotated, Literal, TYPE_CHECKING
 
@@ -323,6 +324,278 @@ def _hermitian(matrix, pointer, *, density=False):
         _error(pointer, 'matrix must be finite and Hermitian')
 
 
+# Pinned wheel/source owners used by the numerical allocation certificate.
+_LINDBLAD_RUNTIME_FILES = [{'distribution': 'numpy',
+  'path': 'numpy.libs/libgfortran-83c28eba-468e71e5.so.5.0.0',
+  'sha256': 'a6a368328d02a5d8a149746f13f6268f8cc9192df5c18777b25c3c9b5ef52160'},
+ {'distribution': 'numpy',
+  'path': 'numpy.libs/libquadmath-2284e583-a9307bba.so.0.0.0',
+  'sha256': '6bc3069003caec1f075be3c51ae8355332f081fa9465910c4b5724e7fe7d8ad4'},
+ {'distribution': 'numpy',
+  'path': 'numpy.libs/libscipy_openblas64_-f48b354e.so',
+  'sha256': '432e1c1739731468ba305771af96773939e43016643e2d630f58cb45b6670e96'},
+ {'distribution': 'numpy',
+  'path': 'numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'b185dfe64b07180bedc7c15fb2735b0d0f4f4e09eb9c15bd8e67f74568aebcbf'},
+ {'distribution': 'numpy',
+  'path': 'numpy/linalg/_linalg.py',
+  'sha256': '99ec3bec6f80194741a62407fbcea521a0690577105fe9f3096f156842de76a9'},
+ {'distribution': 'numpy',
+  'path': 'numpy/linalg/_umath_linalg.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '2e075f582c3a25a21fe97a55931a0fdb22ceb84f4fce8203a5040d405ccf65ce'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/_brtensor.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '331c8816989cbecb5ad2be790a4d38d5a30f36bc5771927000b0b8d7bc5f583a'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/_brtools.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '7b082067ff9db838644a66b3e4b9a2a7138c05eb4a3c54e5690b53c9366b86bd'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/_element.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '0b6171526bc9dfeb11740125ace6ba07b0f9fdc065e173f917e4e980b476813f'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/_element.pyx',
+  'sha256': 'd8ba45292be8660d6cdddcc183a3134924691b5a98e0e0ef1e082e228cfb311e'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/coefficient.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '83e6bd4b11d464b1eb88c765442af7a408ae2574110cbe44f7093f516363e43d'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/coefficient.pyx',
+  'sha256': '5b5f4df2e9c5dbc92f54a9ca22dd313143fbab353cd2ca3f1871a406a640a695'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/lindblad_matrix_form.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'ec90c9ff77ee7ae1f28c6fab5d36b0afd990e237cfec405c87ae7ba36650b640'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/math.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'e81f00cfdbcf4e9b7a4b0ee9aa3828517327d7b4b6c41a426d825c05107ebd67'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/qobjevo.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '1dcfbc8c7a9165ea00d9fcf4f3c758fcbb1cd43a12e7c0aea4f86b9e2e516a76'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/cy/qobjevo.pyx',
+  'sha256': '8d939f48a7fcaeb899d22f1ce6f841c672ff574875b0e34073e7be429c41f464'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/_local_matmul.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'd686a4ef1a04dae62b884125ac38f342e6bdb42d19e5637fd6a1cf17f5109904'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/add.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'f4e5bbf8ece164bf88d6b32915be80a10dabed8360eec302f5d5a080d27fc124'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/add.pyx',
+  'sha256': 'a9256c0eeff15d0ec2859f88098d0d1524a727381e772beeb34f4f3833fa409f'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/adjoint.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'fa311a9483f9cae3d5e37f8c1af4bc23d5b8a36ef9538c7313b81c98fa334fe6'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/base.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '084801704343bf1516eca53d3ffea95f6c723c18fcd6365c4616d4bdb5b530d7'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/block_operations.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'f6121415cd72f90ac6091ab9c2fa1ad539060cae92925a1f8775c665e43efb39'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/convert.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '44873f7f21a43ec44bdf32beb8ce5a5267d3689dac1028a20772a3de3a2e3c93'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/csr.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '61e4f6279092cf807979df252b05db614721baebab3be9d1f690448f50cf284f'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/data_iterator.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '9c1fdcb140d9d46c3532a2ed5f9d489bf5168a406769bb6dfe0b0d9e12da127a'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/dense.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '4e6fb1f00962b3d7ded70925b893735dbe0092b95993021dfbb799da05763530'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/dia.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '96c6612c8ee0094661049d4323869b9491e8850ccc658b577b6d94a25e8244fc'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/dispatch.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '76493160c017ab87e366053ec374f7b54a316d9c96be7517e570c15c4b589cd6'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/expect.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '78604ba1187e1d86eef255377c80222d1c412201a7ec450c6ad2e5ed64d163c2'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/inner.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '42dccb15afc2c36e102de84c1d516aeb8b42807339aa1b7cb03eace03963cabd'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/kron.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'e3b7c767ba2aeae59dae33e0fb40908bab3d73c797d4297a5c8eaaf87a5fe719'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/kron.pyx',
+  'sha256': 'e296988bf756a2a5fe5f1cb77f21711133b5aa12bd92c944ed8c032ad9929387'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/matmul.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'e8ade1001a215e2fb5d35c0447c72d7c045b315be867cc70233cbcb4b694625a'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/matmul.pyx',
+  'sha256': '98934614492b1ee984d32cd3d3656ab854b9df31528298e6508629d53c857262'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/mean.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '144d4a3b407c9afe643ed3ac8fca6b6571bcd0102aad0cd48dfa703f9687442d'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/mul.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '06ee1ad15e576919f3de392cbb30d7328df95e483016c1f11b1060414b0864a1'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/norm.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '9dd06dced2ff8dc4263fd020cc50c13dea2b01004afa25aa27f3af2575fafa5e'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/ode.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '42543bdc2ca609d0d96a3f3ec5c0b8330a54b2b95d826dcd4692d887f8ef57ff'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/permute.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '3a53a9307c25afff0ceb877497eb75190c575fdb15372ad049aa63a7e95638ab'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/pow.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'e86d34dcd6fe95313eb1ebd51712708bec5dd78899dc389e02756157ebbacb77'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/project.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '22560c34b078da0622db9f81f71f7f20da4ed787ce5b212aad3b70858fb80531'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/properties.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'bb1d89574df0c93188ccb5f35614a721f2d84b791af75b7b1410334f4dd265ff'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/ptrace.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'd6c34e1ddf768f04a6dbff7e3a0eaa68a1d7d596d28b509b9228e19fe0af78a4'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/reshape.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'f75ab832053f357521430aa1826139751a65a1ca973f5ee235572b979a4f572d'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/solve.py',
+  'sha256': '42d9052b085ec22d15368371f8258e889c46a8b8d2bf192cc526d5ae4056b962'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/tidyup.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '7997a47bdc542cfa4a5d95af1c84622db899cf9dee0ce4e0cdc97ca387225f0b'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/data/trace.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '74f08f141b37db3b30e8aab147e2f9cf6975cdb469eb588995aa40cc77d121cb'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/operators.py',
+  'sha256': 'e0a63214ae579f07eeda55ce922b488cffe43b8e9e84f10311ee63e1821d31de'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/qobj.py',
+  'sha256': '1b8734acb26614e633afe969b07058517e6c878208b1d7eac3e061ebee8aaca7'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/states.py',
+  'sha256': 'ec7ed019f7aab36a4af34944fc62c33d2f72043e5d307f0799550d041309c0ab'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/superoperator.py',
+  'sha256': '3ed25770c270406b4928f865e7522b9f1ba5f9d58b714034469752295b0be39f'},
+ {'distribution': 'qutip',
+  'path': 'qutip/core/tensor.py',
+  'sha256': '848594c412fae9bee6e225a52385eca56b7d5dc9189e6a6b10d658b3cd57bfff'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/cy/dysolve.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '75ecf3a598b016963af23b4466aa94b608f55da64d0f756a8175b5a5685479c8'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/cy/nm_mcsolve.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '992defaca69846c996befe1197674b320fb7c114705e9670fc3389d71b8a3e32'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/integrator/explicit_rk.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'bbb5b5680c106a2df22f74782f0fb8f3426262abf764574f3ad29c4516be9038'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/integrator/explicit_rk.pyx',
+  'sha256': 'a2b6f7d8e1c4cdce982d8d11f8a4bcfd353ee9bcd833c4c7fa5eace763c7b01e'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/integrator/qutip_integrator.py',
+  'sha256': '1a67c489555e29d78cc572ade2ebd898f535d96c58b1372f0e5fc9807f49cbba'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/integrator/verner7efficient.py',
+  'sha256': 'c9449bf1a0a152b0428cff140021d62d479ccb8df65a3fade4b29ae1ee3db1b2'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/mcsolve.py',
+  'sha256': '68c1810dc3f8d48e5edf6a7b5eaea47c40442be0ee5e431469e607cfb217b7bf'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/mesolve.py',
+  'sha256': 'da584d41aad3eb78c1483a75f73d99e81d24005aef40b20b16f1581f2eddae40'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/multitraj.py',
+  'sha256': 'a2f2f2e77b9d95e7653042dceff27d9b5d01184cf1c293cd679f8842e07ec8f6'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/sesolve.py',
+  'sha256': '262b288a9fa30b71d2683a31aa2c9f3d1fee61ea493806bdf1b40acaadef2d0e'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/sode/_sode.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'f156c9da052a08435e3e1abd5809b078f33dc4aa111fb9811183892543d57619'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/sode/ssystem.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '410c9a74d323939fe102954b92a878e97e55fea1df1e91129a55991997188685'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/solver_base.py',
+  'sha256': 'c9c2f19069c549a1f04da5565727dc7ccf1a2522113c5c1e547e52381c5b8d58'},
+ {'distribution': 'qutip',
+  'path': 'qutip/solver/steadystate.py',
+  'sha256': '907a818a90cf789567cb2f7111d865985b88caf79bdaf13c6d9a65e3b9746b2e'},
+ {'distribution': 'scipy',
+  'path': 'scipy.libs/libgfortran-040039e1-0352e75f.so.5.0.0',
+  'sha256': 'c6090048eccc763522c12ef016f81da6b627cb3a044f55cf0479a839c41c0980'},
+ {'distribution': 'scipy',
+  'path': 'scipy.libs/libgfortran-83c28eba.so.5.0.0',
+  'sha256': '468e71e59e1d784821a76702e5ecd1e0dbcfc024499f74a552d1bea4b26f27ad'},
+ {'distribution': 'scipy',
+  'path': 'scipy.libs/libquadmath-2284e583.so.0.0.0',
+  'sha256': 'a9307bbaa353623fa014e8b682d50c4629f5e5c7d61daa9a8652f7d165cd421a'},
+ {'distribution': 'scipy',
+  'path': 'scipy.libs/libquadmath-96973f99-934c22de.so.0.0.0',
+  'sha256': '6ed5137f412781ad7863439fb543613f620b43c32b63292a0029246162f5bbc6'},
+ {'distribution': 'scipy',
+  'path': 'scipy.libs/libscipy_openblas-5f890258.so',
+  'sha256': '2a5b4c1a6311873c59132b2ceaaf3c26258a17350b7cd27ea8782a47e3322981'},
+ {'distribution': 'scipy',
+  'path': 'scipy/linalg/_decomp.py',
+  'sha256': '4dbf81305777e4bfd7e6df834e411aa8751b715a7d957c6f42b70808cb0b6a2f'},
+ {'distribution': 'scipy',
+  'path': 'scipy/linalg/_decomp_svd.py',
+  'sha256': '7bdb48fe1ded88a717e41f0d6b0d3247e20cc129c0686eb89e8de88720ff916a'},
+ {'distribution': 'scipy',
+  'path': 'scipy/linalg/_flapack.cpython-312-x86_64-linux-gnu.so',
+  'sha256': '00fc3e3414d7f42f023d5ba1f1b616d3d81da8da0f5cc6b17279af70be963b9c'},
+ {'distribution': 'scipy',
+  'path': 'scipy/linalg/_internal_matfuncs.cpython-312-x86_64-linux-gnu.so',
+  'sha256': 'e98f03e852b7acf316c6a6d2294360ed2fb98ee4b1e9c8eccffd123f9c1dc74f'},
+ {'distribution': 'scipy',
+  'path': 'scipy/linalg/_matfuncs.py',
+  'sha256': '72da5780b458ecf9f78fd75662fa28c95cb14b66c4faf1327891be009830a1b6'},
+ {'distribution': 'scipy',
+  'path': 'scipy/linalg/lapack.py',
+  'sha256': '8601f185072fd4cd98fb516c2035a50f49841e265353afb466f5988ef2042827'}]
+
+
+def _request_storage_bytes(value):
+    """Bound canonical JSON and its Pydantic owners without identity-dependent sizes."""
+    pending, total, nodes = [value], 0, 0
+    while pending:
+        item = pending.pop()
+        nodes += 1
+        if isinstance(item, dict):
+            # CPython 3.12 dict, fields-set and BaseModel header together fit
+            # this bound for the fixed schema's <=32 named entries/fields.
+            total += 512+256*len(item)
+            pending.extend(item.keys())
+            pending.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            total += 64+16*len(item)
+            pending.extend(item)
+        elif isinstance(item, str):
+            total += 80+4*len(item)
+        else:
+            total += sys.getsizeof(item)
+    # Worst-case traversal stack references, including list growth overlap.
+    return total+16*nodes
+
+
+
+def _operator_storage_bytes(operator, modes, *, superoperator=False):
+    """Bound copied drive data from the frozen tensor/operator constructors."""
+    dimension = math.prod(mode.dimension for mode in modes)
+    size = dimension**2 if superoperator else dimension
+    if operator.kind == 'matrix' or any(value.startswith('proj:') for value in operator.factors.values()):
+        # Named matrices and basis outer products are Dense; spre/spost tensor
+        # them with a same-type identity, retaining exactly size² complex cells.
+        return 16*size*size+16384
+    # a/adag/n/I have one DIA diagonal, x/y two; kron reserves their
+    # product, including duplicate offsets, not merely the used diagonals.
+    diagonals = math.prod(2 if operator.factors.get(mode.name) in ('x', 'y') else 1 for mode in modes)
+    return 16*size*diagonals+8*diagonals+16384
+
+
 class LindbladRequest(_Base):
     model_config = ConfigDict(extra='forbid', strict=True, json_schema_extra=_operation_schema)
     engine: Literal['lindblad'] = 'lindblad'
@@ -341,6 +614,45 @@ class LindbladRequest(_Base):
     evals_count: int = 6
     return_vectors: bool = False
     return_state: bool = True
+
+    @model_validator(mode='before')
+    @classmethod
+    def _input_owner_preflight(cls, value):
+        """Refuse a proven input-owner overrun before expanding complex models."""
+        if not isinstance(value, dict):
+            return value
+        matrices, complex_cells = [], 0
+        model = value.get('model')
+        if isinstance(model, dict):
+            named = model.get('matrices')
+            if isinstance(named, dict):
+                matrices.extend(matrix for matrix in named.values() if isinstance(matrix, list))
+            modes = model.get('modes')
+            if isinstance(modes, list):
+                matrices.extend(mode['hamiltonian'] for mode in modes
+                    if isinstance(mode, dict) and mode.get('kind') == 'matrix'
+                    and isinstance(mode.get('hamiltonian'), list))
+            drives = model.get('drives')
+            if isinstance(drives, list):
+                for drive in drives:
+                    envelope = drive.get('envelope') if isinstance(drive, dict) else None
+                    if (isinstance(envelope, dict) and envelope.get('shape') == 'sampled'
+                            and isinstance(envelope.get('values'), list)):
+                        complex_cells += len(envelope['values'])
+        state = value.get('initial_state')
+        if isinstance(state, dict) and isinstance(state.get('values'), list):
+            if state.get('kind') == 'amplitudes':
+                complex_cells += len(state['values'])
+            elif state.get('kind') == 'density':
+                matrices.append(state['values'])
+        complex_cells += sum(len(row) for matrix in matrices for row in matrix if isinstance(row, list))
+        # Every valid normalized complex cell has both finite float re/im
+        # fields. This exact canonical-structure charge is already included
+        # four times in admission, even before other request/output owners.
+        per_cell = _request_storage_bytes({'re': 0., 'im': 0.})
+        if 4*complex_cells*per_cell > 2*1024**3:
+            _error('/model', 'certified Lindblad input owners exceed the CPU budget', 'resource_limit')
+        return value
 
     @model_validator(mode='after')
     def _operation_fields(self):
@@ -591,6 +903,125 @@ class LindbladRequest(_Base):
         return plan_result(arrays, metadata_characters=65536, summary_bytes=65536)
 
     def admission_plan(self) -> 'AllocationPlan':
+        from .physics_results import AllocationPlan
         dimension = self._physical_checks()
-        self._result_plan(dimension)
-        _error('/model', 'frozen Lindblad native allocation certificate is unavailable', 'resource_limit')
+        result = self._result_plan(dimension)
+        canonical = self.canonical_envelope()
+        drives, segments = self.model.drives, 1
+        channels = sum(1 + int(drive.hc) for drive in drives)
+        if drives:
+            start, stop = canonical['times'][0], canonical['times'][-1]
+            edges = {start, stop}
+            for drive in drives:
+                envelope = drive.envelope
+                if envelope.shape == 'sampled':
+                    points = envelope.times
+                elif envelope.shape == 'constant':
+                    points = ()
+                elif envelope.shape == 'flattop_cosine':
+                    points = (envelope.start, envelope.start+envelope.rise,
+                              envelope.stop-envelope.rise, envelope.stop)
+                else:
+                    points = (envelope.start, envelope.stop)
+                edges.update(value for value in points if start < value < stop)
+            segments = len(edges)-1
+            # Every smooth piece has its two endpoint knots in the native grid.
+            if 2*segments > 65536:
+                _error('/model/drives', 'coefficient breakpoint grid exceeds 65536 knots', 'resource_limit')
+        collapse = sum(2 if item.kind == 'thermal' else 1 for item in self.model.collapse)
+        observable = len(self.observables)
+        # CSR add reserves nnz(left)+nnz(right), up to 2n² cells.
+        # DIA add reserves both diagonal counts, up to 4n-2 diagonals;
+        # account capacity rather than only used nnz/diagonals.
+        hilbert = max(16*dimension**2, 48*dimension**2+8*(dimension+1),
+                      16*dimension*(4*dimension-2)+8*(4*dimension-2)) + 16384
+        liouville_size = dimension**2
+        liouville = max(16*liouville_size**2, 48*liouville_size**2+8*(liouville_size+1),
+                       16*liouville_size*(4*liouville_size-2)+8*(4*liouville_size-2)) + 16384
+        # _coefficient_segments uses QobjEvo(copy=True) for every retained piece.
+        # HC terms copy the adjoint too; this is not just coefficient storage.
+        drive_owners = sum((1+int(drive.hc))*_operator_storage_bytes(drive.operator, self.model.modes) for drive in drives)
+        retained_terms = segments*(hilbert+drive_owners) if drives else hilbert
+        state_elements = (dimension**2 if self.solver == 'me' else dimension)
+        if self.operation == 'propagator':
+            state_elements = dimension**4 if self.solver == 'me' else dimension**2
+        state = 16*state_elements
+        solver_generators = 0
+        rk_workspace = 0
+        static_workspace = 0
+        if self.operation in ('evolve', 'propagator'):
+            # explicit_rk.set_initial_value: k[16], y, temp/front/prev, optional
+            # FSAL; solver copies/returned state and validation scratch coexist.
+            rk_workspace = (16+1+3+1+3+4)*state
+            generator = liouville if self.solver == 'me' else hilbert
+            # The generator owns its terms and tensor/add conversion scratch.
+            # QobjEvo liouvillian retains spre(H) and spost(H.dag()) terms
+            # plus the summed dissipator; four conversion/add operands overlap.
+            generator_terms = (2*sum((1+int(drive.hc))*_operator_storage_bytes(
+                drive.operator, self.model.modes, superoperator=True) for drive in drives)
+                if self.solver == 'me' else drive_owners)
+            solver_generators = generator_terms+5*generator
+            if self.solver == 'mc':
+                # MCSolver c_ops, n_ops and effective-Hamiltonian products.
+                solver_generators += (2*collapse+4)*hilbert
+            if self.operation == 'evolve' and self.solver in ('se', 'me'):
+                # The existing options feedback cycle can retain prior solvers;
+                # do not assume Python cyclic GC releases a native workspace.
+                rk_workspace *= segments
+                solver_generators *= segments
+        elif self.operation == 'spectrum':
+            n = dimension
+            # _static_spectrum/verification/Fortran input and HEEVD outputs.
+            # Frozen HEEVD work-query bounds include vectors and eigenvalues-only.
+            static_workspace = (5*16*n*n + 16*(n*n+33*n+1)
+                                + 8*(2*n*n+5*n+1) + 8*(5*n+3))
+        else:
+            n = liouville_size
+            # SVD values-only: dense input/copy, complex work<=66n, real 7n,
+            # integer 8n; direct solve adds trace-row/dense copy and GESV LU.
+            static_workspace = (4*liouville + 5*16*n*n + 16*66*n
+                                + 8*7*n + 8*8*n + 16*5*n)
+        encoded_bytes = len(json.dumps(canonical, allow_nan=False).encode())
+        request_bytes = _request_storage_bytes(canonical)
+        base64_bytes = 4*((result.npz_upper_bytes+2)//3)
+        items = (
+            ('native_import_reserve', 512*1024**2),
+            ('request_models_canonical_and_child_handoff', 4*request_bytes+5*4*encoded_bytes),
+            ('named_and_local_matrix_conversion', (len(self.model.matrices)+len(self.model.modes)+4)*hilbert),
+            ('static_hamiltonian_build_temporaries', 10*hilbert),
+            ('observables_collapse_and_drive_operators', (observable+collapse+channels+4)*hilbert),
+            ('retained_segment_qobjevo_terms', retained_terms),
+            # Each channel retains its complex values and order-one polynomial;
+            # conjugation, knot/slope and carrier construction temporaries overlap.
+            ('coefficient_values_polynomials_and_temporaries',
+             (16*6*channels+8*6)*65536 if drives else 0),
+            ('coefficient_segment_python_owners', segments*(1024+(channels+1)*512) if drives else 0),
+            ('native_solver_generators_and_conversion', solver_generators),
+            ('vern7_state_stage_and_validation_owners', rk_workspace),
+            ('static_lapack_and_direct_solver_owners', static_workspace),
+            # SciPy 1.18.1 matrix_exponential_z: Am[6*n*n+4*n], pivot[n],
+            # input and output. Matrix representation slack covers pivots/Qobj.
+            ('initial_and_validation_state_temporaries', 8*hilbert),
+            ('numeric_result_arrays_and_copy_overlap', 2*result.numeric_bytes),
+            ('metadata_unicode_utf8_and_scalar', 3*4*65536+65536),
+            ('npz_serialization_buffers', 4*result.npz_upper_bytes),
+            ('base64_bytes_and_ascii_string', 2*base64_bytes),
+            ('callback_json_unicode_and_utf8', 5*result.callback_upper_bytes),
+            ('parent_child_result_handoff', 2*result.callback_upper_bytes),
+        )
+        peak = sum(value for _, value in items)
+        if peak > 2*1024**3:
+            _error('/model', 'certified Lindblad allocation exceeds the CPU budget', 'resource_limit')
+        algorithm = ({'spectrum': 'scipy-zheevd-spectrum',
+                      'steadystate': 'svd-unique-qutip-dense-solve'}.get(self.operation)
+                     or 'qutip-vern7-'+self.operation+'-'+self.solver)
+        return AllocationPlan('lindblad-cpu-vern7-evd-svd-v1', algorithm,
+            {'hilbert': dimension, 'coefficient_segments': segments,
+             'coefficient_channels': channels, 'native_state_elements': state_elements}, items, peak,
+            {'runtime_files': [dict(item) for item in _LINDBLAD_RUNTIME_FILES],
+             'rk_stage_buffers': 16, 'rk_state_and_scratch_buffers': 12,
+             'heevd_complex_work_bound': 'n*n+33*n+1',
+             'heevd_real_work_bound': '2*n*n+5*n+1',
+             'heevd_integer_work_bound': '5*n+3',
+             'gesdd_values_only_complex_work_bound': '66*n',
+             'owner_source_revision': 'qutip-5.3.1-vern7-segment-owners-v1'}, result)

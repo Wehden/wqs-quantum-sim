@@ -164,7 +164,7 @@ def test_native_public_admission_remains_fail_closed():
     dimension = req._physical_checks()
     plan = AllocationPlan('synthetic-test-only', 'drive-numerics-test',
         {'hilbert': dimension}, (), 0, {}, req._result_plan(dimension))
-    with pytest.raises(ValueError, match='certificate'):
+    with pytest.raises(ValueError, match='native allocation plan differs from admission'):
         native.build_lindblad_model(req, plan)
 
 

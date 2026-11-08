@@ -162,7 +162,7 @@ def test_public_entry_stays_certificate_gated(monkeypatch):
     req = request()
     model = model_for(req)
     monkeypatch.setattr(adapter, 'build_lindblad_model', lambda *a: pytest.fail('native build before certificate'))
-    with pytest.raises(ValueError, match='certificate'):
+    with pytest.raises(ValueError, match='execution_policy_mismatch.*allocation plan'):
         adapter.run_lindblad(req, model.allocation_plan, execution_context={})
 
 

@@ -113,7 +113,7 @@ def test_no_observables_and_me_never_falls_back_to_kets():
 def test_public_admission_refuses_before_native_construction(monkeypatch):
     req = request()
     monkeypatch.setattr(adapter, 'build_lindblad_model', lambda *a: pytest.fail('constructed before admission'))
-    with pytest.raises(ValueError, match='resource_limit.*certificate'):
+    with pytest.raises(ValueError, match='execution_policy_mismatch.*allocation plan'):
         adapter.run_lindblad(req, plan_for(req), execution_context={})
 
 
