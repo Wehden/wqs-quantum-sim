@@ -15,7 +15,10 @@ _certified_physics_profiles = {
     'operations': {'scqubits': {
         'spectrum': 'scqubits-cpu-evr-v1',
         'matrix_elements': 'scqubits-cpu-evr-v1',
-    }},
+        'export_for_lindblad': 'scqubits-cpu-evr-v1',
+    }, 'josim': {'transient': 'josim-cpu-bookworm-nodev-v1'},
+        'lindblad': {operation:'lindblad-cpu-vern7-evd-svd-v1'
+                     for operation in ('evolve','propagator','spectrum','steadystate')}},
     'worker': {
         'version': 1, 'id': 'physics-cpu-v1', 'backend': 'cpu',
         'policy_revision': 'physics-placement-v1',

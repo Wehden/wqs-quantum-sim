@@ -37,10 +37,15 @@ def job(client, context):
 
 
 def complete(identifier, sky):
-    sky.finish(dispatch(identifier)['launch_id'])
+    rid=dispatch(identifier)['launch_id'];sky.finish(rid)
+    sky.results[rid]=(int(rid),None)
     with store.connect() as db:
         db.execute("UPDATE jobs SET status='SUCCEEDED' WHERE id=?", (identifier,))
     controller.tick()
+    if dispatch(identifier)['profile_json'] is not None:
+        check=dispatch(identifier)['native_check_id']
+        sky.results[check]=[{'job_id':int(dispatch(identifier)['launch_id']),'status':'SUCCEEDED'}]
+        sky.finish(check);controller.tick()
 
 
 def test_pure_policy_is_native_and_scheduler_free(monkeypatch):
@@ -58,7 +63,7 @@ def test_pure_policy_is_native_and_scheduler_free(monkeypatch):
 
 
 @pytest.mark.parametrize('engine,operation,revision',[
-    ('scqubits','spectrum','unknown'),('scqubits','export_for_lindblad','scqubits-cpu-evr-v1'),
+    ('scqubits','spectrum','unknown'),('scqubits','export_for_lindblad','unknown'),
     ('lindblad','evolve','unknown'),('josim','transient','unknown'),('gpu','spectrum','unknown')])
 def test_uncertified_policy_has_no_fallback(monkeypatch,engine,operation,revision):
     monkeypatch.setattr(settings,'WORKER_IMAGE',IMAGE)
@@ -234,3 +239,92 @@ def test_unknown_requested_gpu_resources_cannot_change_server_profile(client,sky
     assert sky.calls[0][2]['resources']['cpus']==2
     assert 'accelerators' not in sky.calls[0][2]['resources']
     assert 'untrusted-host' not in json.dumps(sky.calls[0][2])
+
+
+@pytest.mark.parametrize('native',['SUCCEEDED','FAILED','FAILED_SETUP','FAILED_DRIVER','CANCELLED'])
+def test_native_terminal_without_callback_becomes_failure_without_reexecution(client,sky,monkeypatch,native):
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    controller.tick();check=dispatch(identifier)['native_check_id'];assert check
+    sky.results[check]=[{'job_id':17,'status':native}];sky.finish(check)
+    controller.tick()
+    assert client.get('/api/jobs/'+identifier,headers=auth()).json()['status']=='FAILED'
+    assert len([c for c in sky.calls if c[0] in ('launch','exec')])==1
+
+
+def test_pending_unknown_or_other_native_job_never_fails_owned_job(client,sky,monkeypatch):
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    controller.tick();check=dispatch(identifier)['native_check_id']
+    sky.results[check]=[{'job_id':18,'status':'FAILED'}];sky.finish(check);controller.tick()
+    assert client.get('/api/jobs/'+identifier,headers=auth()).json()['status']=='LAUNCHING'
+    assert dispatch(identifier)['native_check_id'] is None
+
+
+def test_callback_race_wins_native_terminal_reconciliation(client,sky,monkeypatch):
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    controller.tick();check=dispatch(identifier)['native_check_id']
+    sky.results[check]=[{'job_id':17,'status':'SUCCEEDED'}];sky.finish(check)
+    original=sky.get
+    def committed(request):
+        result=original(request)
+        if request==check:
+            with store.connect() as db:db.execute("UPDATE jobs SET status='SUCCEEDED' WHERE id=?",(identifier,))
+        return result
+    monkeypatch.setattr(sky,'get',committed)
+    controller.tick()
+    assert client.get('/api/jobs/'+identifier,headers=auth()).json()['status']=='SUCCEEDED'
+
+
+@pytest.mark.parametrize('native',['FAILED_SETUP','FAILED_DRIVER'])
+def test_unhealthy_native_worker_is_torn_down_not_reused(client,sky,monkeypatch,native):
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    controller.tick();check=dispatch(identifier)['native_check_id']
+    sky.results[check]=[{'job_id':17,'status':native}];sky.finish(check)
+    controller.tick();controller.tick()
+    assert dispatch(identifier)['down_id']
+    assert pool(dispatch(identifier)['cluster'])['job_id']==identifier
+
+
+def test_confirmed_native_absence_cleans_terminal_job_without_success_attestation(client,sky,monkeypatch):
+    from test_dispatch import GoneError
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    with store.connect() as db:db.execute("UPDATE jobs SET status='SUCCEEDED' WHERE id=?",(identifier,))
+    controller.tick();check=dispatch(identifier)['native_check_id'];sky.finish(check,GoneError())
+    controller.tick()
+    assert pool(dispatch(identifier)['cluster']) is None
+    with store.connect() as db:assert db.execute('SELECT cleaned FROM jobs WHERE id=?',(identifier,)).fetchone()[0]==1
+    assert not (settings.DATA/identifier/'callback-token').exists()
+    assert not [call for call in sky.calls if call[0]=='down']
+
+
+def test_native_observation_failure_preserves_running_ownership_and_never_relaunches(client,sky,monkeypatch):
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    controller.tick();check=dispatch(identifier)['native_check_id']
+    original=sky.api_status
+    def unavailable(**kwargs):
+        if kwargs.get('request_ids')==[check]:raise RuntimeError('private status lookup failed')
+        return original(**kwargs)
+    monkeypatch.setattr(sky,'api_status',unavailable);controller.tick()
+    row=client.get('/api/jobs/'+identifier,headers=auth()).json()
+    assert row['status']=='LAUNCHING' and 'unverified' in row['error']
+    assert dispatch(identifier)['retry_pending']==0
+    assert [call[0] for call in sky.calls]==['launch','queue']
+    assert pool(dispatch(identifier)['cluster'])['job_id']==identifier
+
+
+def test_native_ack_survives_api_request_expiration_without_reexecution(client,sky,monkeypatch):
+    identifier=job(client,context(monkeypatch));controller.tick()
+    rid=dispatch(identifier)['launch_id'];sky.results[rid]=(17,None);sky.finish(rid)
+    controller.tick();check=dispatch(identifier)['native_check_id']
+    assert dispatch(identifier)['native_job_id']==17
+    del sky.requests[rid];del sky.results[rid]
+    sky.results[check]=[{'job_id':17,'status':'FAILED'}];sky.finish(check)
+    controller.tick();controller.tick()
+    assert client.get('/api/jobs/'+identifier,headers=auth()).json()['status']=='FAILED'
+    with store.connect() as db:assert db.execute('SELECT cleaned FROM jobs WHERE id=?',(identifier,)).fetchone()[0]==1
+    assert len([call for call in sky.calls if call[0] in ('launch','exec')])==1

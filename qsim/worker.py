@@ -2,6 +2,8 @@
 import base64
 import collections
 import io
+import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -52,23 +54,57 @@ def _physics_failure(error):
     return payload
 
 
-def simulate_physics(request, output):
+def _runtime_policy():
+    """Check installed source identity; immutable image assignment is proven by SkyPilot/CD."""
+    try:
+        policy = json.loads(Path('/opt/josim/share/physics-policy.json').read_text())
+        root = Path(__file__).resolve().parent
+        if set(policy['source_sha256']) != {p.name for p in root.glob('*.py')}:
+            raise ValueError()
+        for name,digest in policy['source_sha256'].items():
+            if hashlib.sha256((root/name).read_bytes()).hexdigest() != digest:
+                raise ValueError()
+        return policy
+    except (OSError,ValueError,TypeError,KeyError):
+        raise ValueError('execution_policy_mismatch: installed runtime provenance unavailable') from None
+
+
+def _prepare_physics(request, context):
+    runtime = _runtime_policy()
+    engine = request.get('engine')
+    if engine == 'lindblad':
+        from qsim.lindblad_models import LindbladRequest as Model
+    elif engine == 'scqubits':
+        from qsim.scqubits_models import ScqubitsRequest as Model
+    elif engine == 'josim':
+        from qsim.josim_models import JoSIMRequest as Model
+    else:
+        raise ValueError('invalid_model: unsupported physics engine')
+    normalized = Model.model_validate(request)
+    plan = normalized.admission_plan()
+    from qsim.physics_results import validate_execution_context
+    validate_execution_context(context,plan,expected_profile=runtime['worker'])
+    if runtime['operations'].get(engine,{}).get(normalized.operation) != plan.policy_revision:
+        raise ValueError('execution_policy_mismatch: operation policy differs from installed runtime')
+    for item in plan.coefficient_plan.get('runtime_files',[]):
+        installed = importlib.metadata.distribution(item['distribution']).locate_file(item['path']).resolve()
+        if not installed.is_relative_to(Path(sys.prefix).resolve()):
+            raise ValueError('execution_policy_mismatch: native provenance path differs')
+        with installed.open('rb') as source:
+            actual = hashlib.file_digest(source,'sha256').hexdigest()
+        if actual != item['sha256']:
+            raise ValueError('execution_policy_mismatch: native runtime identity differs')
+    return normalized,plan
+
+
+def simulate_physics(request, output, execution_context=None):
     """Reproduce admission and serialize numeric results inside the fresh child."""
     result = None
     try:
         if os.geteuid() == 0:
             raise ValueError('execution_policy_mismatch: nonroot physics child required')
-        engine = request.get('engine')
-        if type(engine) is not str or engine not in _PHYSICS_FORMATS:
-            raise ValueError('invalid_model: unsupported physics engine')
-        if engine == 'lindblad':
-            from qsim.lindblad_models import LindbladRequest as Model
-        elif engine == 'scqubits':
-            from qsim.scqubits_models import ScqubitsRequest as Model
-        else:
-            from qsim.josim_models import JoSIMRequest as Model
-        normalized = Model.model_validate(request)
-        plan = normalized.admission_plan()
+        normalized,plan = _prepare_physics(request, execution_context)
+        engine = normalized.engine
         if engine == 'lindblad':
             from qsim.lindblad_adapter import run_lindblad as execute
         elif engine == 'scqubits':
@@ -76,7 +112,7 @@ def simulate_physics(request, output):
         else:
             from qsim.josim_adapter import run_josim as execute
         from qsim.physics_results import ArraySpec, plan_result, serialize_physics_result
-        result = execute(normalized, plan, execution_context={'backend': 'cpu'})
+        result = execute(normalized, plan, execution_context={'backend': execution_context['worker_profile']['backend']})
         exact = plan.result
         if engine == 'josim':
             # Native adaptive integration may emit fewer rows than the reserved ceiling.
@@ -141,9 +177,12 @@ def simulate(source: Path, output: Path):
     resource.setrlimit(resource.RLIMIT_AS, (3 * 1024**3, 3 * 1024**3))
     resource.setrlimit(resource.RLIMIT_FSIZE, (12 * 1024**2, 12 * 1024**2))
     request = json.loads(source.read_text())
+    context = None
+    if type(request) is dict and set(request) == {'request','execution_context'}:
+        request,context = request['request'],request['execution_context']
     if _is_physics(request):
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        return simulate_physics(request, output)
+        return simulate_physics(request, output, context)
     if request.get("engine") == "aer":
         return simulate_aer(request, output)
     if request.get("engine", "clifft") == "qsim":
@@ -407,12 +446,26 @@ def remote():
             time.sleep(min(2**attempt, 10))
         raise RuntimeError("Result service unreachable")
 
-    request = call()
+    received = call()
+    context = None
+    if type(received) is dict and set(received) == {'request','execution_context'}:
+        request,context = received['request'],received['execution_context']
+    else:
+        request = received
     physics = _is_physics(request)
+    if physics:
+        try:
+            launched = json.loads(os.environ.get('QSIM_EXECUTION_CONTEXT','null'))
+            if json.dumps(launched,sort_keys=True,allow_nan=False) != json.dumps(context,sort_keys=True,allow_nan=False):
+                raise ValueError('execution_policy_mismatch')
+            _prepare_physics(request,context)
+        except (ValueError,TypeError,KeyError,OSError):
+            call(_physics_failure(ValueError('execution_policy_mismatch')))
+            return 1
     call({"status": "RUNNING"})
     with tempfile.TemporaryDirectory() as directory:
         source, output = Path(directory) / "input.json", Path(directory) / "output.json"
-        source.write_text(json.dumps(request))
+        source.write_text(json.dumps({'request':request,'execution_context':context} if physics else request))
         # Do not give the native simulator job credentials or controller environment.
         env = {"PATH": os.environ["PATH"], "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
         if physics:

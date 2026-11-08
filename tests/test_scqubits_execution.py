@@ -284,10 +284,13 @@ def test_runtime_version_mismatch_precedes_native_constructor(package, monkeypat
         adapter.run_scqubits(req, plan, execution_context={})
 
 
-def test_export_stays_closed_at_public_admission():
+def test_empty_operator_export_has_its_own_certified_result_plan():
     req = request(operation='export_for_lindblad', operators=[])
-    with pytest.raises(ValueError, match='resource_limit'):
-        req.admission_plan()
+    plan = req.admission_plan()
+    assert [array.name for array in plan.result.arrays] == ['eigenvalues','hamiltonian']
+    assert plan.coefficient_plan['export_certificate']
+    assert dict(plan.allocation_items)['operator_constructor'] == 0
+    assert plan.peak_bytes <= 2*1024**3
 
 
 @pytest.mark.parametrize('kind', ['source_hashes', 'native_hashes'])

@@ -53,6 +53,21 @@ _CPU_CERTIFICATE = {'algorithm': 'scipy-dsyevr-zheevr-subset',
  'versions': {'numpy': '2.5.4', 'qutip': '5.3.1', 'scipy': '1.18.1', 'scqubits': '4.3.1'}}
 
 
+_EXPORT_CERTIFICATE = {'revision': 'scqubits-export-shared-eigensystem-v1',
+ 'native_certificate': '531974791bde44c9f6bb29e85fe042e785e1315326e8c0288c788ad38ab4991d',
+ 'adapter_sha256': '05ad5fc4f87e804fe24fb3e12e2076006fadd359486f904cd727454c8f19b8a9',
+ 'representation': {'python': 'CPython 3.12',
+                    'pointer_bytes': 8,
+                    'float_bytes': 24,
+                    'two_unicode_key_dict_bytes': 184,
+                    'empty_list_bytes': 56,
+                    'list_growth': 'n + (n >> 3) + 6'},
+ 'energy_arrays': 'shifted result plus angle vector and real diagonal before complex conversion',
+ 'operator_workspace': 'one sequential constructor/validation/transform; all numeric and JSON '
+                       'results retained',
+ 'digest': '04bb1ae263260aed485690d89509c4c00846e5af7d55149e4b0ded344d98540a'}
+
+
 def _finite(value):
     if type(value) not in (int, float):
         raise ValueError("expected a finite JSON number")
@@ -284,8 +299,6 @@ class ScqubitsRequest(BaseModel):
         from .physics_results import AllocationPlan
         dimension = self._physical_checks()
         result = self._result_plan(dimension)
-        if self.operation == 'export_for_lindblad':
-            raise ValueError('resource_limit: frozen scqubits export allocation certificate is unavailable')
         levels = self.evals_count
         square = dimension * dimension
         raw_itemsize = 16 if self.model.qubit == 'FluxQubit' else 8
@@ -311,11 +324,13 @@ class ScqubitsRequest(BaseModel):
         else:
             lwork, liwork = _CPU_CERTIFICATE['lapack_workspace']['dsyevr']
             workspace = (8*lwork + 4*liwork)*dimension
+        needs_operator = (self.operation == 'matrix_elements' or
+                          self.operation == 'export_for_lindblad' and bool(self.operators))
         base64_bytes = 4*((result.npz_upper_bytes+2)//3)
         items = (
             ('import_native_headroom', 512*1024**2),
             ('two_hamiltonian_constructors', 2*constructor),
-            ('operator_constructor', operator if self.operation == 'matrix_elements' else 0),
+            ('operator_constructor', operator if needs_operator else 0),
             ('hamiltonian_scaled_copy', raw_itemsize*square),
             ('hamiltonian_absolute_values', 8*square),
             ('hamiltonian_conjugate', raw_itemsize*square),
@@ -328,9 +343,9 @@ class ScqubitsRequest(BaseModel):
             ('ordered_eigenpair_copies', (2*raw_itemsize+16)*dimension*levels + 24*levels),
             ('residual_and_orthogonality_arrays',
              72*dimension*levels + 48*levels*levels + 16*levels + 8*dimension),
-            ('operator_validation_arrays', 106*square if self.operation == 'matrix_elements' else 0),
+            ('operator_validation_arrays', 106*square if needs_operator else 0),
             ('operator_transform_arrays',
-             32*dimension*levels + 16*levels*levels if self.operation == 'matrix_elements' else 0),
+             32*dimension*levels + 16*levels*levels if needs_operator else 0),
             ('numeric_result_arrays', result.numeric_bytes),
             ('metadata_unicode_utf8_and_scalar', 3*4*65536 + 65536),
             ('npz_serialization_buffers', 4*result.npz_upper_bytes),
@@ -338,9 +353,24 @@ class ScqubitsRequest(BaseModel):
             ('callback_json_unicode_and_utf8', 5*result.callback_upper_bytes),
             ('parent_child_handoff', 2*result.callback_upper_bytes),
         )
+        if self.operation == 'export_for_lindblad':
+            # _json_matrix retains one two-key dict and two Python floats per
+            # complex value. CPython list_resize bounds row/outer pointer slots
+            # by n + (n >> 3) + 6; the pinned-image proof checks these layouts.
+            row_bytes = 56 + 8*(levels + (levels >> 3) + 6)
+            matrix_objects = levels*levels*(184 + 2*24) + (levels + 1)*row_bytes
+            items += (
+                ('export_json_matrix_objects', (1 + len(self.operators))*matrix_objects),
+                # shifted is in numeric_result_arrays; retain the angle vector
+                # and the temporary real diagonal before complex conversion.
+                ('export_energy_shift_and_diagonal_arrays', 8*levels + 8*levels*levels),
+            )
         peak = sum(size for _, size in items)
         if peak > 2*1024**3:
             raise ValueError('resource_limit: certified scqubits allocation exceeds the CPU budget')
+        certificate = {'certificate': _CPU_CERTIFICATE['digest']}
+        if self.operation == 'export_for_lindblad':
+            certificate['export_certificate'] = _EXPORT_CERTIFICATE['digest']
         return AllocationPlan(_CPU_CERTIFICATE['policy_revision'], _CPU_CERTIFICATE['algorithm'],
                               {'raw_basis': dimension, 'levels': levels}, items, peak,
-                              {'certificate': _CPU_CERTIFICATE['digest']}, result)
+                              certificate, result)

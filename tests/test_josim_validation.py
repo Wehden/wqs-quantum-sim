@@ -187,8 +187,7 @@ def test_admission_plans_bound_numeric_result_and_preserves_canonical_identity(m
     assert plan.numeric_bytes == rows * 16
     assert plan.callback_upper_bytes < 12 * 1024**2
     assert request.canonical_envelope() == canonical_before
-    with pytest.raises(ValueError, match='certificate is unavailable'):
-        request.admission_plan()
+    assert request.admission_plan() == allocation
 
 
 @pytest.mark.parametrize('step,stop', [('1e-12', '1e-9'), ('1e-11', '1e-8'), ('1e-9', '1e-6')])
@@ -204,9 +203,8 @@ def test_small_output_grid_uses_fixed_bounded_history_not_internal_step_charge(s
     _, info = validate_josim_netlist(request.netlist)
     assert 1000 <= info['predicted_rows'] <= 1002
     assert info['trace_names'] == ['P(B01)']
-    with pytest.raises(ValueError, match='certificate is unavailable'):
-        request.admission_plan()
-    plan = request._certified_allocation_plan()
+    plan = request.admission_plan()
+    assert plan == request._certified_allocation_plan()
     assert dict(plan.allocation_items)['history'] == 2397056
     assert plan.peak_bytes < 2*1024**3
     assert plan.coefficient_plan['binary_sha256'] == (
@@ -306,7 +304,7 @@ def test_certificate_matches_frozen_source_charge_and_build_identity():
     from qsim.josim_models import JoSIMRequest
 
     proof = runpy.run_path('spec/physics-engines/probe_josim_history.py')
-    plan = JoSIMRequest(netlist=minimal())._certified_allocation_plan()
+    plan = JoSIMRequest(netlist=minimal()).admission_plan()
     receipt = proof['BUILD_PROVENANCE']
     certificate = plan.coefficient_plan
     assert certificate['binary_sha256'] == '0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676'
@@ -346,7 +344,7 @@ def test_largest_certified_grammar_shapes_include_output_and_parent_child_overla
 
     proof = runpy.run_path('spec/physics-engines/probe_josim_history.py')
     for text in proof['_capacity_cases']().values():
-        plan = JoSIMRequest(netlist=text)._certified_allocation_plan()
+        plan = JoSIMRequest(netlist=text).admission_plan()
         items = dict(plan.allocation_items)
         assert plan.peak_bytes == sum(items.values()) < 2*1024**3
         assert items['csv_payload_and_text'] >= 6*6*1024**2
@@ -362,13 +360,13 @@ def test_plan_certificate_cannot_be_mutated_to_change_later_admission():
     from qsim.josim_models import JoSIMRequest
 
     request = JoSIMRequest(netlist=minimal())
-    original = request._certified_allocation_plan()
-    altered = request._certified_allocation_plan()
+    original = request.admission_plan()
+    altered = request.admission_plan()
     altered.coefficient_plan['binary_sha256'] = '0'*64
     altered.coefficient_plan['patched_source_sha256']['src/Simulation.cpp'] = '0'*64
     altered.dimensions['native_dimension_upper_bound'] = 800
-    assert request._certified_allocation_plan() == original
-    assert request._certified_allocation_plan() != altered
+    assert request.admission_plan() == original
+    assert request.admission_plan() != altered
 
 
 def test_native_projection_preserves_canonical_request_and_duplicate_trace_positions():
@@ -472,3 +470,33 @@ def test_full_public_byte_cap_can_expand_only_into_fixed_native_byte_cap():
     assert all(entry['scale'] == 1 and entry['rewritten'] for entry in info['trace_projection'])
     with pytest.raises(ValueError):
         JoSIMRequest(netlist='*\n'+text)
+
+
+def test_final_admission_is_solver_and_filesystem_free(monkeypatch):
+    import subprocess
+    import sys
+    from qsim.josim_models import JoSIMRequest
+
+    request = JoSIMRequest(netlist=minimal())
+    before = request.canonical_envelope()
+    imported_before = set(sys.modules)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('pure admission must not access runtime files or processes')
+    monkeypatch.setattr(Path, 'open', forbidden)
+    monkeypatch.setattr(subprocess, 'run', forbidden)
+    plan = request.admission_plan()
+    assert plan.peak_bytes < 2*1024**3
+    assert request.canonical_envelope() == before
+    assert not {'sky', 'qutip', 'scqubits'} & (set(sys.modules) - imported_before)
+
+
+def test_final_admission_does_not_bypass_native_binary_verification(tmp_path, monkeypatch):
+    from qsim import josim_adapter
+    from qsim.josim_models import JoSIMRequest
+
+    fake = tmp_path/'josim-cli'
+    fake.write_bytes(b'not the sealed native executable')
+    monkeypatch.setattr(josim_adapter, '_BINARY', fake)
+    request = JoSIMRequest(netlist=minimal())
+    with pytest.raises(ValueError, match='binary identity mismatch'):
+        josim_adapter.run_josim(request, request.admission_plan(), execution_context={'backend':'cpu'})

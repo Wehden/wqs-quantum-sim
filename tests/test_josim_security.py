@@ -61,7 +61,7 @@ def test_validator_module_has_no_native_or_process_imports():
                    for node in ast.walk(tree))
 
 
-def test_request_rejection_and_missing_certificate_never_invoke_native_process(monkeypatch):
+def test_request_rejection_and_sealed_admission_never_invoke_native_process(monkeypatch):
     import subprocess
     from qsim.josim_models import JoSIMRequest
 
@@ -75,8 +75,7 @@ def test_request_rejection_and_missing_certificate_never_invoke_native_process(m
     request = JoSIMRequest(netlist=BASE)
     assert request.canonical_envelope()['engine'] == 'josim'
     assert request._certified_allocation_plan().peak_bytes < 2*1024**3
-    with pytest.raises(ValueError, match='resource_limit'):
-        request.admission_plan()
+    assert request.admission_plan() == request._certified_allocation_plan()
 
 
 def test_request_model_has_only_api_safe_imports():
@@ -105,17 +104,17 @@ def test_private_candidate_certificate_does_not_enable_any_runtime_binary(binary
     monkeypatch.setattr(josim_adapter, '_BINARY_SHA256', binary_digest)
     monkeypatch.setattr(josim_adapter.subprocess, 'run',
                         lambda *a, **k: pytest.fail('uncertified runtime launched'))
-    with pytest.raises(ValueError, match='production worker packaging'):
+    with pytest.raises(ValueError, match='native_failure: JoSIM binary identity differs from certificate'):
         josim_adapter.run_josim(request, plan, execution_context={})
 
 
-def test_current_source_voltage_trace_debt_preserves_request_and_stays_gated():
+def test_current_source_voltage_projection_preserves_request_and_sealed_admission():
     from qsim.josim_models import JoSIMRequest
 
     request = JoSIMRequest(netlist=BASE.replace('.print DEVV B1', '.print DEVV I1'))
     envelope = request.canonical_envelope()
     assert validate_josim_netlist(request.netlist)[1]['trace_names'] == ['V(I1)']
     assert request._certified_allocation_plan().result.arrays[1].shape[1] == 1
-    with pytest.raises(ValueError, match='production worker packaging'):
-        request.admission_plan()
+    plan = request.admission_plan()
+    assert plan.coefficient_plan['trace_projection'] == validate_josim_netlist(request.netlist)[1]['trace_projection']
     assert request.canonical_envelope() == envelope

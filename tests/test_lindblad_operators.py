@@ -123,7 +123,7 @@ def test_native_boundary_rechecks_mutated_request(change):
 
 def test_public_builder_cannot_use_synthetic_certificate():
     req = request()
-    with pytest.raises(ValueError, match='native allocation certificate is unavailable'):
+    with pytest.raises(ValueError, match='allocation plan differs'):
         build_lindblad_model(req, staged(req).allocation_plan)
 
 

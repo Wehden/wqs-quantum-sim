@@ -33,12 +33,34 @@
           "name": "serialize_physics_result",
           "kind": "function",
           "signature": "serialize_physics_result(result: PhysicsExecutionResult, plan: ResultPlan) -> tuple[dict, str]"
+        },
+        {
+          "name": "allocation_plan_digest",
+          "kind": "function",
+          "signature": "allocation_plan_digest(plan: AllocationPlan) -> str"
+        },
+        {
+          "name": "validate_execution_context",
+          "kind": "function",
+          "signature": "validate_execution_context(context: Mapping, plan: AllocationPlan, *, expected_profile: Mapping) -> None"
+        },
+        {
+          "name": "validate_physics_callback",
+          "kind": "function",
+          "signature": "validate_physics_callback(raw: bytes, summary: Mapping, request: Mapping, context: Mapping) -> None"
+        },
+        {
+          "name": "make_execution_context",
+          "kind": "function",
+          "signature": "make_execution_context(plan: AllocationPlan, profile: Mapping) -> dict"
         }
       ],
       "internal_only": [
         "_validate_array",
         "_validate_metadata",
-        "_npz_bytes"
+        "_npz_bytes",
+        "_stored_result_plan",
+        "_context_shape"
       ]
     },
     "qsim/lindblad_models.py": {
@@ -53,7 +75,9 @@
       "internal_only": [
         "_finite",
         "_shape_products",
-        "_physical_checks"
+        "_physical_checks",
+        "_request_storage_bytes",
+        "_operator_storage_bytes"
       ]
     },
     "qsim/scqubits_models.py": {

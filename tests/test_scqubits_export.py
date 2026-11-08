@@ -186,10 +186,10 @@ def test_largest_all_operator_export_fits_finite_json_and_exact_numeric_plan():
     lindblad_spectrum(result.metadata['lindblad_request'])
 
 
-def test_public_export_remains_certificate_gated(monkeypatch):
+def test_export_rejects_a_missing_or_changed_allocation_plan_before_runtime(monkeypatch):
     monkeypatch.setattr(adapter, '_native_constructor', lambda _: pytest.fail('export before certificate'))
     monkeypatch.setattr(adapter, '_verify_runtime_identity', lambda: pytest.fail('runtime before admission'))
-    with pytest.raises(ValueError, match='export allocation certificate is unavailable'):
+    with pytest.raises(ValueError, match='allocation plan'):
         adapter.run_scqubits(request(), None, execution_context={})
 
 
@@ -256,3 +256,78 @@ def test_exported_operators_drive_real_lindblad_expectations_in_the_same_basis(q
         expected = [np.vdot(psi, exported.arrays[name]@psi) for name in req.operators]
         np.testing.assert_allclose(evolved.arrays['expectations'][index], expected, atol=1e-7)
     assert exported.metadata['units']['removed_ground_energy'] == 'GHz'
+
+
+@pytest.mark.parametrize('qubit', PARAMETERS)
+def test_export_admission_charges_shared_eigensystem_and_retained_json(qubit):
+    req = request(qubit)
+    plan = req.admission_plan()
+    charges = dict(plan.allocation_items)
+    assert charges['operator_constructor'] > 0
+    assert charges['operator_validation_arrays'] > 0
+    assert charges['operator_transform_arrays'] > 0
+    assert charges['export_json_matrix_objects'] > 0
+    assert charges['export_energy_shift_and_diagonal_arrays'] > 0
+    assert plan.peak_bytes == sum(charges.values()) <= 2*1024**3
+    assert plan.coefficient_plan['export_certificate']
+    assert plan.result == req._result_plan(req._physical_checks())
+
+
+@pytest.mark.parametrize('qubit', PARAMETERS)
+def test_certified_export_executes_without_an_admission_bypass(qubit):
+    req = request(qubit)
+    plan = req.admission_plan()
+    result = adapter.run_scqubits(req, plan, execution_context={'backend':'cpu'})
+    _, artifact = serialize_physics_result(result, plan.result)
+    assert result.metadata['policy_revision'] == plan.policy_revision
+    assert result.work['eigensystem_calls'] == '1'
+    assert result.work['operator_transforms'] == str(len(req.operators))
+    with np.load(io.BytesIO(base64.b64decode(artifact)), allow_pickle=False) as arrays:
+        assert list(arrays.files) == [*result.arrays, 'metadata_json']
+        assert not any(arrays[name].dtype.hasobject for name in arrays.files)
+
+
+def test_export_certificate_binds_source_and_python_container_layouts():
+    import hashlib
+    from pathlib import Path
+    import struct
+    import sys
+    from qsim.scqubits_models import _CPU_CERTIFICATE, _EXPORT_CERTIFICATE
+    manifest = {key:value for key,value in _EXPORT_CERTIFICATE.items() if key!='digest'}
+    assert hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(',',':')).encode()).hexdigest() == _EXPORT_CERTIFICATE['digest']
+    assert _EXPORT_CERTIFICATE['native_certificate'] == _CPU_CERTIFICATE['digest']
+    assert hashlib.sha256(Path(adapter.__file__).read_bytes()).hexdigest() == _EXPORT_CERTIFICATE['adapter_sha256']
+    assert sys.implementation.name == 'cpython' and sys.version_info[:2] == (3,12)
+    assert struct.calcsize('P') == 8 and sys.getsizeof(0.) == 24
+    assert sys.getsizeof({'re':0.,'im':0.}) <= 184 and sys.getsizeof([]) == 56
+    for count in range(1,33):
+        value=[float(n) for n in range(count)]
+        assert sys.getsizeof(value) <= 56+8*(count+(count>>3)+6)
+
+
+@pytest.mark.parametrize('qubit', PARAMETERS)
+def test_every_export_operator_count_has_exact_maximum_metadata_boundary(qubit):
+    from qsim.scqubits_models import _OPERATORS
+    maximum_params={**PARAMETERS[qubit]}
+    maximum_params.update({'cutoff':512} if qubit=='Fluxonium' else
+                          {'ncut':10 if qubit=='FluxQubit' else 255})
+    for count in range(len(_OPERATORS[qubit])+1):
+        accepted=[]
+        for levels in range(1,33):
+            req=ScqubitsRequest(schema_version=1,operation='export_for_lindblad',evals_count=levels,
+                model={'qubit':qubit,'params':maximum_params},operators=list(_OPERATORS[qubit][:count]))
+            try:plan=req.admission_plan()
+            except ValueError as error:
+                assert 'inline export exceeds the metadata envelope' in str(error)
+            else:accepted.append((levels,req,plan))
+        levels,req,plan=accepted[-1]
+        assert levels < 32 and plan.peak_bytes <= 2*1024**3
+        assert plan.dimensions['raw_basis'] in (511,512,441)
+        result=adapter.run_scqubits(req,plan,execution_context={'backend':'cpu'})
+        _,artifact=serialize_physics_result(result,plan.result)
+        with np.load(io.BytesIO(base64.b64decode(artifact)),allow_pickle=False) as arrays:
+            assert arrays['hamiltonian'].shape == (levels,levels)
+            assert np.isfinite(arrays['hamiltonian']).all()
+            assert len(base64.b64decode(artifact)) <= plan.result.npz_upper_bytes
+        assert result.work['eigensystem_calls']=='1'
+        assert result.work['operator_transforms']==str(count)

@@ -45,11 +45,15 @@ def test_canonical_grid_defaults_and_explicit_route_identity():
 @pytest.mark.parametrize('operation,solver', [('evolve', 'se'), ('evolve', 'me'),
     ('evolve', 'mc'), ('propagator', 'se'), ('propagator', 'me'),
     ('spectrum', None), ('steadystate', None)])
-def test_all_operation_cells_are_staged_fail_closed(operation, solver):
+def test_all_operation_cells_have_source_bound_cpu_plans(operation, solver):
     request = LindbladRequest(**payload(operation, solver))
     assert request._physical_checks() == 2
-    with pytest.raises(ValueError, match='frozen Lindblad native allocation certificate'):
-        request.admission_plan()
+    plan = request.admission_plan()
+    assert plan.policy_revision == 'lindblad-cpu-vern7-evd-svd-v1'
+    assert plan.peak_bytes == sum(value for _, value in plan.allocation_items) <= 2*1024**3
+    assert plan.coefficient_plan['runtime_files']
+    assert plan.coefficient_plan['rk_stage_buffers'] == 16
+    assert plan.result == request._result_plan(2)
 
 
 @pytest.mark.parametrize('operation,solver', [('evolve', 'se'), ('evolve', 'me'), ('evolve', 'mc'),
@@ -139,8 +143,7 @@ def test_stationary_observables_and_internal_density_independent_of_output():
     body.update(return_state=False, observables=[{'name': 'n', 'operator': product()}])
     request = LindbladRequest(**body)
     assert [(item.name, item.shape) for item in request._result_plan(2).arrays] == [('expectations', (1,))]
-    with pytest.raises(ValueError, match='certificate'):
-        request.admission_plan()
+    assert request.admission_plan().result == request._result_plan(2)
 
 
 @pytest.mark.parametrize('solver,size', [('se', 2), ('me', 4)])
@@ -572,3 +575,153 @@ def test_coherent_component_magnitude_overflow_has_semantic_pointer():
     with pytest.raises(ValueError, match='coherent occupation') as caught:
         request.admission_plan()
     assert caught.value.pointer == '/initial_state/modes/q/amplitude'
+
+
+def test_plan_identity_survives_json_defaults_and_object_aliasing():
+    body = payload()
+    body['model']['hamiltonian'] = [{'coefficient': .01, 'operator': product('n')}] * 4
+    first = LindbladRequest(**body)
+    canonical = first.canonical_envelope()
+    second = LindbladRequest(**json.loads(json.dumps(canonical)))
+    assert first.admission_plan() == second.admission_plan()
+    assert LindbladRequest(**second.canonical_envelope()).admission_plan() == second.admission_plan()
+
+
+def test_cpython_owner_bounds_cover_fixed_schema_container_abi():
+    from qsim.lindblad_models import _Complex
+    model = _Complex(re=1., im=2.)
+    overhead = sys.getsizeof(model)+3*sys.getsizeof(None)
+    for length in range(33):
+        data = {str(i): i for i in range(length)}
+        fields = set(data)
+        assert sys.getsizeof(data)+sys.getsizeof(fields)+overhead <= 512+256*length
+    for length in (0, 1, 32, 256, 65536):
+        assert sys.getsizeof([None]*length) <= 64+16*length
+    for text in ('ascii', '\u00e9'*64, '\U0001f642'*64):
+        assert sys.getsizeof(text) <= 80+4*len(text)
+
+
+def test_frozen_lapack_queries_cover_every_admitted_matrix_size():
+    from scipy.linalg.lapack import get_lapack_funcs
+    heevd = get_lapack_funcs('heevd_lwork', dtype=complex)
+    gesdd = get_lapack_funcs('gesdd_lwork', dtype=complex)
+    for size in range(1, 257):
+        for vectors in (0, 1):
+            work, integer, real, info = heevd(size, compute_v=vectors)
+            assert info == 0
+            assert work.real <= size*size+33*size+1
+            assert real <= 2*size*size+5*size+1
+            assert integer <= 5*size+3
+    for size in range(1, 1025):
+        work, info = gesdd(size, size, compute_uv=0)
+        assert info == 0 and work.real <= 66*size
+
+
+def test_segment_operator_copies_are_charged_and_large_live_owners_refused():
+    body = payload()
+    body['model']['modes'][0]['dimension'] = 32
+    body['model']['drives'] = [{'operator': product('n'), 'amplitude': .001,
+                              'envelope': {'shape': 'constant'}}]
+    one = LindbladRequest(**body).admission_plan()
+    sampled = body['model']['drives'][0]['envelope']
+    sampled.update(shape='sampled', interpolation='linear', times=[i/10000 for i in range(10001)],
+                   values=[1.]*10001)
+    with pytest.raises(ValueError, match='certified Lindblad allocation exceeds'):
+        LindbladRequest(**body).admission_plan()
+    sampled['times'], sampled['values'] = [0., .5, 1.], [1., 1., 1.]
+    two = LindbladRequest(**body).admission_plan()
+    assert two.dimensions['coefficient_segments'] == 2
+    assert dict(two.allocation_items)['retained_segment_qobjevo_terms'] == 2*dict(one.allocation_items)['retained_segment_qobjevo_terms']
+    assert dict(two.allocation_items)['vern7_state_stage_and_validation_owners'] == 2*dict(one.allocation_items)['vern7_state_stage_and_validation_owners']
+
+
+def test_native_provenance_is_frozen_and_copied_per_plan():
+    from importlib.metadata import distribution
+    from pathlib import Path
+    import hashlib
+    first = LindbladRequest(**payload()).admission_plan()
+    for item in first.coefficient_plan['runtime_files']:
+        assert hashlib.sha256(Path(distribution(item['distribution']).locate_file(item['path'])).read_bytes()).hexdigest() == item['sha256']
+    first.coefficient_plan['runtime_files'][0]['sha256'] = 'tampered'
+    second = LindbladRequest(**payload()).admission_plan()
+    assert second.coefficient_plan['runtime_files'][0]['sha256'] != 'tampered'
+
+
+def test_native_tensor_representation_matches_operator_owner_certificate():
+    import qutip as qt
+    from qsim.lindblad_models import _ProductOperator, _MatrixOperator, _operator_storage_bytes
+    from qsim.lindblad_model import _operator
+    modes = [{'name': str(i), 'kind': 'oscillator', 'dimension': 2} for i in range(8)]
+    request = LindbladRequest(schema_version=1, operation='spectrum', evals_count=1,
+                             model={'modes': modes})
+    product_operator = _ProductOperator(kind='product', factors={str(i): 'x' for i in range(8)})
+    native = _operator(request, product_operator)
+    assert isinstance(native.data, qt.core.data.Dia)
+    stored = native.data.as_scipy(full=True)
+    assert stored.data.nbytes+stored.offsets.nbytes < _operator_storage_bytes(product_operator, request.model.modes)
+    dense_request = LindbladRequest(schema_version=1, operation='spectrum', evals_count=1,
+        model={'modes': [{'name':'q','kind':'oscillator','dimension':32}],
+               'matrices': {'h': np.eye(32).tolist()}})
+    named = _MatrixOperator(kind='matrix',name='h')
+    native = _operator(dense_request,named)
+    assert isinstance(native.data,qt.core.data.Dense)
+    assert native.full().nbytes < _operator_storage_bytes(named,dense_request.model.modes)
+    assert qt.spre(native).full().nbytes < _operator_storage_bytes(named,dense_request.model.modes,superoperator=True)
+
+
+def test_overbudget_raw_complex_matrices_refused_before_leaf_expansion(monkeypatch):
+    from pydantic import model_validator
+    from qsim import lindblad_models as models
+    constructed = []
+
+    class InstrumentedComplex(models._Complex):
+        @model_validator(mode='before')
+        @classmethod
+        def _observe_construction(cls, value):
+            constructed.append(True)
+            raise RuntimeError('complex leaf constructed')
+
+    class InstrumentedModel(models._Model):
+        matrices: dict[str, list[list[InstrumentedComplex]]]
+
+    class InstrumentedRequest(LindbladRequest):
+        model: InstrumentedModel
+
+    # Prove the leaf instrumentation is active without constructing a large tree.
+    ordinary = payload('spectrum', None)
+    ordinary['model']['matrices'] = {'one': [[0.]]}
+    with pytest.raises(RuntimeError, match='complex leaf constructed'):
+        InstrumentedRequest(**ordinary)
+    constructed.clear()
+    matrix = [[0]*256 for _ in range(256)]
+    large = payload('spectrum', None)
+    large['model']['modes'][0]['dimension'] = 256
+    large['model']['matrices'] = {'m'+str(index): matrix for index in range(32)}
+    encoded = json.dumps(large, separators=(',', ':'))
+    assert len(encoded.encode()) < 5*1024**2
+    large = json.loads(encoded)
+    monkeypatch.setattr(models.np, 'zeros', lambda *a, **k: pytest.fail('native array before input-owner check'))
+    with pytest.raises(ValueError, match='certified Lindblad input owners exceed'):
+        InstrumentedRequest(**large)
+    assert not constructed
+    with pytest.raises(ValueError, match='certified Lindblad input owners exceed'):
+        LindbladRequest(**large)
+
+
+def test_complex_cell_preflight_is_only_an_existing_plan_lower_bound():
+    from qsim.lindblad_models import _request_storage_bytes
+    cell = _request_storage_bytes({'re':0.,'im':0.})
+    assert cell == 1328
+    for dimension in (1,2,4,16):
+        body = payload('spectrum', None)
+        body['evals_count'] = 1
+        body['model']['modes'][0]['dimension'] = dimension
+        body['model']['matrices'] = {'a': [[0.]*dimension for _ in range(dimension)]}
+        request = LindbladRequest(**body)
+        canonical = request.canonical_envelope()
+        plan = request.admission_plan()
+        cells = dimension*dimension
+        assert cells*cell <= _request_storage_bytes(canonical)
+        assert 4*cells*cell <= dict(plan.allocation_items)['request_models_canonical_and_child_handoff']
+        assert plan.peak_bytes <= 2*1024**3
+        assert LindbladRequest(**json.loads(json.dumps(canonical))).admission_plan() == plan

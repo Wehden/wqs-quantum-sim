@@ -31,10 +31,12 @@ def ceiling(request_model):
     return request_model._certified_allocation_plan()
 
 
-def test_public_entry_remains_closed(request_model, ceiling, monkeypatch):
+def test_public_entry_refuses_changed_admission_plan_before_native(request_model, ceiling, monkeypatch):
     monkeypatch.setattr(adapter.subprocess, 'run', lambda *a, **k: pytest.fail('native launched'))
-    with pytest.raises(ValueError, match='certificate is unavailable'):
-        adapter.run_josim(request_model, ceiling, execution_context={})
+    from dataclasses import replace
+    altered = replace(ceiling, policy_revision='unverified-policy')
+    with pytest.raises(ValueError, match='admission plan mismatch'):
+        adapter.run_josim(request_model, altered, execution_context={})
 
 
 def test_real_sfq_and_exact_serialization(request_model, ceiling, monkeypatch):

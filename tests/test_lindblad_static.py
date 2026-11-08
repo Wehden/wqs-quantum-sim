@@ -175,7 +175,7 @@ def test_static_drives_refused_before_native_construction(operation, monkeypatch
 def test_public_static_admission_stays_certificate_gated(operation, monkeypatch):
     req = request(operation)
     monkeypatch.setattr(adapter, 'build_lindblad_model', lambda *a: pytest.fail('native allocation'))
-    with pytest.raises(ValueError, match='certificate'):
+    with pytest.raises(ValueError, match='execution_policy_mismatch.*allocation plan'):
         adapter.run_lindblad(req, None, execution_context={})
 
 

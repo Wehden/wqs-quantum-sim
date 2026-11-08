@@ -62,7 +62,7 @@ def test_explicit_generic_canonical_replay_and_context(client,monkeypatch):
     assert conflict.status_code==409
     owner=client.post('/api/jobs/scqubits',headers=headers(who='bob'),json=scqubits())
     assert owner.status_code==503
-    assert client.get('/internal/jobs/'+identifier,headers=callback(identifier)).json()==json.loads(row['request'])
+    assert client.get('/internal/jobs/'+identifier,headers=callback(identifier)).json()=={'request':json.loads(row['request']),'execution_context':ctx}
 
 
 def test_generic_key_optional_explicit_key_required(client,monkeypatch):
@@ -102,13 +102,14 @@ def test_nested_pointer_does_not_include_discriminator_label(client,monkeypatch)
     ('josim',dict(schema_version=1,netlist=Path('tests/fixtures/physics/josim/sfq.cir').read_text())),
     ('scqubits',{**scqubits(),'operation':'export_for_lindblad','operators':['n_operator']}),
 ])
-def test_missing_certificates_are_refused_before_job(client,monkeypatch,engine,body):
+def test_certified_cpu_operations_enqueue(client,monkeypatch,engine,body):
     enabled(monkeypatch)
     result=client.post('/api/jobs/'+engine,headers=headers(),json=body)
-    assert result.status_code==422,result.text
-    assert 'pointer' in result.json()['detail'][0]
-    assert 'resource_limit:' in result.json()['detail'][0]['msg']
-    assert client.get('/api/jobs',headers=auth()).json()==[]
+    assert result.status_code==202,result.text
+    assert result.json()['status']=='QUEUED'
+    with store.connect() as db:
+        ctx=json.loads(db.execute('SELECT profile_json FROM job_dispatch').fetchone()[0])
+        assert ctx['version']==2 and ctx['result_plan']['arrays']
 
 
 def test_maintenance_holds_new_work_but_replays_old(client,monkeypatch):
@@ -255,3 +256,34 @@ def test_explicit_generic_mismatches_have_pointer_and_no_job(client,monkeypatch)
     assert result.status_code==422
     assert '/input_format' in [item['pointer'] for item in result.json()['detail']]
     assert not client.get('/api/jobs',headers=auth()).json()
+
+
+def test_physics_callback_validates_stored_contract_before_success(client,monkeypatch):
+    import base64
+    import io
+    import numpy as np
+    from qsim.physics_results import PhysicsExecutionResult,serialize_physics_result
+    from qsim.physics_submission import normalize_physics_submission
+    enabled(monkeypatch)
+    response=client.post('/api/jobs/scqubits',headers=headers(),json=scqubits())
+    identifier=response.json()['id']
+    model=normalize_physics_submission(scqubits(),explicit_engine='scqubits').request
+    plan=model.admission_plan()
+    # Real serializer output for the HTTP boundary; this fixture is not a native numerical proof.
+    summary,encoded=serialize_physics_result(PhysicsExecutionResult({'eigenvalues':np.arange(4,dtype=float)},
+        {'engine':'scqubits','operation':'spectrum','schema_version':1,'backend':'cpu',
+         'precision':'float64/complex128','policy_revision':plan.policy_revision,'algorithm':plan.algorithm},{}),plan.result)
+    bad=io.BytesIO();np.savez(bad,eigenvalues=np.array([object()],dtype=object))
+    callback_url='/internal/jobs/'+identifier
+    rejected=client.post(callback_url,headers=callback(identifier),json={'status':'SUCCEEDED','summary':summary,
+        'artifact':base64.b64encode(bad.getvalue()).decode()})
+    assert rejected.status_code==422
+    assert client.get('/api/jobs/'+identifier,headers=auth()).json()['status']=='QUEUED'
+    assert not (settings.DATA/identifier/'result.npz').exists()
+    payload={'status':'SUCCEEDED','summary':summary,'artifact':encoded}
+    assert client.post(callback_url,headers=callback(identifier),json=payload).status_code==200
+    assert client.get('/api/jobs/'+identifier+'/result',headers=auth()).content==base64.b64decode(encoded)
+    # Terminal callback replay does not re-run a newly changed admission policy.
+    with store.connect() as db:db.execute("UPDATE job_dispatch SET profile_json='{}' WHERE job_id=?",(identifier,))
+    assert client.post(callback_url,headers=callback(identifier),json=payload).status_code==200
+    assert client.post(callback_url,headers=callback(identifier),json={'status':'FAILED','error':'late'}).status_code==409

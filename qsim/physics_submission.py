@@ -1,7 +1,6 @@
 """Solver-free physics normalization, canonical identity and admission."""
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
-import hashlib
+from dataclasses import dataclass
 import json
 
 from pydantic import ValidationError
@@ -9,7 +8,7 @@ from . import settings
 from .lindblad_models import LindbladRequest
 from .scqubits_models import ScqubitsRequest
 from .josim_models import JoSIMRequest
-from .physics_results import AllocationPlan
+from .physics_results import AllocationPlan, make_execution_context
 
 __all__ = ('NormalizedPhysicsRequest', 'ValidatedPhysicsRequest', 'normalize_physics_submission',
            'admit_physics_request', 'canonical_physics_request', 'physics_schema', 'physics_capabilities')
@@ -52,7 +51,8 @@ def _physics_validation_error(error, payload=None):
                 current = current[part]
             else:
                 current = None
-        pointer = getattr(error, 'pointer', '/'+'/'.join(path) if path else '')
+        pointer = getattr(item.get('ctx',{}).get('error'),'pointer',
+                          getattr(error,'pointer','/'+'/'.join(path) if path else ''))
         details.append({'type': item['type'], 'loc': ['body', *loc],
                         'msg': item['msg'], 'pointer': pointer})
     result = ValueError('invalid physics request')
@@ -93,12 +93,9 @@ def admit_physics_request(normalized: NormalizedPhysicsRequest, *, policy: Mappi
             raise ValueError('resource_limit: physics operation is not enabled by server policy')
         profile = settings.physics_execution_profile(request.engine, request.operation,
                                                       admission_policy_revision=plan.policy_revision)
-        plan_digest = hashlib.sha256(json.dumps(asdict(plan),sort_keys=True,separators=(',', ':'),
-                                                allow_nan=False).encode()).hexdigest()
     except ValueError as error:
         raise _physics_validation_error(error, normalized.canonical_envelope) from None
-    context = {'version': 1, 'worker_profile': profile, 'admission_policy_revision': plan.policy_revision,
-               'allocation_plan_digest': plan_digest, 'algorithm': plan.algorithm}
+    context = make_execution_context(plan,profile)
     return ValidatedPhysicsRequest(normalized, plan, context)
 
 

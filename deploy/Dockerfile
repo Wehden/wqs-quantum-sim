@@ -25,6 +25,9 @@ RUN printf 'cmake==3.28.3 --hash=sha256:d3bc42bf54ea3d64e5d81eb31275076817507cf4
 COPY LICENSE /build/WQS-LICENSE
 COPY deploy/physics/josim-build.sh vendor/josim/bounded-history.patch /build/
 RUN bash /build/josim-build.sh /out
+FROM josim-build AS physics-policy
+COPY qsim/settings.py /build/physics-settings.py
+RUN python3 -I -c "import json,runpy; p=runpy.run_path('/build/physics-settings.py')['_certified_physics_profiles']; open('/out/share/physics-policy.json','w').write(json.dumps(p,sort_keys=True))"
 
 FROM python:3.12-bookworm@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0 AS worker
 COPY --from=josim-build /out/ /opt/josim/
@@ -38,6 +41,8 @@ COPY qsim/__init__.py qsim/worker.py qsim/qasm_adapter.py qsim/aer_adapter.py /o
 COPY qsim/physics_results.py qsim/lindblad_models.py qsim/lindblad_model.py qsim/lindblad_adapter.py \
      qsim/scqubits_models.py qsim/scqubits_adapter.py qsim/josim_models.py \
      qsim/josim_validation.py qsim/josim_adapter.py /opt/qsim/qsim/
+COPY --from=physics-policy /out/share/physics-policy.json /opt/josim/share/physics-policy.json
+RUN /opt/qsim-venv/bin/python -I -c "import hashlib,json,pathlib; p=pathlib.Path('/opt/josim/share/physics-policy.json'); m=json.loads(p.read_text()); m['source_sha256']={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(pathlib.Path('/opt/qsim/qsim').glob('*.py'))}; p.write_text(json.dumps(m,sort_keys=True))"
 COPY --chmod=755 deploy/worker/tail /usr/local/bin/tail
 ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 CMD ["sleep", "infinity"]
