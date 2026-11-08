@@ -42,14 +42,14 @@ def init():
             intent TEXT, intent_at REAL, retry_pending INTEGER NOT NULL DEFAULT 0,
             retry_after REAL NOT NULL DEFAULT 0)""")
         columns = {r['name'] for r in db.execute('PRAGMA table_info(job_dispatch)')}
-        for name, declaration in {'cluster':'TEXT','method':"TEXT NOT NULL DEFAULT 'launch'"}.items():
+        for name, declaration in {'cluster':'TEXT','method':"TEXT NOT NULL DEFAULT 'launch'",'profile_json':'TEXT'}.items():
             if name not in columns:
                 db.execute(f'ALTER TABLE job_dispatch ADD COLUMN {name} {declaration}')
         db.execute("""CREATE TABLE IF NOT EXISTS worker_pool (
             cluster TEXT PRIMARY KEY, job_id TEXT UNIQUE, created REAL NOT NULL,
             released REAL, retired INTEGER NOT NULL DEFAULT 0)""")
         columns = {r["name"] for r in db.execute("PRAGMA table_info(worker_pool)")}
-        for name, declaration in {'image': 'TEXT', 'retire_check_id': 'TEXT',
+        for name, declaration in {'image': 'TEXT', 'profile_json': 'TEXT', 'retire_check_id': 'TEXT',
                                   'retire_down_id': 'TEXT', 'retire_intent_at': 'REAL',
                                   'retire_retry_after': 'REAL NOT NULL DEFAULT 0'}.items():
             if name not in columns:

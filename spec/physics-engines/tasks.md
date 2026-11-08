@@ -832,8 +832,9 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence is now proven by TASK-036. Final admission certification remains separate. |
 | TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
 | TASK-022 | Complete private isolated-worker integration, merged through PR #76 at `439c94d`. Main CI and existing-service CD/backup/acceptance passed; public physics admission remains closed. |
-| TASK-023 | CPU worker packaging and the approved Bookworm JoSIM repin are implemented with constrained-image and frozen-reference proofs below; awaiting PR review, CI and merge. |
-| TASK-024 through TASK-034 | Remaining API/profile integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. TASK-026 is the next dependency-ready implementation lane after TASK-023 merges. |
+| TASK-023 | Complete CPU worker packaging and approved Bookworm JoSIM repin, merged through PR #77 at `f18253a`; the constrained-image and frozen-reference receipt below remains authoritative. |
+| TASK-026 | Durable CPU profiles, exact-profile warm reuse and additive dispatch/pool storage are implemented in the receipt below; pending review, CI and merge. |
+| TASK-024/025 and TASK-027 through TASK-034 | API admission/context integration, lifecycle safety, final certificates, GPU decisions and G2/G3/G4 acceptance remain required before activation. TASK-024 follows TASK-026; no public physics activation is implied. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
 
@@ -1558,3 +1559,64 @@ production rollout performed by this task. Physics admission remains closed;
 TASK-026 profile/storage integration precedes TASK-024 API integration. Final
 native admission certificates and G2/G3/G4 evidence remain required. Existing
 credentials, unrelated workloads and backup/release gates are unchanged.
+
+
+### TASK-026 durable profile and pool receipt, 2026-11-08
+
+PR #77 is merged at main `f18253ae9c0c6db73f629d2413064e72da26fb90`.
+Its worker-image implementation head `65df0ecb482a775c3977bc427e60291540e56aa0`
+is an ancestor of main. This task starts from that main in an isolated worktree.
+The TASK-023 implementation is now merged; its earlier pending-review labels
+are historical checkpoints.
+
+The pure settings resolver now returns a fresh `physics-cpu-v1` worker profile
+with an immutable image digest, scheduling infrastructure, 2 CPUs/4 GiB,
+nonroot uid 1000, 3-GiB child AS, 12-MiB file limit, serial native threads,
+float64/complex128 precision and explicit placement/algorithm-set revisions.
+It imports neither native numerical packages nor SkyPilot. The registry covers
+only the current certified scqubits spectrum/matrix-element operation policy.
+Missing Lindblad, JoSIM and export admission certificates remain refusals.
+GPU dispatch and CPU fallback are unavailable until a reviewed production
+profile and equivalent numerical admission exist; the discovery-only 8-GiB GPU
+profile is not promoted here.
+
+Existing `job_dispatch` and `worker_pool` tables gain nullable `profile_json`
+TEXT columns through their existing additive migration path. Legacy jobs/pool
+ownership are preserved; there is no jobs-table rewrite. A dispatch context
+contains the worker tuple plus admission-policy revision, allocation-plan digest
+and per-job algorithm. Pool rows store only the worker tuple. Complete canonical
+profile fingerprints control physics warm reuse, so per-job allocation or
+algorithm choices do not prevent compatible reuse. Missing/corrupt pool metadata
+never authorizes physics reuse, and circuit workers retain their legacy
+compatibility lane. Busy or retiring workers remain unavailable for reuse.
+
+The controller validates the stored context before claiming work. It records
+the pool assignment and launch intent transactionally before calling SkyPilot,
+and builds resources/image from the persisted profile rather than rollout-time
+defaults. Physics runs under the packaged qsim account, preserving only named
+outer-worker callback/context and native-thread environment variables through
+sudo. Actual launch, execution and teardown still use the existing SkyPilot
+SDK. Lost acknowledgements retain their original intent for reconciliation;
+capacity failure tears down partial placement and queues the same identity with
+its original profile. Cancellation retains that context until native cleanup
+settles. No global queue cap, deadline or direct GPU/host placement is added.
+
+Verification: 29 new placement tests failed before implementation. The final
+placement/dispatch/real-installed-SDK group passes 71 tests. Including existing
+transaction, release-control and backup/restore tests passes 172 tests; the
+three console tests pass, dependency compatibility and diff checks pass.
+These tests use fake SkyPilot requests plus real SDK task construction; no
+cluster allocation or production rollout was performed. The broad host suite
+hit 36 failures and four import errors, including OpenMP `static TLS block`
+exhaustion in Aer/qsim. An unchanged-main run reproduced the identical 40
+failure identifiers. The configured CI runner remains the full-suite gate;
+this host run is not reported as green.
+
+Five implementation/test files are within the six-file lease and three new
+production functions are within the ten-symbol budget. This coordinator
+checklist is included in the same PR. TASK-026 awaits review, CI and merge.
+TASK-024 must wire normalized API admission/context persistence into the same
+enqueue/idempotency transaction and complete worker-context integration/safety
+verification before activation. Final numerical certificates and G2/G3/G4
+remain open. Existing credentials, backup/release gates and unrelated workloads
+are unchanged.
