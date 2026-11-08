@@ -283,7 +283,7 @@ def test_real_current_source_voltage_projection_is_native_bitwise_exact(nodes, m
     if not candidate or not original:
         pytest.skip('Distinct real executables required for numerical projection acceptance')
     assert adapter.hashlib.sha256(Path(original).read_bytes()).hexdigest() == probe['ORIGINAL_SHA256']
-    assert adapter.hashlib.sha256(Path(candidate).read_bytes()).hexdigest() == probe['BUILD_PROVENANCE']['candidate_binary_sha256']
+    assert adapter.hashlib.sha256(Path(candidate).read_bytes()).hexdigest() == adapter._BINARY_SHA256
     a, b = nodes
     waveform = 'DC 1u' if mode == 'dc' else 'PWL(0 0 1.375p 1u 2.625p -1u 5.125p 0)'
     extra = 'R02 2 0 5\n' if b == '2' else ''
@@ -344,7 +344,7 @@ def test_real_maximum_pwl_mixed_projection_keeps_duplicate_native_columns(monkey
     outputs = []
     for index, (binary, expected_digest) in enumerate((
             (original, receipts['original_binary_sha256']),
-            (candidate, receipts['candidate_binary_sha256']),
+            (candidate, adapter._BINARY_SHA256),
             (instrumented, receipts['instrumented_binary_sha256']))):
         assert adapter.hashlib.sha256(Path(binary).read_bytes()).hexdigest() == expected_digest
         root = tmp_path / str(index)

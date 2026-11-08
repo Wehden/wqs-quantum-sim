@@ -80,7 +80,7 @@ class JoSIMRequest(BaseModel):
             'native_input_bytes': 65568, 'projection_json_bytes': 2048,
             'native_netlist_sha256': hashlib.sha256(info['native_netlist'].encode('ascii')).hexdigest(),
             'trace_projection': info['trace_projection'],
-            'binary_sha256': '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21',
+            'binary_sha256': '0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676',
             'source_commit': '02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224',
             'patch_sha256': 'eb727347b5933f7bb42c983c26ec63098e51d0d5a43fa7ceb865bfa28ce768ae',
             'patched_source_sha256': {
@@ -89,9 +89,9 @@ class JoSIMRequest(BaseModel):
                 'src/Output.cpp': 'e15afbe9799edb873f988bbe090028dbca1013dd5e2cb039483a40d53066ba13',
                 'src/Simulation.cpp': '43b309c8861369558b6722cc6d6324da1121c23b89db7a038907a7c309a1707c',
             },
-            'build_image': 'sha256:30465f32041d36dc6f3d0ac1e20fe5b856f72a25943f74829683cfc7fea61b79',
+            'build_image': 'python@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0',
             'source_date_epoch': 1792989136,
-            'compiler': 'GCC 13.3.0-6ubuntu2~24.04.1',
+            'compiler': 'g++ (Debian 12.2.0-14+deb12u1) 12.2.0',
             'build_type': 'Release -O3 -DNDEBUG',
             'phase_analysis': True, 'startup': True,
             'print_start_seconds': 0, 'fir_window_seconds': 0,
@@ -99,7 +99,7 @@ class JoSIMRequest(BaseModel):
             'child_address_space_bytes': 3*1024**3, 'child_file_bytes': 12*1024**2,
         }
         return AllocationPlan(
-            'josim-cpu-nodev-projection-v1', 'josim-phase-bounded-history-nodev-v1',
+            'josim-cpu-bookworm-nodev-v1', 'josim-phase-bounded-history-nodev-v1',
             {'output_rows_upper_bound': rows, 'trace_count': traces,
              'device_count': info['device_count'], 'node_count': info['node_count'],
              'native_dimension_upper_bound': d, 'selected_variables_upper_bound': selected},

@@ -18,13 +18,26 @@ ENV HOME=/data/controller-home
 USER 1000:1000
 CMD ["python", "-m", "qsim.controller"]
 
-FROM python:3.12-bookworm AS worker
+FROM python:3.12-bookworm@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0 AS josim-build
+RUN printf 'cmake==3.28.3 --hash=sha256:d3bc42bf54ea3d64e5d81eb31275076817507cf4a6aa07a49ffc01985cae1f09\n' > /tmp/cmake.txt \
+    && python -m pip install --no-cache-dir --no-deps --require-hashes --only-binary=:all: \
+         --index-url https://pypi.org/simple -r /tmp/cmake.txt
+COPY LICENSE /build/WQS-LICENSE
+COPY deploy/physics/josim-build.sh vendor/josim/bounded-history.patch /build/
+RUN bash /build/josim-build.sh /out
+
+FROM python:3.12-bookworm@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0 AS worker
+COPY --from=josim-build /out/ /opt/josim/
+RUN useradd --uid 1000 --create-home --shell /bin/bash qsim
 COPY --from=uv /uv /usr/local/bin/uv
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-server rsync sudo curl fuse && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/qsim
 COPY pyproject.toml uv.lock ./
 RUN UV_PROJECT_ENVIRONMENT=/opt/qsim-venv uv sync --frozen --no-dev --extra worker
 COPY qsim/__init__.py qsim/worker.py qsim/qasm_adapter.py qsim/aer_adapter.py /opt/qsim/qsim/
+COPY qsim/physics_results.py qsim/lindblad_models.py qsim/lindblad_model.py qsim/lindblad_adapter.py \
+     qsim/scqubits_models.py qsim/scqubits_adapter.py qsim/josim_models.py \
+     qsim/josim_validation.py qsim/josim_adapter.py /opt/qsim/qsim/
 COPY --chmod=755 deploy/worker/tail /usr/local/bin/tail
 ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 CMD ["sleep", "infinity"]

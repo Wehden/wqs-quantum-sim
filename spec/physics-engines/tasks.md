@@ -492,7 +492,7 @@ The owner approved the [native handoff amendment](discovery/native-handoff-amend
 - **Steps:** Build/install the pinned JoSIM executable reproducibly with verified source and runtime libraries/notices. Copy only required physics runtime modules into the existing worker target and keep API/store/controller authority out. Extend the current image smoke script for all three physical backends and every new schema family. Test startup and numerical execution with actual child limits and constrained CPU memory.
 - **Verification:** Run bash tools/ci/check-worker.sh, then explicit 2-CPU/4-GiB container checks using the selected worker tag and the existing 3-GiB/12-MiB child limits. Verify actual native version/provenance and numerical arrays, absent credentials, no unintended files and clean exit. Do not label an unconstrained host pass as image acceptance.
 - **Rollback / Backout:** Retain the last accepted worker digest and leave physics routes disabled until a compatible image is available.
-- **Change budget:** max_files=4, max_new_symbols=3, interface_policy=extend-only.
+- **Change budget:** max_files=9, max_new_symbols=3, interface_policy=extend-only.
 - **write_lease:**
 
 ```text
@@ -500,6 +500,11 @@ The owner approved the [native handoff amendment](discovery/native-handoff-amend
 ^deploy/physics/josim\-build\.sh$
 ^tests/check_worker_image\.sh$
 ^tests/test_physics_image\.py$
+^qsim/josim_models\.py$
+^qsim/josim_adapter\.py$
+^tests/test_josim_validation\.py$
+^tests/test_physics_worker\.py$
+^tests/test_josim_execution\.py$
 ```
 
 ### TASK-024: Integrate additive API routes, schemas and capabilities
@@ -826,8 +831,9 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-021 | Private native transient execution, bounded projection and matching binary/certificate verification are merged. Worker row-shape reconciliation is implemented through TASK-022 below; production packaging and public admission remain gated. |
 | TASK-035 | Complete, merged through PR #56 at `3d8cbd6`. Seven frozen original fixtures self-compare exactly. The audit establishes finite retention feasibility; patched equivalence is now proven by TASK-036. Final admission certification remains separate. |
 | TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
-| TASK-022 | Private isolated-worker integration is implemented in the receipt below and awaits review, CI and merge. |
-| TASK-023 through TASK-034 | Production packaging, remaining worker/API/profile integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. |
+| TASK-022 | Complete private isolated-worker integration, merged through PR #76 at `439c94d`. Main CI and existing-service CD/backup/acceptance passed; public physics admission remains closed. |
+| TASK-023 | CPU worker packaging and the approved Bookworm JoSIM repin are implemented with constrained-image and frozen-reference proofs below; awaiting PR review, CI and merge. |
+| TASK-024 through TASK-034 | Remaining API/profile integration, final certificates, combined-image validation and G2/G3/G4 acceptance remain required before activation. TASK-026 is the next dependency-ready implementation lane after TASK-023 merges. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
 
@@ -1434,3 +1440,121 @@ packaging/image checks follow after merge. Final native allocation certificates,
 durable profile/API integration and G2/G3/G4 remain mandatory before physics
 activation. No GPU/model/cluster allocation was launched for these local tests.
 Existing credentials, backup/release gates and unrelated workloads are unchanged.
+
+
+### TASK-023 packaging checkpoint and proposed lease amendment, 2026-11-06
+
+PR #76 is merged at main `439c94d80efa10ffc37cf893e89431d870b2a508`, including
+its original worker commit `9c5a465d0c7fd34ec951e5820d94ee37ac93322e`.
+[Main CI 42237753443](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42237753443)
+passed. [CD 42238675056](https://github.com/Wehden/wqs-quantum-sim/actions/runs/42238675056)
+passed. The deployment ledger records that exact SHA as verified, with a
+completed backup and verified acceptance for the existing circuit service.
+
+The existing exact JoSIM candidate cannot execute in the current
+`python:3.12-bookworm` worker: a read-only, network-disabled test reports missing
+GLIBC_2.38 and GLIBCXX_3.4.32. That worker has glibc 2.36. Its immutable base
+manifest is `sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0`.
+The candidate remains the frozen original acceptance artifact; do not weaken its
+identity check or label a copied incompatible binary as a deployable build.
+
+Within the existing four-file lease, packaging now includes only the required
+physics runtime modules and a locked nonroot qsim account. The numeric uid alone
+was insufficient: a fresh credential-free scqubits child raised `Could not
+determine home directory` without a passwd/home entry. The image checks use a
+bounded ephemeral user home. No API/store/controller authority is copied. These
+changes do not activate physics and are not a complete image acceptance receipt.
+Both independent package/notices and real certified scqubits child tests passed
+in the newly built Bookworm worker under nonroot 2-CPU/4-GiB constraints. The
+owned prototype image tag was removed after testing; no image was published.
+
+**Owner approved on 2026-11-07:** retain the Bookworm worker base and
+produce a reproducible compatible JoSIM build from the same pinned upstream
+commit and bounded-history patch. Preserve the KLU numerical path; exclude unused
+SuperLU/CBLAS dependencies from the production link/build where their absence is
+proven. Bundle complete corresponding native sources, applicable notices and a
+rebuild/relink recipe. Licensing/source correspondence remains a distribution
+gate, not a claim that JoSIM's MIT notice covers all dependencies.
+
+After native frozen-equivalence, representation/capacity and constrained-image
+memory proofs pass, repin the production binary/toolchain identity. Do not change
+frozen fixture outputs or silently accept a failed proof. Keep all public
+admission refusals, CPU/AS/file limits, credentials and backup/release gates.
+
+The existing TASK-023 lease cannot update the runtime identity or its two
+hardcoded positive identity tests. Extend max_files from four to eight, keeping
+the three-symbol production budget, with these additional files:
+
+```text
+^qsim/josim_models\.py$
+^qsim/josim_adapter\.py$
+^tests/test_josim_validation\.py$
+^tests/test_physics_worker\.py$
+```
+
+The original negative tests for previously measured binary identities remain
+valid and must not be replaced by a permissive check. The shared coordinator
+checklist accompanies implementation/tests in the same PR. No production
+identity file has been changed at this checkpoint. The alternative owner choice
+is to retain the old binary and review a worker-base migration separately.
+
+The owner approved this lease amendment and the verified production repin on 2026-11-07. Admission, credentials and backup gates remain unchanged.
+
+Production-repin scope reconciliation, 2026-11-07: the existing
+`tests/test_josim_execution.py` also compares its active production candidate to
+the historical Ubuntu receipt indirectly. Include this companion test in the
+same approved native-repin work (nine leased implementation/test files total).
+It now checks the sealed production digest while retaining the original binary,
+frozen fixtures and diagnostic companion as independent references. No frozen
+numerical reference or failure check is weakened.
+
+
+### TASK-023 CPU worker packaging receipt, 2026-11-07
+
+The approved Bookworm rebuild supersedes the incompatible Ubuntu production
+candidate. The upstream JoSIM commit and bounded-history patch are unchanged,
+as are all four patched numerical source hashes and frozen reference outputs.
+The production executable SHA-256 is
+`0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676`;
+its source-matched diagnostic companion is
+`aec6e2ea281a70484512285d0d6b42722e0a0e8c7fab04b657ca6736adeef209`.
+The compiler is Debian GCC 12.2.0-14+deb12u1, using the pinned Bookworm base
+recorded above. The production allocation policy revision is now
+`josim-cpu-bookworm-nodev-v1`; source-derived allocation charges, result bounds
+and child limits are unchanged.
+
+The build verifies downloaded source hashes, links the KLU long solver and
+excludes unused SuperLU/CBLAS. It packages applicable notices, complete
+corresponding native sources and an offline rebuild/relink recipe. A manifest
+records source/compiler identities, executable digests and runtime library
+hashes. Rebuilding the bundled sources in a different directory without network
+access reproduced the exact production executable digest. The diagnostic
+executable and test code are absent from the production worker.
+
+`bash tools/ci/check-worker.sh` passed the existing startup/circuit smoke checks
+and all seven new image tests. Actual cgroup limits were verified at 2 CPUs and
+4 GiB, with nonroot fresh numerical children, no network, read-only root and
+ephemeral writable directories. The children retain their 3-GiB address-space
+and 12-MiB output-file limits. Seven frozen JoSIM cases matched exactly,
+including failure diagnostics; all seven capacity cases passed with matching
+production/diagnostic results and bounded native histories. The longest
+restart case covered 264,765,429 attempted steps. Compiler representation and
+index-overflow checks passed in the actual builder environment.
+
+The image also passed maximum certified scqubits spectrum/matrix-element
+shapes for all four supported classes. Test-local private plans exercised all
+Lindblad solver/result families, scqubits export and the JoSIM SFQ result through
+real isolated children. These private numerical checks do not certify every
+Lindblad admission bound or enable any public operation. The normal scqubits
+export refusal remains enforced. Production contains no test admission switch.
+
+The focused worker/lifecycle, Lindblad, scqubits and JoSIM regression group
+passed 1,114 tests without skips using the new production executable plus the
+independent original/diagnostic references. `uv pip check` reported 148
+compatible packages. Shell syntax checks and `git diff --check` passed.
+
+TASK-023 remains pending PR review, CI and merge. No image was published or
+production rollout performed by this task. Physics admission remains closed;
+TASK-026 profile/storage integration precedes TASK-024 API integration. Final
+native admission certificates and G2/G3/G4 evidence remain required. Existing
+credentials, unrelated workloads and backup/release gates are unchanged.

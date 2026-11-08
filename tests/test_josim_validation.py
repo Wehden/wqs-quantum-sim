@@ -210,7 +210,7 @@ def test_small_output_grid_uses_fixed_bounded_history_not_internal_step_charge(s
     assert dict(plan.allocation_items)['history'] == 2397056
     assert plan.peak_bytes < 2*1024**3
     assert plan.coefficient_plan['binary_sha256'] == (
-        '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21')
+        '0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676')
 
 
 def test_numeric_node_labels_are_not_silently_merged():
@@ -309,11 +309,13 @@ def test_certificate_matches_frozen_source_charge_and_build_identity():
     plan = JoSIMRequest(netlist=minimal())._certified_allocation_plan()
     receipt = proof['BUILD_PROVENANCE']
     certificate = plan.coefficient_plan
-    assert certificate['binary_sha256'] == receipt['candidate_binary_sha256']
+    assert certificate['binary_sha256'] == '0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676'
     assert certificate['source_commit'] == receipt['upstream_commit']
-    for key in ('patch_sha256', 'patched_source_sha256', 'source_date_epoch', 'compiler', 'build_type'):
+    for key in ('patch_sha256', 'patched_source_sha256', 'source_date_epoch', 'build_type'):
         assert certificate[key] == receipt[key]
-    assert certificate['build_image'] == receipt['image']
+    assert certificate['build_image'] == 'python@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0'
+    assert certificate['compiler'] == 'g++ (Debian 12.2.0-14+deb12u1) 12.2.0'
+    assert certificate['binary_sha256'] != receipt['candidate_binary_sha256']
     assert certificate['binary_sha256'] != receipt['original_binary_sha256']
     assert certificate['binary_sha256'] != receipt['instrumented_binary_sha256']
     charge = proof['_workspace_charge']()
@@ -321,7 +323,7 @@ def test_certificate_matches_frozen_source_charge_and_build_identity():
     assert {key: items[key] for key in charge['components_bytes']} == charge['components_bytes']
     assert sum(charge['components_bytes'].values()) == 570708992
     assert plan.peak_bytes == sum(items.values()) < 2*1024**3
-    assert plan.policy_revision == 'josim-cpu-nodev-projection-v1'
+    assert plan.policy_revision == 'josim-cpu-bookworm-nodev-v1'
     assert plan.algorithm == 'josim-phase-bounded-history-nodev-v1'
     assert plan.dimensions['native_dimension_upper_bound'] == 80
     assert plan.dimensions['selected_variables_upper_bound'] == 24
