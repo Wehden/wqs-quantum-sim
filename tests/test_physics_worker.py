@@ -257,7 +257,7 @@ worker.simulate(Path(sys.argv[1]), Path(sys.argv[2]))
             assert abs(np.trapezoid(traces[window, column], times[window])/2.0678338484619295e-15-1) < .02
         metadata = json.loads(str(result['metadata_json']))
         assert metadata['time_units'] == 's'
-        assert metadata['binary_sha256'] == '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21'
+        assert metadata['binary_sha256'] == '0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676'
 
 
 @pytest.mark.parametrize('problem', ['numeric_limit', 'metadata_limit', 'wrong_shape', 'nonfinite'])

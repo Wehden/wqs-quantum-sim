@@ -67,3 +67,35 @@ assert final_memory(result,metadata,4).tolist() == [[1]]*4
 """], cwd='/opt/qsim', env=env, check=True)
 print('Worker package, isolated module entry point, all three engines and adapters passed')
 PY
+
+# Source-matched diagnostics and offline source rebuild are test-only artifacts.
+audit_image="wqs-physics-audit:${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-$$"
+audit_dir=$(mktemp -d)
+trap 'docker image rm "$audit_image" >/dev/null 2>&1 || true; rm -rf "$audit_dir"' EXIT
+docker build --target josim-build --tag "$audit_image" --file deploy/Dockerfile .
+docker run --rm --network none --read-only --entrypoint cat "$audit_image" /build/audit/josim-cli > "$audit_dir/audit"
+chmod 755 "$audit_dir/audit"
+docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
+    --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
+    --tmpfs /compile:rw,exec,nosuid,nodev,size=128m,mode=1777 \
+    --env WQS_IMAGE_TEST=1 --env PYTHONDONTWRITEBYTECODE=1 \
+    --entrypoint /usr/local/bin/python "$audit_image" - \
+    PhysicsWorkerImage.test_corresponding_source_rebuild_and_compiler_representation < tests/test_physics_image.py
+
+# Physics checks use the actual package, fresh nonroot children and CPU limits.
+# Test code enters over stdin and is never copied into the production image.
+docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
+    --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --tmpfs /tmp:rw,nosuid,nodev,size=128m,mode=1777 \
+    --tmpfs /home/qsim:rw,nosuid,nodev,size=16m,uid=1000,gid=1000,mode=700 \
+    --mount "type=bind,src=$audit_dir/audit,dst=/audit,readonly" \
+    --mount "type=bind,src=$PWD/spec/physics-engines/probe_josim_history.py,dst=/proof/spec/physics-engines/probe.py,readonly" \
+    --mount "type=bind,src=$PWD/tests/fixtures/physics/josim,dst=/proof/tests/fixtures/physics/josim,readonly" \
+    --env HOME=/tmp --env WQS_IMAGE_TEST=1 --env PYTHONDONTWRITEBYTECODE=1 \
+    --entrypoint /opt/qsim-venv/bin/python "$image" - PhysicsWorkerImage.test_package_boundary_and_distribution_notices \
+    PhysicsWorkerImage.test_real_certified_scqubits_child_and_closed_admission \
+    PhysicsWorkerImage.test_josim_provenance_and_corresponding_source \
+    PhysicsWorkerImage.test_maximum_certified_scqubits_shapes \
+    PhysicsWorkerImage.test_frozen_native_equivalence_and_bounded_capacity \
+    PhysicsWorkerImage.test_real_private_lindblad_and_export_families < tests/test_physics_image.py

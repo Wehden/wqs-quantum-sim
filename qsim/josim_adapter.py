@@ -17,7 +17,7 @@ from .physics_results import AllocationPlan, PhysicsExecutionResult
 __all__ = ('run_josim',)
 
 _BINARY = Path('/opt/josim/bin/josim-cli')
-_BINARY_SHA256 = '87582444021dc3e68320162c62752ff3c3646c430def1600a4298e9ecb8cae21'
+_BINARY_SHA256 = '0bca2802d5e152a1b4325cc4a9f4e8e5b01331d705d45ea757c72e0cb1afe676'
 _SOURCE_COMMIT = '02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224'
 _OUTPUT_BYTES = 6 * 1024**2
 
