@@ -1,6 +1,10 @@
 """Single durable dispatcher; only this process has access to SkyPilot."""
+import copy
+import hashlib
+import json
 import logging
 import os
+import re
 import shutil
 import time
 from . import settings, store
@@ -12,9 +16,50 @@ def cluster_name(job_id):
     return "qs-" + job_id[:20]
 
 
+def _profile_fingerprint(profile):
+    return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(',', ':'),
+                                     allow_nan=False).encode()).hexdigest()
+
+
+def _execution_profile(row):
+    """Validate persisted context without replacing it with current defaults."""
+    raw = row['profile_json'] if 'profile_json' in row.keys() else None
+    request = json.loads(row['request']) if 'request' in row.keys() else {}
+    physics = request.get('engine') in ('lindblad', 'scqubits', 'josim')
+    if not physics and raw is None:
+        return None
+    try:
+        context = json.loads(raw)
+        if (not physics or set(context) != {'version', 'worker_profile', 'admission_policy_revision',
+                                           'allocation_plan_digest', 'algorithm'} or type(context['version']) is not int or context['version'] != 1):
+            raise ValueError()
+        revision = settings._certified_physics_profiles['operations'].get(request['engine'], {}).get(request.get('operation'))
+        if not revision or context['admission_policy_revision'] != revision:
+            raise ValueError()
+        if (not isinstance(context['algorithm'], str) or not re.fullmatch(r'[a-zA-Z0-9._:-]{1,128}', context['algorithm'])
+                or not re.fullmatch(r'[0-9a-f]{64}', context['allocation_plan_digest'])):
+            raise ValueError()
+        profile = context['worker_profile']
+        expected = copy.deepcopy(settings._certified_physics_profiles['worker'])
+        image = profile['image']
+        infra = profile['resources']['infra']
+        if (not re.fullmatch(r'[^\s@]+@sha256:[0-9a-f]{64}', image) or image.startswith('docker:')
+                or not isinstance(infra, str) or not re.fullmatch(r'[a-zA-Z0-9_./:-]{1,128}', infra)):
+            raise ValueError()
+        expected['image'] = image
+        expected['resources']['infra'] = infra
+        # Canonical bytes reject booleans masquerading as integer resource values.
+        if json.dumps(profile,sort_keys=True,allow_nan=False) != json.dumps(expected,sort_keys=True):
+            raise ValueError()
+        return profile
+    except (ValueError, TypeError, KeyError, AttributeError):
+        raise ValueError('execution_policy_mismatch: invalid persisted physics context') from None
+
+
 def task_config(row):
     token = (settings.DATA / row["id"] / "callback-token").read_text()
-    return {
+    profile = _execution_profile(row)
+    config = {
         "name": "wqsim-simulation",
         "resources": {"infra": os.environ.get("QSIM_SKY_INFRA", "k8s"), "cpus": 2, "memory": 4,
                       "image_id": "docker:" + settings.WORKER_IMAGE,
@@ -23,6 +68,15 @@ def task_config(row):
                  "QSIM_JOB_TOKEN": token},
         "run": "cd /opt/qsim && /opt/qsim-venv/bin/python -m qsim.worker",
     }
+    if profile is not None:
+        config['resources'] = {**profile['resources'], 'image_id': 'docker:' + profile['image'],
+                               'labels': {'workload': 'qsim'}}
+        config['envs']['QSIM_EXECUTION_CONTEXT'] = row['profile_json']
+        config['run'] = ('cd /opt/qsim && sudo -n -H -u qsim '
+                         '--preserve-env=QSIM_JOB_URL,QSIM_JOB_TOKEN,QSIM_EXECUTION_CONTEXT,'
+                         'OPENBLAS_NUM_THREADS,OMP_NUM_THREADS '
+                         '/opt/qsim-venv/bin/python -m qsim.worker')
+    return config
 
 
 def sky_client():
@@ -130,20 +184,44 @@ def advance(sky, row):
         return
     if row['status'] != 'QUEUED':
         return  # A pre-upgrade launch remains owned by its existing worker.
+    try:
+        profile = _execution_profile(row)
+    except ValueError:
+        mark_failed(row['id'], 'Physics execution profile is unavailable; contact the service operator')
+        # No external intent exists, so there is no remote allocation to tear down.
+        with store.connect() as db:
+            db.execute('UPDATE jobs SET cleaned=1 WHERE id=?', (row['id'],))
+        (settings.DATA / row['id'] / 'callback-token').unlink(missing_ok=True)
+        return
+    image = profile['image'] if profile is not None else settings.WORKER_IMAGE
+    task = sky.Task.from_yaml_config(task_config(row))
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
         changed = db.execute("UPDATE jobs SET status='LAUNCHING', updated=?, started=? WHERE id=? AND status='QUEUED'", (time.time(), time.time(), row['id'])).rowcount
         if not changed:
             return
-        worker = db.execute('SELECT cluster FROM worker_pool WHERE job_id IS NULL AND retired=0 AND image=? AND released>? ORDER BY released DESC LIMIT 1', (settings.WORKER_IMAGE,time.time()-540)).fetchone()
+        worker = None
+        for candidate in db.execute('SELECT * FROM worker_pool WHERE job_id IS NULL AND retired=0 '
+                                    'AND image=? AND released>? ORDER BY released DESC', (image,time.time()-540)):
+            try:
+                pooled = json.loads(candidate['profile_json']) if candidate['profile_json'] is not None else None
+                compatible = ((profile is None and candidate['profile_json'] is None) or
+                              (profile is not None and candidate['profile_json'] is not None and
+                               _profile_fingerprint(profile) == _profile_fingerprint(pooled)))
+            except (ValueError, TypeError):
+                compatible = False
+            if compatible:
+                worker = candidate
+                break
         cluster = worker['cluster'] if worker else cluster_name(row['id'])
         method = 'exec' if worker else 'launch'
         if worker:
             db.execute('UPDATE worker_pool SET job_id=? WHERE cluster=?', (row['id'],cluster))
         else:
-            db.execute('INSERT INTO worker_pool(cluster,job_id,created,image) VALUES(?,?,?,?)', (cluster,row['id'],time.time(),settings.WORKER_IMAGE))
+            db.execute('INSERT INTO worker_pool(cluster,job_id,created,image,profile_json) VALUES(?,?,?,?,?)',
+                       (cluster,row['id'],time.time(),image,
+                        json.dumps(profile,sort_keys=True,separators=(',',':')) if profile is not None else None))
         db.execute("UPDATE job_dispatch SET intent='launch',intent_at=?,cluster=?,method=? WHERE job_id=?", (time.time(),cluster,method,row['id']))
-    task = sky.Task.from_yaml_config(task_config(row))
     if worker:
         request_id = sky.exec(task, cluster_name=cluster)
     else:
