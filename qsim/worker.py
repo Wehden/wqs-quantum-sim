@@ -429,7 +429,8 @@ def simulate_aer(request, output):
 
 def remote():
     url = os.environ["QSIM_JOB_URL"]
-    headers = {"Authorization": "Bearer " + os.environ["QSIM_JOB_TOKEN"], "Content-Type": "application/json"}
+    headers = {"Authorization": "Bearer " + os.environ["QSIM_JOB_TOKEN"], "Content-Type": "application/json",
+               "X-WQSIM-Execution-Context": "2"}
 
     def call(payload=None):
         encoded = None if payload is None else json.dumps(payload).encode()

@@ -94,6 +94,7 @@ def test_physics_real_child_gets_no_callback_credentials_and_cleans_scratch(monk
         'model': {'qubit': 'Transmon', 'params': {'EJ': 15., 'EC': .3, 'ng': 0., 'ncut': 30}}}
     envelope = remote_physics_context(monkeypatch,body)
     def response(request, **kwargs):
+        assert request.get_header('X-wqsim-execution-context') == '2'
         if request.data:
             callbacks.append(json.loads(request.data))
             return io.BytesIO(b'{}')

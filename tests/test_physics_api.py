@@ -287,3 +287,20 @@ def test_physics_callback_validates_stored_contract_before_success(client,monkey
     with store.connect() as db:db.execute("UPDATE job_dispatch SET profile_json='{}' WHERE job_id=?",(identifier,))
     assert client.post(callback_url,headers=callback(identifier),json=payload).status_code==200
     assert client.post(callback_url,headers=callback(identifier),json={'status':'FAILED','error':'late'}).status_code==409
+
+
+def test_legacy_physics_worker_input_stays_flat_until_context_protocol_negotiated(client,monkeypatch):
+    enabled(monkeypatch)
+    response=client.post('/api/jobs/scqubits',headers=headers(),json=scqubits())
+    identifier=response.json()['id']
+    with store.connect() as db:
+        row=db.execute('SELECT request FROM jobs WHERE id=?',(identifier,)).fetchone()
+        context=json.loads(db.execute('SELECT profile_json FROM job_dispatch WHERE job_id=?',(identifier,)).fetchone()[0])
+        context={key:value for key,value in context.items() if key not in ('result_plan','native_identity')}
+        context['version']=1
+        db.execute('UPDATE job_dispatch SET profile_json=? WHERE job_id=?',(json.dumps(context),identifier))
+    url='/internal/jobs/'+identifier
+    assert client.get(url,headers=callback(identifier)).json()==json.loads(row['request'])
+    negotiated={**callback(identifier),'X-WQSIM-Execution-Context':'2'}
+    assert client.get(url,headers=negotiated).json()=={'request':json.loads(row['request']),'execution_context':context}
+    assert client.get(url,headers={**callback(identifier),'X-WQSIM-Execution-Context':'unknown'}).status_code==400

@@ -359,17 +359,24 @@ def callback_job(job_id, authorization):
 
 
 @app.get("/internal/jobs/{job_id}")
-def input_job(job_id: str, authorization: str = Header(default="")):
+def input_job(job_id: str, authorization: str = Header(default=""),
+              execution_protocol: str = Header(default="", alias="X-WQSIM-Execution-Context")):
     row = callback_job(job_id, authorization)
     if row["status"] in settings.TERMINAL:
         raise HTTPException(409, "Job has ended")
     request = json.loads(row['request'])
     if request.get('engine') in ('lindblad','scqubits','josim'):
+        if execution_protocol not in ('', '2'):
+            raise HTTPException(400, 'Unsupported physics execution protocol')
         with store.connect() as db:
             dispatch = db.execute('SELECT profile_json FROM job_dispatch WHERE job_id=?',(job_id,)).fetchone()
         if dispatch is None or dispatch['profile_json'] is None:
             raise HTTPException(503,'Physics execution context unavailable')
-        return {'request':request,'execution_context':json.loads(dispatch['profile_json'])}
+        context = json.loads(dispatch['profile_json'])
+        # Previously accepted jobs retain their pinned worker's flat transport.
+        if context.get('version') == 1 and not execution_protocol:
+            return request
+        return {'request':request,'execution_context':context}
     return request
 
 

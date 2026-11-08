@@ -150,3 +150,10 @@ peak RSS 1,285,020 KiB. Existing native source rebuild, 7 frozen/7 capacity case
 all packaged physics families and legacy circuit/startup checks pass. The
 synthetic scheduler reference is explicitly labeled in the same JUnit receipt;
 real scheduling/image/CD attestation remains a later live gate.
+
+Private input transport explicitly negotiates execution-context protocol 2 with
+`X-WQSIM-Execution-Context`. Previously accepted version-1 jobs retain the flat
+input expected by their pinned older worker when that header is absent. New
+workers receive the sealed envelope, including for version-1 jobs, and still
+verify its original admission digest and profile. Unknown protocol versions
+are rejected. Public request bodies and idempotency hashes are unchanged.

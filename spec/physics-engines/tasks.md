@@ -2122,3 +2122,9 @@ the source ledgers, exact identities, commands and scope boundaries.
 Tranche A awaits current-head CI, automatic review and owner merge. Next is the
 already-approved Tranche B qualification PR. G2/G3/G4 and the final all-three live
 rollout are not marked complete by local tests or this source receipt.
+
+Final compatibility reconciliation: private protocol negotiation preserves flat
+input for older pinned version-1 workers and returns sealed context to new
+workers. A regression covers both shapes and unsupported protocol rejection.
+The focused API/worker/lifecycle run passes 96 tests with one host-only native
+skip. This uses existing files within the same tranche budget.
