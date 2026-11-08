@@ -11,7 +11,9 @@ import ipaddress
 import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from typing import Annotated, Any
+from pydantic import WrapValidator
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +23,8 @@ from .streams import router as stream_router
 from .http_boundary import HttpBoundary
 from .qasm_adapter import SUPPORTED_COMBINATIONS
 from .auth import digest, identity
+from .physics_submission import (NormalizedPhysicsRequest, normalize_physics_submission,
+    canonical_physics_request, admit_physics_request, physics_schema, physics_capabilities)
 from .models import Submission, StimSubmission, QasmSubmission, Qasm3Submission, Completion, KeyRequest
 
 
@@ -40,9 +44,20 @@ app.add_middleware(HttpBoundary)
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, error):
-    return JSONResponse(status_code=422, content={"detail": [
-        {key: item[key] for key in ("type", "loc", "msg")} for item in error.errors()
-    ]})
+    details = []
+    explicit = request.url.path in ('/api/jobs/lindblad', '/api/jobs/scqubits', '/api/jobs/josim')
+    for item in error.errors():
+        physics = getattr(item.get('ctx', {}).get('error'), 'physics_errors', None)
+        if physics is not None:
+            details.extend(physics)
+        else:
+            detail = {key: item[key] for key in ('type', 'loc', 'msg')}
+            if 'pointer' in item:
+                detail['pointer'] = item['pointer']
+            if explicit and 'pointer' not in detail:
+                detail['pointer'] = ''
+            details.append(detail)
+    return JSONResponse(status_code=422, content={'detail': details})
 
 
 @app.get("/healthz")
@@ -112,11 +127,17 @@ def owned(job_id, user):
 
 
 @app.post("/api/jobs", status_code=202)
-def submit(body: Submission, user=Depends(identity), idempotency_key: str | None = Header(default=None)):
+def submit(body: Annotated[Submission, WrapValidator(lambda value, handler:
+        normalize_physics_submission(value) if isinstance(value, dict) and
+        (value.get('engine') in ('lindblad','scqubits','josim') or
+         value.get('input_format') in ('lindblad_model','scqubits_model','josim_netlist'))
+        else handler(value))], user=Depends(identity), idempotency_key: str | None = Header(default=None)):
     return enqueue(body,user,idempotency_key)
 
 
 def canonical_request(body):
+    if isinstance(body, NormalizedPhysicsRequest):
+        return canonical_physics_request(body)
     canonical_body = body.model_dump()
     # Existing reservations include normalized defaults but predate engine selection and bindings.
     if canonical_body["engine"] == "clifft":
@@ -128,13 +149,38 @@ def canonical_request(body):
 
 
 def enqueue(body,user,idempotency_key):
+    physics = isinstance(body, NormalizedPhysicsRequest)
     if idempotency_key is not None and not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}",idempotency_key):
-        raise HTTPException(422,"Idempotency-Key must be 1–128 ASCII letters, digits, dots, underscores, colons or hyphens")
+        message = "Idempotency-Key must be 1–128 ASCII letters, digits, dots, underscores, colons or hyphens"
+        if physics:
+            raise RequestValidationError([{'type':'value_error','loc':['header','idempotency-key'],
+                                           'msg':message,'pointer':''}])
+        raise HTTPException(422,message)
     request_hash=digest(canonical_request(body))
     key_hash=digest(idempotency_key) if idempotency_key is not None else None
+    context = None
     job_id = uuid.uuid4().hex
     token = secrets.token_urlsafe(32)
     now = time.time()
+    if physics:
+        # Replay before current admission; the write transaction repeats this check.
+        with store.connect() as db:
+            if key_hash:
+                previous=db.execute("SELECT * FROM job_idempotency WHERE owner=? AND key_hash=?",(user,key_hash)).fetchone()
+                if previous:
+                    if previous['request_hash'] != request_hash:
+                        raise HTTPException(409,"Idempotency-Key was already used with a different request")
+                    existing=db.execute("SELECT * FROM jobs WHERE id=? AND owner=?",(previous['job_id'],user)).fetchone()
+                    if existing is None:
+                        raise HTTPException(410,"The idempotent job was deleted or expired; use a new key for new work")
+                    return JSONResponse(store.public(existing),status_code=202,headers={'Location':'/api/jobs/'+existing['id'],'Idempotency-Replayed':'true'})
+        if os.environ.get('QSIM_PHYSICS_ENABLED') != '1':
+            raise HTTPException(503, 'Physics submissions are not enabled', headers={'Retry-After':'60'})
+        try:
+            validated = admit_physics_request(body, policy=settings._certified_physics_profiles['operations'])
+        except ValueError as error:
+            raise RequestValidationError(error.physics_errors) from None
+        context = validated.dispatch_context
     with store.connect() as db:
         db.execute("BEGIN IMMEDIATE")
         db.execute("DELETE FROM job_idempotency WHERE created<? AND NOT EXISTS (SELECT 1 FROM jobs WHERE jobs.id=job_idempotency.job_id)",(now-30*86400,))
@@ -164,10 +210,33 @@ def enqueue(body,user,idempotency_key):
             try:os.fsync(fd)
             finally:os.close(fd)
         db.execute("INSERT INTO jobs (id,owner,name,status,created,updated,request,callback_hash) VALUES (?,?,?,'QUEUED',?,?,?,?)",
-                   (job_id, user, body.name, now, now, body.model_dump_json(), digest(token)))
+                   (job_id, user, body.request.name if physics else body.name, now, now,
+                    canonical_request(body) if physics else body.model_dump_json(), digest(token)))
         if key_hash:
             db.execute("INSERT INTO job_idempotency(owner,key_hash,request_hash,job_id,created) VALUES (?,?,?,?,?)",(user,key_hash,request_hash,job_id,now))
+        if physics:
+            db.execute('INSERT INTO job_dispatch(job_id,profile_json) VALUES(?,?)',
+                       (job_id,json.dumps(context,sort_keys=True,separators=(',', ':'),allow_nan=False)))
     return JSONResponse(store.public(owned(job_id,user)),status_code=202,headers={'Location':'/api/jobs/'+job_id,'Idempotency-Replayed':'false'})
+
+
+@app.post('/api/jobs/lindblad', status_code=202)
+@app.post('/api/jobs/scqubits', status_code=202)
+@app.post('/api/jobs/josim', status_code=202)
+def submit_physics(request: Request, body: Any = Body(...), user=Depends(identity),
+                   idempotency_key: str = Header(min_length=1,max_length=128)):
+    try:
+        normalized = normalize_physics_submission(body, explicit_engine=request.url.path.rsplit('/',1)[1])
+    except ValueError as error:
+        raise RequestValidationError(error.physics_errors) from None
+    return enqueue(normalized,user,idempotency_key)
+
+
+@app.get('/api/schemas/lindblad/1.json')
+@app.get('/api/schemas/scqubits/1.json')
+@app.get('/api/schemas/josim/1.json')
+def schema(request: Request, user=Depends(identity)):
+    return physics_schema(request.url.path.split('/')[-2],1)
 
 
 @app.post('/api/jobs/stim',status_code=202)
@@ -238,6 +307,8 @@ def capabilities(user=Depends(identity)):
                 'conditional_measurement_reset': ['qasm3'],
                 'nested_conditions': False, 'loops': False},
             'limits': {'max_expanded_operations': 65536, 'max_source_nesting': 32}}
+    if os.environ.get('QSIM_PHYSICS_ENABLED') == '1':
+        result['engines'].update(physics_capabilities(settings._certified_physics_profiles['operations']))
     return result
 
 

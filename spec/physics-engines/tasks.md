@@ -833,8 +833,9 @@ Owner approval recorded on 2026-10-25. Base main is `83ffac2ebc55423cc804b623423
 | TASK-036 | Complete native history patch/proof stage, merged through PR #61 at `5bfcff9`. Seven original/candidate fixtures and seven capacity cases pass with distinct real binaries; 182 focused tests passed without skips. Source-derived charge is 570,708,992 bytes under the 2-GiB ceiling. TASK-020 still owns the final admission certificate; TASK-023 owns packaging/distribution. No backend activation is implied. |
 | TASK-022 | Complete private isolated-worker integration, merged through PR #76 at `439c94d`. Main CI and existing-service CD/backup/acceptance passed; public physics admission remains closed. |
 | TASK-023 | Complete CPU worker packaging and approved Bookworm JoSIM repin, merged through PR #77 at `f18253a`; the constrained-image and frozen-reference receipt below remains authoritative. |
-| TASK-026 | Durable CPU profiles, exact-profile warm reuse and additive dispatch/pool storage are implemented in the receipt below; pending review, CI and merge. |
-| TASK-024/025 and TASK-027 through TASK-034 | API admission/context integration, lifecycle safety, final certificates, GPU decisions and G2/G3/G4 acceptance remain required before activation. TASK-024 follows TASK-026; no public physics activation is implied. |
+| TASK-026 | Complete durable CPU profile and pool integration, merged through PR #78 at `c4cdb55`. Historical pending-review labels below are superseded by this merge. |
+| TASK-024 | Additive physics routes, normalization, schemas and atomic admission/context persistence are implemented in the receipt below; awaiting review, CI and merge. Production physics admission remains off. |
+| TASK-025 and TASK-027 through TASK-034 | Shared lifecycle/backup safety, final certificates, GPU decisions and G2/G3/G4 acceptance remain required before activation. TASK-025 follows TASK-024. |
 
 The historical initial discovery PR combined the approved plan with TASK-001 through TASK-004 and TASK-005's blocked-evidence report. Combined task budgets allow at most 12 files, plus two coordinator status files, with zero new production symbols and no runtime interface changes. Actual touched paths total 12. No lease overlaps occurred. Independent coordinator repeats of Lindblad, all four scqubits boundary exports and the native JoSIM probe passed. Public reports contain synthetic data and immutable local image identities, not private endpoints or credentials.
 
@@ -1620,3 +1621,73 @@ enqueue/idempotency transaction and complete worker-context integration/safety
 verification before activation. Final numerical certificates and G2/G3/G4
 remain open. Existing credentials, backup/release gates and unrelated workloads
 are unchanged.
+
+
+### TASK-024 gated API integration receipt, 2026-11-08
+
+PR #78 is merged at main `c4cdb55957e3ee13e5f37d924b90c9501dcef7e3`.
+Its head `f2c1b28f53e9f5e3d4a0f59bf9e2e68792b2f48e` is an ancestor of main.
+This task starts from that main in an isolated worktree and reconciles
+TASK-026's earlier pending-review checkpoint.
+
+The three explicit submission routes and three version-1 schema routes are
+implemented. Generic `/api/jobs` recognizes physics engine/format selectors,
+while the unchanged circuit `Submission` model retains its existing validation
+path. Explicit routes supply engine/format defaults and require the existing
+Idempotency-Key header; the generic route retains its optional-header contract.
+All routes share authentication, owner scope and the existing enqueue/store.
+There is no second queue or scheduler.
+
+`physics_submission` selects the existing strict engine models, normalizes
+operation defaults and emits canonical JSON independently of server policy.
+Structural/finite validation precedes replay. Matching owner-scoped retries
+return their durable reservation before the current activation gate, image or
+resource admission runs. New jobs receive physical/native allocation admission
+outside the write transaction. The existing BEGIN IMMEDIATE transaction repeats
+the reservation check, honors the unchanged release-maintenance block, then
+persists the job, reservation and dispatch context together. The context seals
+the allocation plan digest, algorithm and admission revision separately from
+the canonical public request/hash and records the resolved worker profile.
+
+New physics validation errors retain bounded type/location/message fields plus
+an escaped RFC 6901 pointer; raw inputs and exception tracebacks are omitted.
+Legacy circuit errors retain their existing fields and locations. Structural
+schemas are generated from the same Pydantic models and explicitly distinguish
+schema validity from semantic/admission checks. API imports load no QuTiP,
+scqubits, SciPy, SkyPilot or worker/controller code. The existing `engines`
+capability mapping receives only enabled certified physics cells.
+
+The new server-only `QSIM_PHYSICS_ENABLED=1` activation switch defaults off.
+No deployed configuration is changed. Even with this gate enabled in synthetic
+tests, missing Lindblad, JoSIM and scqubits-export admission certificates remain
+refusals; only the current scqubits spectrum/matrix-element CPU policy resolves.
+GPU selection, raw resources and client activation overrides remain unavailable.
+The existing controller consumes the persisted context; final worker-context
+revalidation and lifecycle/native/result/backup safety must be certified before
+activation. This PR does not claim G2/G3/G4 acceptance or a physics rollout.
+
+Verification includes concurrent duplicate submissions, cross-route/default
+replay, changed-body conflicts and a conflict injected during admission,
+tombstones, owner isolation, maintenance holds, allocation-plan digest identity,
+strict schema versions, escaped nested pointers, body byte limits, absent
+native imports and versioned-schema parity. The combined API/schema,
+placement/dispatch/real-SDK, transactions, release-control, bootstrap and
+backup/restore group passes 216 tests. The three console tests and dependency,
+Python syntax and diff checks pass. The bootstrap test exposed a changed
+indentation of the reviewed release-maintenance block; the implementation now
+preserves that block exactly, without changing the test or protocol tooling.
+
+The specified API/compatibility/service/transaction command reports 134 passes
+and the same two Aer native-result failures reproduced on unchanged main.
+The final broad host run reports 1,875 passes, 36 skips, 36 failures and four
+import errors; its 40 failing identifiers exactly match the unchanged-main
+baseline. Native OpenMP static-TLS loading failures remain a host limitation,
+not a green full-suite receipt. No TLS/dependency workaround or weakened test
+is introduced. The configured CI runner remains the full-suite gate.
+
+Four implementation/test files and ten new production definitions stay within
+the five-file/ten-symbol lease. This coordinator checklist accompanies the same
+PR. TASK-024 awaits review, CI and merge. TASK-025 is the next dependency-ready
+shared lifecycle/backup certification task after merge; final missing admission
+certificates and G2/G3/G4 remain open. Credentials, existing backup/release gates
+and unrelated workloads are unchanged. No cluster resources are allocated.
