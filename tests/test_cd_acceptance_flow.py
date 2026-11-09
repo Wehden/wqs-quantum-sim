@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 from pathlib import Path
 
@@ -6,15 +7,15 @@ import numpy as np
 import pytest
 
 from test_cd_acceptance import hook
-from test_cd_release import SHA
+from test_cd_release import SHA, evidence
 from tools.cd import acceptance
 
 
-@pytest.mark.parametrize('failure', [None, 'failed-job', 'wrong-owner', 'lost-hold', 'timeout'])
+@pytest.mark.parametrize('failure', [None, 'failed-job', 'wrong-owner', 'lost-hold', 'timeout', 'wrong-physics', 'wrong-native-digest'])
 def test_live_flow_evidence_and_failures(tmp_path, monkeypatch, failure):
     verifier = hook(tmp_path)
     state_dir = Path(verifier.config['state_dir'])
-    ledger = {'sha': SHA, 'status': 'deploying', 'images': {}}
+    ledger = {'sha': SHA, 'status': 'deploying', 'images': {'worker':evidence()['worker_image']}}
     (state_dir / 'deployment.json').write_text(json.dumps(ledger))
     monkeypatch.setattr(verifier, 'roles', lambda expected: None)
     probes = []
@@ -22,9 +23,22 @@ def test_live_flow_evidence_and_failures(tmp_path, monkeypatch, failure):
         probes.append(native)
         if failure == 'lost-hold':
             raise ValueError('hold lost')
-        return {'cleaned': True, 'heartbeat': len(probes), 'native_succeeded': native}
+        records=evidence()['jobs'] if native else {}
+        for name,record in records.items():
+            identifier=verifier.jobs[name];record['id']=identifier
+            record['result_sha256']=hashlib.sha256(artifacts[identifier]).hexdigest()
+        if native and failure=='wrong-native-digest':records['lindblad_spectrum']['result_sha256']='0'*64
+        return {'cleaned':True,'heartbeat':len(probes),'native_succeeded':native,'jobs':records}
     monkeypatch.setattr(verifier, 'probe', probe)
-    submitted = {}
+    submitted = {};artifacts={}
+    real_verifier=acceptance.verify_result
+    def simulated_math(body,summary,artifact,*,name=None,related=None):
+        # Control-flow test only. Packaged tests below execute actual math.
+        if body['engine'] not in ('lindblad','scqubits','josim'):
+            return real_verifier(body,summary,artifact)
+        if failure=='wrong-physics':raise ValueError('synthetic physics failure')
+        return {'metadata':{'lindblad_request':acceptance.cases()['lindblad_spectrum']},'arrays':{}}
+    monkeypatch.setattr(acceptance,'verify_result',simulated_math)
     def request(path, body=None, key=None, external=False):
         if failure == 'timeout':
             raise TimeoutError()
@@ -50,7 +64,8 @@ def test_live_flow_evidence_and_failures(tmp_path, monkeypatch, failure):
                       if probability else
                       {'measurements' if body['input_format'] == 'stim' else 'classical_memory': np.ones((16,1), dtype=np.uint8)})
             np.savez_compressed(buffer, **arrays)
-            return buffer.getvalue()
+            artifacts[job]=buffer.getvalue()
+            return artifacts[job]
         return json.dumps({'id': job, 'status': 'FAILED' if failure == 'failed-job' else 'SUCCEEDED',
             'summary': {'engine': body['engine'] + ' test', 'operation': body['operation'],
                         'shots': 16, 'counts': {'1': 16}, 'bitstrings': ['0','1'], 'probabilities': [0,1]}}).encode()
@@ -63,7 +78,7 @@ def test_live_flow_evidence_and_failures(tmp_path, monkeypatch, failure):
     else:
         result = verifier.execute()
         assert set(result['cases']) == set(acceptance.cases())
-        assert len(submitted) == 8 and probes[-1] is True
+        assert len(submitted) == len(acceptance.cases()) and probes[-1] is True
         assert json.loads(verifier.receipt_path.read_text())['status'] == 'verified'
     # This hook never edits the parent's deployment ledger, admission or jobs.
     assert json.loads((state_dir / 'deployment.json').read_text()) == ledger

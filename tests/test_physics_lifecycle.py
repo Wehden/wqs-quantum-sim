@@ -203,6 +203,7 @@ def joined(tmp_path,monkeypatch,record_property):
         else:pytest.fail('Joined API process never became ready')
         yield SimpleNamespace(client=client,sky=transport,data=data,token=token,other=other,api_log=api_log)
     finally:
+        record_property('joined_successful_native_processes',sum(p['returncode']==0 for p in transport.placements))
         client.close()
         process.terminate()
         try:process.wait(timeout=5)
@@ -214,7 +215,8 @@ def joined(tmp_path,monkeypatch,record_property):
 
 
 def complete(joined,engine,body,*,expect='SUCCEEDED',key=None):
-    response=joined.client.post('/api/jobs/'+engine,headers={'Idempotency-Key':key or uuid.uuid4().hex},json=body)
+    response=joined.client.post('/api/jobs' if engine is None else '/api/jobs/'+engine,
+        headers={'Idempotency-Key':key or uuid.uuid4().hex},json=body)
     assert response.status_code==202,response.text
     identifier=response.json()['id']
     for _ in range(8):

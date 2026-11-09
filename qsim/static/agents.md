@@ -3,11 +3,11 @@
 Base URL: https://simulation.example.invalid
 Developer guide: https://simulation.example.invalid/
 This guide: https://simulation.example.invalid/agents.md
-Guide updated: 2026-10-14. Check `GET /api/capabilities` on your installation before selecting a new operation.
+Guide updated: 2026-11-08. Check `GET /api/capabilities` on your installation before selecting a new operation.
 
 ## Scope and credentials
 
-wqsim runs independent Clifft 0.12.0, Google qsim 0.22.1 and Qiskit Aer 0.17.2 CPU simulation jobs. The caller manages call sequences, batches, dependencies, and quantum state between requests. Submitting a job does not create a persistent quantum session.
+wqsim runs independent CPU circuit and physical-model jobs. Circuit engines are Clifft 0.12.0, Google qsim 0.22.1 and Qiskit Aer 0.17.2. QuTiP, scqubits and JoSIM provide the gated physics matrix described below. The caller manages call sequences, batches, dependencies, and quantum state between requests. Submitting a job does not create a persistent quantum session.
 
 Use an API key supplied by the user or their secret store:
 
@@ -29,7 +29,7 @@ If no key is available, direct the user to https://simulation.example.invalid/#k
 | Google qsim | QASM3, `POST /api/jobs/qasm3` | Sampling or basis probabilities | `engine:"qsim"`, explicit `operation`, `circuit`; `bitstrings` for probabilities |
 | Qiskit Aer | QASM2 or QASM3, corresponding format endpoint | Conditional sampling | `engine:"aer"`, `operation:"sample"`, `circuit` |
 
-All three format endpoints require `Content-Type: application/json` and `Idempotency-Key`. Clifft remains the default engine; explicitly select qsim or Aer for supported QASM operations. Unsupported engine combinations fail rather than switch engines.
+All explicit circuit and physics submission endpoints require `Content-Type: application/json` and `Idempotency-Key`. Clifft remains the default engine; explicitly select qsim or Aer for supported QASM operations. Unsupported engine combinations fail rather than switch engines.
 
 The existing QASM2 probability operation remains unitary-only for both engines: no classical registers, measurement, reset, conditions or custom gate definitions. Google qsim QASM2 sampling and QASM3 use a broader tested Cirq subset described below. Never remove measurements to turn a sampling request into a probability query.
 
@@ -223,7 +223,7 @@ A result URL is relative to the wqsim base URL and is not a signed anonymous dow
 | POST | `/api/jobs/{id}/cancel` | Record cancellation; returns 202. |
 | DELETE | `/api/jobs/{id}` | Delete a terminal, cleaned job; returns 204. |
 
-The `engine` field accepts `clifft` (default), `qsim`, or `aer`; Aer supports QASM2/QASM3 sampling only. The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires explicit `engine="qsim"` or `engine="aer"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
+For circuit submissions, the `engine` field accepts `clifft` (default), `qsim`, or `aer`; Aer supports QASM2/QASM3 sampling only. The general submission route accepts `input_format` (`stim`, `qasm2` or `qasm3`) and `operation` (`sample` or `basis_probabilities`). Defaults are `stim` and `sample`. Probability queries require `bitstrings` and optionally `bit_order`. QASM3 requires an explicit operation even on the general route. QASM sampling requires explicit `engine="qsim"` or `engine="aer"`. Prefer the explicit format endpoints for new clients. Unknown JSON fields are rejected.
 
 ## Limits and errors
 
@@ -296,3 +296,164 @@ Aer standard gate names: `id`, `x`, `y`, `z`, `h`, `s`, `sdg`, `t`, `tdg`, `sx`,
 Aer shares the 26-declared-qubit ceiling and 3 GiB process limit. It uses one native CPU thread within the existing worker profile. The operation budget counts both branches, and the sampling-cell budget includes all possible measurement events, even when skipped. No active-job deadline or fixed concurrency cap is added. This API returns complete samples, not incremental sample streaming.
 
 Upstream: [Qiskit Aer](https://github.com/Qiskit/qiskit-aer) and [QASM3 importer](https://qiskit.github.io/qiskit-qasm3-import/).
+
+
+## Physics-model API (schema v1)
+
+Physics routes are implemented for the CPU matrix below. Production activation is gated by exact-release acceptance. Check authenticated `GET /api/capabilities` on your deployment; an omitted engine is unavailable, and new physics submissions return `503` while activation is off. A source merge or image build does not establish production availability.
+
+The physics matrix is CPU-only, float64/complex128, with no GPU profile or automatic backend substitution. Check capabilities before new work. The caller owns sequences, sweeps and state handoffs. No Python, symbolic coefficient strings, native options or resource selectors are accepted.
+
+| Engine | Submit | Generic input format | Authenticated schema |
+| --- | --- | --- | --- |
+| QuTiP 5.3.1 Lindblad | `POST /api/jobs/lindblad` | `lindblad_model` | `GET /api/schemas/lindblad/1.json` |
+| scqubits 4.3.1 | `POST /api/jobs/scqubits` | `scqubits_model` | `GET /api/schemas/scqubits/1.json` |
+| Patched JoSIM v2.7 | `POST /api/jobs/josim` | `josim_netlist` | `GET /api/schemas/josim/1.json` |
+
+Use an integer `schema_version: 1`, explicit operation and saved idempotency key.
+The generic route uses matching engine/format fields and retains an optional
+idempotency header; explicit routes require it. Structural schemas are
+necessary but physical/resource checks still apply. Names default to
+`Untitled simulation`. Physics requests have no `shots` field.
+
+### Lindblad operation matrix
+
+| Operation | Solver | Use it for | Numeric NPZ arrays |
+| --- | --- | --- | --- |
+| `evolve` | `se` | Pure-state Schrödinger evolution without dissipation | `times`, optional `expectations`, optional `state_times`/`states` |
+| `evolve` | `me` | Lindblad density-matrix evolution with or without collapse channels | Same names; retained `states` are density matrices |
+| `evolve` | `mc` | Seeded serial quantum-jump trajectories with a pure input and nonzero collapse | Same names; retained `states` are ensemble density matrices |
+| `propagator` | `se` | Hilbert-space propagators | `times`, `propagators` |
+| `propagator` | `me` | Density/Liouville propagators | `times`, `propagators` |
+| `spectrum` | Omit solver | Static Hamiltonian energies and optional eigenvectors | `eigenvalues`, optional `eigenvectors` |
+| `steadystate` | Omit solver | A unique stationary density matrix and optional observables | Optional `steady_state`, optional `expectations` |
+
+Time and T1/Tphi are ns, Hamiltonian/frequency values are linear GHz and phases are radians. The service converts GHz by `2*pi` once; collapse rates are `1/ns`. Finite complex values use numbers or `{"re":...,"im":...}`. Modes are oscillator, duffing or explicit Hermitian matrix; order follows `model.modes`. JSON drive envelopes are constant, square, gaussian, flattop_cosine or linearly sampled; DRAG and positive square rise are absent in v1.
+
+SE rejects dissipation and mixed inputs. ME preserves density-state semantics even without collapse. MC requires pure input and nonzero collapse; seed defaults to 42 and 1–1,000 trajectories run serially. Seed/trajectories apply only to MC. Repeated seeds on the same pinned image reproduce the tested result; no cross-version/backend bitwise promise is made. State output is controlled by `store_states=none|final|all`: SE `[R,D]`, ME/MC ensemble density `[R,D,D]`, with `state_times`. Propagators have `[T,D,D]` or `[T,D²,D²]` shape, begin at identity and act from the first requested time; ME uses column-stacked density. Spectra return GHz eigenvalues and optional vectors; nonunique stationary solutions fail.
+
+POST this body to `/api/jobs/lindblad`; expectation is one and phase is `exp(-2*pi*i*0.017*t)`:
+
+<!-- example: physics-lindblad-evolve-se -->
+```json
+{
+  "engine": "lindblad",
+  "input_format": "lindblad_model",
+  "schema_version": 1,
+  "operation": "evolve",
+  "model": {
+    "modes": [
+      {
+        "name": "q",
+        "kind": "oscillator",
+        "dimension": 2,
+        "frequency": 0.017
+      }
+    ]
+  },
+  "solver": "se",
+  "times": [
+    0.0,
+    0.5,
+    1.0
+  ],
+  "initial_state": {
+    "kind": "product",
+    "modes": {
+      "q": {
+        "kind": "fock",
+        "index": 1
+      }
+    }
+  },
+  "observables": [
+    {
+      "name": "n",
+      "operator": {
+        "kind": "product",
+        "factors": {
+          "q": "n"
+        }
+      }
+    }
+  ],
+  "store_states": "all"
+}
+```
+
+The developer page's physics section contains marked examples for ME/MC evolution, both propagators, spectrum and steady state. Derive new bodies using `/api/schemas/lindblad/1.json`; do not add controls from a different operation.
+
+### scqubits and numeric handoff
+
+Supported classes are `Transmon`, `TunableTransmon`, `Fluxonium`, `FluxQubit`. `spectrum` returns ascending GHz `eigenvalues` and optional eigenvectors; `matrix_elements` adds a complex square `matrix_elements` for one allowed operator; `export_for_lindblad` returns shifted energies, diagonal Hamiltonian and selected operators in one shared eigensystem. Use strict numeric class fields from `/api/schemas/scqubits/1.json`. Cutoff convergence is the client's responsibility. Charge offsets and flux fractions are dimensionless; phi operators use radians.
+
+POST to `/api/jobs/scqubits`:
+
+<!-- example: physics-scqubits-export -->
+```json
+{
+  "engine": "scqubits",
+  "input_format": "scqubits_model",
+  "schema_version": 1,
+  "operation": "export_for_lindblad",
+  "evals_count": 4,
+  "model": {
+    "qubit": "Transmon",
+    "params": {
+      "EJ": 15.0,
+      "EC": 0.3,
+      "ng": 0.0,
+      "ncut": 30
+    }
+  },
+  "operators": [
+    "n_operator"
+  ]
+}
+```
+
+Read the completed NPZ with `allow_pickle=False`, parse scalar Unicode `metadata_json`, and use its `lindblad_request` for a separate job with a new key. Preserve the exported operator basis. Removed ground energy is recorded in metadata; do not multiply the Hamiltonian by `2*pi` again. Up to six ordered supported operators may be exported, including an empty list. Export JSON's metadata budget may refuse a level count accepted for a spectrum.
+
+### JoSIM transient subset
+
+The service uses patched JoSIM v2.7, not every upstream JoSIM feature. Accept only self-contained numeric R/L/B circuits, DC/PWL current/voltage sources, one positive numeric JJ model with RTYPE=1, one `.TRAN`, explicit unique `.PRINT DEVV|DEVI|PHASE` selections and terminal `.END`. No includes, subcircuits, expressions, noise, external paths or arbitrary options. Output `times` are SI seconds and `traces` follow declared order; `trace_names` and `trace_units` give volts/amperes/radians. Preserve actual row counts without padding.
+
+POST the tested MIT-licensed SFQ fixture to `/api/jobs/josim`:
+
+<!-- example: physics-josim-sfq -->
+```json
+{
+  "engine": "josim",
+  "input_format": "josim_netlist",
+  "schema_version": 1,
+  "operation": "transient",
+  "netlist": "* Source: https://github.com/JoeyDelp/JoSIM/blob/02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224/test/ex_jtl_basic.cir\n* MIT License\n* \n* Copyright (c) 2020 Johannes Delport\n* \n* Permission is hereby granted, free of charge, to any person obtaining a copy\n* of this software and associated documentation files (the \"Software\"), to deal\n* in the Software without restriction, including without limitation the rights\n* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n* copies of the Software, and to permit persons to whom the Software is\n* furnished to do so, subject to the following conditions:\n* \n* The above copyright notice and this permission notice shall be included in all\n* copies or substantial portions of the Software.\n* \n* THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n* SOFTWARE.\n* Fixed single-pulse JTL fixture adapted from JoSIM v2.7 ex_jtl_basic (MIT).\nB01        3          7          jmitll     area=2.16\nB02        6          8          jmitll     area=2.16\nIB01       0          1          pwl(0      0 5p 280u)\nL01        4          3          2p        \nL02        3          2          2.425p    \nL03        2          6          2.425p    \nL04        6          5          2.031p    \nLP01       0          7          0.086p    \nLP02       0          8          0.096p    \nLPR01      2          1          0.278p    \nLRB01      7          9          0.086p    \nLRB02      8          10         0.086p    \nRB01       9          3          5.23      \nRB02       10         6          5.23      \nROUT       5          0          2         \nVIN        4          0          pwl(0 0 100p 0 102.5p 827.13u 105p 0)\n.model jmitll jj(rtype=1, vg=2.8mV, cap=0.07pF, r0=160, rN=16, icrit=0.1mA)\n.tran 0.25p 250p\n.print DEVV B01\n.print PHASE B01\n.print DEVV B02\n.print PHASE B02\n.print DEVI ROUT\n.end\n"
+}
+```
+
+### Shared physics boundaries
+
+The CPU profile requests 2 CPUs and 4 GiB, with a fresh nonroot numerical child per job, a 3-GiB address-space limit and 12-MiB output-file limit. Physics native threads are serial. Admission accounts for native workspace and retained inputs/results before execution; charged allocation must fit 2 GiB, with 512 MiB reserved within that charge for imports/native overhead. Passing a dimension ceiling alone does not guarantee admission.
+
+| Boundary | Current schema-v1 envelope |
+| --- | --- |
+| HTTP body / name | 16 MiB / 1–80 characters; physics name defaults to `Untitled simulation` |
+| Lindblad model | At most 8 ordered modes, total Hilbert dimension 256; dense ME/steady-state dimension at most 32 |
+| Lindblad controls | At most 256 static terms, 32 named matrices, 32 observables, 16 effective collapse channels and 16 scalar drive channels |
+| Lindblad grids / MC | At most 65,536 requested times/combined coefficient knots; 1–1,000 serial MC trajectories |
+| scqubits | Raw basis at most 512, returned levels at most 32; export JSON/array limits may admit fewer levels |
+| JoSIM | 1–65,536 ASCII bytes, 256 logical statements, 32 devices, 16 node identifiers, at most 8 unique selected traces and 4,096 predicted output rows |
+| JoSIM transient | `0 < step <= stop <= 1e-6` seconds; DC/PWL sources, at most 64 PWL time/value pairs |
+| Physics output | At most 6 MiB numeric arrays, 64 KiB UTF-8 metadata, planned NPZ at most 9 MiB and complete callback at most 12 MiB |
+
+There is no new elapsed-time/CPU-time deadline, global job cap or client resource override. Jobs queue when compatible capacity is unavailable. GPU execution is not enabled for this release. Installed CUDA packages or a GPU present in the cluster do not change that matrix.
+
+Structural, finite-value, physical and allocation refusals return `422` before creating a job. New physics errors include `detail[].pointer`, an escaped RFC 6901 JSON Pointer; an empty pointer refers to the whole request. `413` rejects an oversized HTTP body. `401`/`404` retain authentication and owner isolation. `503` means physics is not enabled, release maintenance holds new work, or service configuration is unavailable. Check the response before deciding whether to retry.
+
+After acceptance, inspect terminal status/error. Bounded prefixes include `physical_validation`, `invalid_model`, `resource_limit`, `execution_policy_mismatch`, `native_nonconvergence`, `nonunique_stationary_state`, `invalid_result`, `native_failure` and `execution_failed`. A solver failure does not produce partial success. For an otherwise nonterminal job, acknowledged native completion without a committed final callback becomes a bounded failure instead of silently rerunning computation. Existing terminal states remain immutable. `202` alone is not successful simulation.
+
+Reuse the existing durable polling/SSE/cancellation/deletion flow. SSE gives
+progress and the final result summary, not partial samples/trajectories/traces.
+The result's `metadata_json` identifies versions, units, backend and work.
+Matching retries replay before changed current policy; do not turn a failed job
+into new work unless the user intends a new submission/key.

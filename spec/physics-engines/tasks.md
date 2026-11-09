@@ -787,16 +787,16 @@ After TASK-036, resume TASK-020's fixed source/binary-bound admission certificat
 ## Definition of Done Checklist
 
 - [ ] Every PHY-001 through PHY-020 requirement maps to executed evidence; approved scope has not shrunk to one backend.
-- [ ] Lindblad supports the approved evolve/propagator/spectrum/steadystate matrix, with measured physical/numerical limits and tested coefficient semantics.
-- [ ] scqubits supports all four required classes and spectrum/matrix_elements/export_for_lindblad, including the real numeric export round trip.
-- [ ] JoSIM supports the verified transient subset and an actual SFQ fixture; caller-controlled file/code execution is refused before native launch.
-- [ ] Strict schemas, pointer errors, finite values, operation-specific dimensions and complete callback/file byte budgets are enforced before unsafe allocation.
-- [ ] Existing canonical request identities, errors, idempotency, owner isolation, polling/SSE, cancellation, cleanup and deletion remain compatible.
-- [ ] CPU workers pass with current isolation and measured memory limits. GPU discovery records native coverage, correctness, precision, cold/warm benefit and an explicit placement/fallback decision.
-- [ ] Every advertised GPU cell has actual pinned-image/device execution evidence; unavailable/skipped hardware tests are not counted as passes.
-- [ ] Native result arrays and Unicode metadata remain safe for allow_pickle=False and current backup validation. No credentials are added to children, logs, examples or public evidence.
+- [x] Lindblad supports the approved evolve/propagator/spectrum/steadystate matrix, with measured physical/numerical limits and tested coefficient semantics.
+- [x] scqubits supports all four required classes and spectrum/matrix_elements/export_for_lindblad, including the real numeric export round trip.
+- [x] JoSIM supports the verified transient subset and an actual SFQ fixture; caller-controlled file/code execution is refused before native launch.
+- [x] Strict schemas, pointer errors, finite values, operation-specific dimensions and complete callback/file byte budgets are enforced before unsafe allocation.
+- [x] Existing canonical request identities, errors, idempotency, owner isolation, polling/SSE, cancellation, cleanup and deletion remain compatible.
+- [x] CPU workers pass with current isolation and measured memory limits. GPU discovery records native coverage, correctness, precision, cold/warm benefit and an explicit placement/fallback decision.
+- [x] Every advertised GPU cell has actual pinned-image/device execution evidence; unavailable/skipped hardware tests are not counted as passes.
+- [x] Native result arrays and Unicode metadata remain safe for allow_pickle=False and current backup validation. No credentials are added to children, logs, examples or public evidence.
 - [ ] All old/new CI and image checks pass, with the actual Standpunkt or hosted path recorded. Automatic reviews stay within two rounds unless the owner authorizes an exception; the owner merges PRs.
-- [ ] Developer/agent examples, schemas, capabilities, library versions and supported devices agree. Deferred sweeps, persistent state and Palace are not advertised.
+- [x] Developer/agent examples, schemas, capabilities, library versions and supported devices agree. Deferred sweeps, persistent state and Palace are not advertised.
 - [ ] The exact current-main release passes fresh real backup gates and all required native/application acceptance before general admission reopens. Existing credentials and recovery keys remain unchanged.
 
 ## Execution Notes (tooling, environment, checkpoints)
@@ -2128,3 +2128,63 @@ input for older pinned version-1 workers and returns sealed context to new
 workers. A regression covers both shapes and unsupported protocol rejection.
 The focused API/worker/lifecycle run passes 96 tests with one host-only native
 skip. This uses existing files within the same tranche budget.
+
+### Tranche B execution authorization, 2026-11-08
+
+PR #80 is merged at main `87304d249005ad65db6a256bf970e04ede1c1288`.
+Its complete push CI run `42535051613` passed, including actual Standpunkt
+child `42535074189` and hosted image/runner checks. The owner authorized
+Tranche B. The coordinator owns `tools/cd/acceptance.py`, `tools/cd/release.py`,
+`qsim/release_probe.py`, their three existing CD test modules and the six
+approved spec/evidence files. The CI executor owns the five B2 paths; the
+documentation executor owns the five B4 paths. Leases are disjoint, within the
+approved 25-file/16-new-production-definition combined budget. No new public
+API or scheduler is introduced. Private probe selection and acceptance receipts
+are versioned; historical circuit receipts keep only their original scope.
+Production changes await the merged qualification and controlled rollout.
+
+B2 matching-test reconciliation: the existing joined fixture in
+`tests/test_physics_lifecycle.py` receives one teardown JUnit property counting
+successful actual native processes. This narrowly extends the combined test
+lease so the mandatory receipt gate cannot pass with provenance alone and no
+execution. No runtime behavior changes; the 25-file budget remains unchanged.
+
+
+### Tranche B implementation and reconciliation receipt, 2026-11-08
+
+Tranche A's PR #80 is merged and its exact-main CI is green. TASK-030/031/032/033
+and conditional TASK-027/028/029 are implemented together in this qualification
+branch. Current-head PR CI, automatic review and owner merge remain pending;
+TASK-034 and final live G4 acceptance remain open.
+
+The 21-case version-2 contract retains all eight circuit cases. It adds every
+Lindblad operation/solver family, independent seeded relaxation plus repeat,
+scqubits spectrum/matrix/export and a dependent Lindblad handoff, and exact
+frozen JoSIM SFQ output. Named requests, owners, profiles, source/image identity,
+stored/downloaded digests, refreshed actual SkyPilot CPU allocations, native
+success and cleanup are required. Historical circuit receipts cannot promote
+physics. Failure after an uncertain open or final receipt write attempts to
+restore the owned hold and records failed deployment/version receipts; unknown
+hold recovery stays unknown. No accepted job is cancelled by that recovery.
+
+The mandatory image harness rejects skipped/empty native proofs and requires
+actual successful process counts and inspected image identity. All 13 packaged
+release physics cases pass; all 38 documentation tests (including 11 native
+examples) pass without skips. The current source ledger and remaining real
+release obligations are in [validation](validation.md), the [security audit](security.md)
+and [device disposition](discovery/gpu-acceptance.md). GPU enablement is empty;
+there is no new GPU artifact, allocation or performance claim.
+
+Next: owner merges the qualification PR after exact-head CI/review. Existing CD
+then stages the candidate with physics enabled under its durable owned hold,
+using the unchanged fresh encrypted-backup gates. Only the dedicated smoke
+identity is admitted for the full real-SkyPilot matrix. General admission opens
+only after complete acceptance, native cleanup and drain. Credentials, recovery
+keys and unrelated workloads remain unchanged. No parallel manual deploy path
+or acceptance bypass is introduced.
+
+The same B2 matching-test lease also lets the joined helper submit the unchanged
+full circuit envelopes through the generic `/api/jobs` route. Explicit Stim/QASM
+routes have narrower bodies. The mandatory image lane now executes all eight
+legacy release cases in the actual packaged worker; the normal host lane retains
+its existing isolated-host checks. No circuit API contract is changed or waived.

@@ -1,6 +1,34 @@
 #!/bin/bash
 set -euo pipefail
 image=${1:-worker:local}
+# unittest ordinarily treats skips/expected failures as a successful process.
+# Mandatory image proofs must execute; the footer also rejects an empty source.
+required_unittest_source() {
+    cat <<'WQS_REQUIRED_UNITTEST'
+import unittest as _wqs_unittest
+_wqs_original_main = _wqs_unittest.main
+_wqs_proof_completed = False
+
+def _wqs_required_main(*args, **kwargs):
+    global _wqs_proof_completed
+    kwargs['exit'] = False
+    program = _wqs_original_main(*args, **kwargs)
+    result = program.result
+    if (not result.testsRun or result.skipped or result.expectedFailures
+            or result.unexpectedSuccesses or not result.wasSuccessful()):
+        raise SystemExit('Required image proof failed, skipped or did not execute')
+    _wqs_proof_completed = True
+    return program
+
+_wqs_unittest.main = _wqs_required_main
+WQS_REQUIRED_UNITTEST
+    cat "$1"
+    cat <<'WQS_REQUIRED_UNITTEST_END'
+if not _wqs_proof_completed:
+    raise SystemExit('Required image proof did not run')
+WQS_REQUIRED_UNITTEST_END
+}
+
 # -i feeds the test script to Python in the image; no host temporary markers.
 docker run --rm -i --entrypoint /usr/local/bin/python3 "$image" - <<'PY'
 from pathlib import Path
@@ -76,16 +104,18 @@ trap 'if [ -n "${uv_container:-}" ]; then docker rm "$uv_container" >/dev/null 2
 docker build --target josim-build --tag "$audit_image" --file deploy/Dockerfile .
 docker run --rm --network none --read-only --entrypoint cat "$audit_image" /build/audit/josim-cli > "$audit_dir/audit"
 chmod 755 "$audit_dir/audit"
+required_unittest_source tests/test_physics_image.py | \
 docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
     --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
     --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
     --tmpfs /compile:rw,exec,nosuid,nodev,size=128m,mode=1777 \
     --env WQS_IMAGE_TEST=1 --env PYTHONDONTWRITEBYTECODE=1 \
     --entrypoint /usr/local/bin/python "$audit_image" - \
-    PhysicsWorkerImage.test_corresponding_source_rebuild_and_compiler_representation < tests/test_physics_image.py
+    PhysicsWorkerImage.test_corresponding_source_rebuild_and_compiler_representation
 
 # Physics checks use the actual package, fresh nonroot children and CPU limits.
 # Test code enters over stdin and is never copied into the production image.
+required_unittest_source tests/test_physics_image.py | \
 docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
     --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
     --tmpfs /tmp:rw,nosuid,nodev,size=128m,mode=1777 \
@@ -99,16 +129,17 @@ docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
     PhysicsWorkerImage.test_josim_provenance_and_corresponding_source \
     PhysicsWorkerImage.test_maximum_certified_scqubits_shapes \
     PhysicsWorkerImage.test_frozen_native_equivalence_and_bounded_capacity \
-    PhysicsWorkerImage.test_real_certified_lindblad_and_export_families < tests/test_physics_image.py
+    PhysicsWorkerImage.test_real_certified_lindblad_and_export_families
 
 
 # Mandatory maximum-owner native admission and frozen workspace-query proof.
+required_unittest_source tests/test_physics_cpu_admission.py | \
 docker run --rm -i --user 1000:1000 --cpus 2 --memory 4g --memory-swap 4g \
     --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
     --tmpfs /tmp:rw,nosuid,nodev,size=128m,mode=1777 \
     --tmpfs /home/qsim:rw,nosuid,nodev,size=16m,uid=1000,gid=1000,mode=700 \
     --env WQS_IMAGE_TEST=1 --env HOME=/home/qsim --env PYTHONDONTWRITEBYTECODE=1 \
-    --entrypoint /opt/qsim-venv/bin/python "$image" - PhysicsCPUAdmission < tests/test_physics_cpu_admission.py
+    --entrypoint /opt/qsim-venv/bin/python "$image" - PhysicsCPUAdmission
 
 
 # Mandatory joined HTTP/native proof. Only placement is synthetic; the selected
@@ -131,5 +162,66 @@ export WQS_JOINED_WORKER_IMAGE="$image"
 image_id=$(docker image inspect "$image" --format '{{.Id}}')
 export WQS_JOINED_WORKER_REF="registry.example.invalid/worker@$image_id"
 mkdir -p test-results
+rm -f test-results/physics-joined.xml
 "$uv_bin" run --frozen --extra worker --extra controller --extra backup pytest -q \
-    -o junit_family=legacy --junitxml=test-results/physics-joined.xml tests/test_physics_lifecycle.py
+    -o junit_family=legacy -o xfail_strict=true --junitxml=test-results/physics-joined.xml \
+    tests/test_physics_lifecycle.py tests/test_cd_acceptance.py tests/test_physics_examples.py
+
+
+# A successful pytest process can still contain skipped native proofs. Qualify
+# the executed case inventory and image identity before this image may be bundled.
+python3 - test-results/physics-joined.xml <<'WQS_VERIFY_PHYSICS_JUNIT'
+import os
+from pathlib import Path
+import re
+import sys
+import xml.etree.ElementTree as ET
+from qsim.release_probe import release_cases
+
+root = ET.parse(sys.argv[1]).getroot()
+tests = list(root.iter('testcase'))
+if not tests or any(node.tag in ('failure', 'error', 'skipped') for node in root.iter()):
+    raise SystemExit('Required physics integration contains failed or skipped proof')
+for suite in root.iter('testsuite'):
+    if any(int(suite.get(key, '0')) for key in ('errors', 'failures', 'skipped')):
+        raise SystemExit('Required physics integration suite did not pass completely')
+expected_ref = os.environ['WQS_JOINED_WORKER_REF']
+expected_id = expected_ref.rsplit('@', 1)[-1]
+if (not re.fullmatch(r'sha256:[0-9a-f]{64}', expected_id)
+        or expected_ref != 'registry.example.invalid/worker@'+expected_id):
+    raise SystemExit('Required explicit local-image/synthetic-placement identity')
+required = {
+    'test_all_smoke_cases_pass_real_workers',
+    'test_joined_lindblad_operation_families',
+    'test_joined_scqubits_native_spectrum_and_matrix_elements',
+    'test_joined_scqubits_export_to_lindblad_is_a_client_sequence',
+    'test_joined_josim_sfq_and_circuit_pool_separation',
+    'test_joined_native_lindblad_scqubits_josim_results_restore_with_invitation',
+    'test_packaged_physics_examples',
+}
+expected_cases = {name for name, body in release_cases().items()
+                  if body is None or body.get('engine') in ('lindblad', 'scqubits', 'josim')}
+modules, executed, release_ids = set(), set(), []
+for test in tests:
+    modules.update(test.get('classname', '').split('.'))
+    modules.add(Path(test.get('file', '')).stem)
+    name = test.get('name', '')
+    base = name.split('[', 1)[0]
+    if base in required or base == 'test_packaged_release_physics_cases':
+        properties = {p.get('name'): p.get('value') for p in test.findall('properties/property')}
+        if (properties.get('joined_container_image_id') != expected_id
+                or properties.get('joined_synthetic_scheduler_ref') != expected_ref
+                or properties.get('joined_placement') != 'synthetic SkyPilot placement; real Docker native execution'
+                or int(properties.get('joined_successful_native_processes', '0')) <= 0):
+            raise SystemExit('Required physics proof lacks matching local image/native execution provenance')
+        executed.add(base)
+        if base == 'test_packaged_release_physics_cases':
+            if '[' not in name or not name.endswith(']'):
+                raise SystemExit('Required packaged release case identity missing')
+            release_ids.append(name.split('[', 1)[1][:-1])
+if not {'test_physics_lifecycle', 'test_cd_acceptance', 'test_physics_examples'} <= modules:
+    raise SystemExit('Required physics integration module missing')
+if not required <= executed or not expected_cases or set(release_ids) != expected_cases or len(release_ids) != len(expected_cases):
+    raise SystemExit('Required physics native/example/release case inventory incomplete or duplicated')
+print('Mandatory physics image proofs passed: joined lifecycle, every release physics case and packaged examples; placement is synthetic.')
+WQS_VERIFY_PHYSICS_JUNIT

@@ -300,6 +300,8 @@ class Deployer:
                 raise ValueError('Release requires single-replica application roles')
             container = next(c for c in live['spec']['template']['spec']['containers'] if c['name'] == mapping['container'])
             result[role] = {'image': container['image']}
+            if role == 'api':
+                result[role]['physics_enabled'] = next((e.get('value') for e in container.get('env',[]) if e['name']=='QSIM_PHYSICS_ENABLED'),None)
             if role == 'controller':
                 result[role]['worker_image'] = next((e.get('value') for e in container.get('env', []) if e['name'] == 'QSIM_WORKER_IMAGE'), None)
         return result
@@ -307,6 +309,9 @@ class Deployer:
     def apply(self, role, images, sha):
         mapping = self.config['roles'][role]
         container = {'name': mapping['container'], 'image': images[ROLES[role]]}
+        if role == 'api':
+            # The owning hold is already durable before candidate deployment.
+            container['env'] = [{'name':'QSIM_PHYSICS_ENABLED','value':'1','valueFrom':None}]
         if role == 'controller':
             container['env'] = [{'name': 'QSIM_WORKER_IMAGE', 'value': images['worker'], 'valueFrom': None}]
         patch = {'spec': {'template': {'metadata': {'annotations': {'wqsim-release-sha': sha}},
@@ -331,6 +336,7 @@ class Deployer:
                 if previous['status'] != 'verified':
                     raise ValueError('Prior deployment requires operator recovery')
                 if previous['sha'] == sha:
+                    verify_acceptance(previous['acceptance'], sha, worker_image=previous['images']['worker'], smoke_owner=self.config['smoke_owner'])
                     return previous
             if not current(sha):
                 raise ValueError('Release superseded')
@@ -367,7 +373,7 @@ class Deployer:
                 # Only the private verifier's identity may submit during acceptance.
                 self.control('smoke', sha)
                 verification = json.loads(run(self.config['verify_command'], 600, env=evidence_env))
-                verify_acceptance(verification, sha)
+                verify_acceptance(verification, sha, worker_image=receipt['images']['worker'], smoke_owner=self.config['smoke_owner'])
                 receipt['acceptance'] = verification
                 self.wait_drain(sha)
                 receipt['status'] = 'acceptance_passed'
@@ -379,22 +385,89 @@ class Deployer:
                 write_record(state_dir / (sha + '.json'), receipt)
                 return receipt
             except BaseException:
+                failed_stage=receipt['status']
                 receipt['status'] = 'failed'
+                if failed_stage in ('holding','deploying','acceptance_passed','verified'):
+                    # Reconcile an uncertain open acknowledgement or final
+                    # receipt failure without cancelling any accepted jobs.
+                    try:
+                        held=self.control('hold',sha)
+                        receipt['hold_recovery']='verified' if held.get('release')==sha else 'unverified'
+                    except BaseException:
+                        receipt['hold_recovery']='unverified'
                 write_record(receipt_path, receipt)
+                write_record(state_dir / (sha + '.json'), receipt)
                 raise
 
 
-SMOKE_CASES = {'clifft_stim', 'clifft_qasm2_probability', 'qsim_qasm2_sample',
+CIRCUIT_CASES = {'clifft_stim', 'clifft_qasm2_probability', 'qsim_qasm2_sample',
                'qsim_qasm2_probability', 'qsim_qasm3_sample', 'qsim_qasm3_probability',
                'aer_qasm2_sample', 'aer_qasm3_sample'}
 
 
-def verify_acceptance(evidence, sha):
-    if (evidence.get('sha') != sha or evidence.get('controller_progress') is not True
-            or evidence.get('roles_healthy') != sorted(ROLES)
-            or set(evidence.get('cases', {})) != SMOKE_CASES
+# Versioned inventory names are repeated here so the standalone stdlib gate does
+# not import application dependencies. CI requires exact equality with requests.
+PHYSICS_CASES = {
+    'lindblad_evolve_se':('lindblad','evolve'), 'lindblad_evolve_me':('lindblad','evolve'),
+    'lindblad_evolve_mc':('lindblad','evolve'), 'lindblad_mc_repeat':('lindblad','evolve'),
+    'lindblad_propagator_se':('lindblad','propagator'), 'lindblad_propagator_me':('lindblad','propagator'),
+    'lindblad_spectrum':('lindblad','spectrum'), 'lindblad_steadystate':('lindblad','steadystate'),
+    'scqubits_spectrum':('scqubits','spectrum'), 'scqubits_matrix_elements':('scqubits','matrix_elements'),
+    'scqubits_export_for_lindblad':('scqubits','export_for_lindblad'),
+    'scqubits_export_lindblad':('lindblad','spectrum'), 'josim_sfq':('josim','transient')}
+SMOKE_CASES = CIRCUIT_CASES | set(PHYSICS_CASES)
+
+
+def verify_acceptance(evidence, sha, *, require_physics=True, worker_image=None, smoke_owner=None):
+    if (type(evidence) is not dict or evidence.get('sha')!=sha
+            or evidence.get('controller_progress') is not True
+            or evidence.get('roles_healthy')!=sorted(ROLES)
+            or type(evidence.get('cases')) is not dict
             or any(value is not True for value in evidence['cases'].values())):
         raise ValueError('Complete exact-release live acceptance required')
+    if type(evidence.get('schema',1)) is int and evidence.get('schema',1)==1:
+        if require_physics or set(evidence['cases'])!=CIRCUIT_CASES:
+            raise ValueError('Historical circuit evidence cannot qualify physics')
+        return
+    image=evidence.get('worker_image')
+    if (type(evidence.get('schema')) is not int or evidence['schema']!=2
+            or evidence.get('matrix')!='cpu-physics-v1' or evidence.get('gpu_cells')!=[]
+            or set(evidence['cases'])!=SMOKE_CASES or type(evidence.get('jobs')) is not dict
+            or set(evidence['jobs'])!=SMOKE_CASES or not isinstance(image,str)
+            or not re.fullmatch(r'[^\s@]+@sha256:[0-9a-f]{64}',image)
+            or (worker_image is not None and image!=worker_image)):
+        raise ValueError('Complete versioned CPU physics acceptance required')
+    ids=set();native_ids=set();owners=set()
+    for name,record in evidence['jobs'].items():
+        engine,operation=PHYSICS_CASES.get(name,(name.split('_')[0],
+            'basis_probabilities' if name.endswith('probability') else 'sample'))
+        physics=name not in CIRCUIT_CASES
+        if type(record) is not dict:raise ValueError('Invalid acceptance member')
+        identifier=record.get('id');cluster=record.get('cluster');native=record.get('native_job_id')
+        if (not isinstance(identifier,str) or not re.fullmatch(r'[0-9a-f]{32}',identifier)
+                or identifier in ids or not isinstance(cluster,str) or not re.fullmatch(r'qs-[0-9a-f]{20}',cluster)
+                or type(native) is not int or native<1 or (cluster,native) in native_ids
+                or not isinstance(record.get('owner'),str) or not record['owner']
+                or record.get('source_sha')!=sha or record.get('worker_image')!=image
+                or record.get('engine')!=engine or record.get('operation')!=operation
+                or record.get('native_status')!='SUCCEEDED' or record.get('cleaned') is not True
+                or record.get('mathematics_verified') is not True
+                or record.get('profile_id')!=('physics-cpu-v1' if physics else 'circuit')):
+            raise ValueError('Acceptance identity/native/math mismatch')
+        for key in ('request_sha256','result_sha256'):
+            if not isinstance(record.get(key),str) or not re.fullmatch(r'[0-9a-f]{64}',record[key]):
+                raise ValueError('Missing acceptance digest')
+        context=record.get('context_sha256')
+        if (physics and (not isinstance(context,str) or not re.fullmatch(r'[0-9a-f]{64}',context))) or (not physics and context is not None):
+            raise ValueError('Acceptance profile context mismatch')
+        allocation=record.get('allocation',{})
+        if (allocation.get('worker_image')!=image or allocation.get('backend')!='cpu'
+                or any(type(allocation.get(key)) not in (int,float) or not low<=allocation[key]<float('inf')
+                       for key,low in (('cpus',2),('memory_gib',4)))):
+            raise ValueError('Acceptance native allocation mismatch')
+        ids.add(identifier);native_ids.add((cluster,native));owners.add(record['owner'])
+    if len(owners)!=1 or (smoke_owner is not None and owners!={smoke_owner}):
+        raise ValueError('Acceptance owner mismatch')
 
 
 def publish_version(config, sha, version):
@@ -405,7 +478,7 @@ def publish_version(config, sha, version):
     record = json.loads((Path(config['state_dir']) / (sha + '.json')).read_text())
     if record['sha'] != sha or record['status'] != 'verified':
         raise ValueError('Verified captured deployment required')
-    verify_acceptance(record['acceptance'], sha)
+    verify_acceptance(record['acceptance'], sha, require_physics=False)
     # gh reads credentials from the local environment; notes contain no inventory.
     tag = 'refs/tags/' + version
     existing = json.loads(run(['gh', 'api', 'repos/' + REPOSITORY + '/git/matching-refs/tags/' + version]))
@@ -417,7 +490,8 @@ def publish_version(config, sha, version):
         run(['gh', 'api', '--method', 'POST', 'repos/' + REPOSITORY + '/git/refs',
              '-f', 'ref=' + tag, '-f', 'sha=' + sha])
     notes = ('Verified deployment of ' + sha + '.\n\nCI: https://github.com/' + REPOSITORY +
-             '/actions/runs/' + record['ci_run'] + '\nAll three engines passed live acceptance.\n')
+             '/actions/runs/' + record['ci_run'] + ('\nCircuit and CPU physics matrices passed live acceptance.\n'
+             if record['acceptance'].get('schema')==2 else '\nHistorical circuit-only acceptance; physics was not qualified.\n'))
     # Creating a release is explicit. Existing releases are never edited or retagged.
     tags = run(['gh', 'api', '--paginate', 'repos/' + REPOSITORY + '/releases', '--jq', '.[].tag_name']).splitlines()
     if version in tags:
