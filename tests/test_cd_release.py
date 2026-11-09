@@ -602,8 +602,59 @@ def test_consistently_wrong_receipt_owner_is_rejected_at_deployment_boundary():
 def test_api_candidate_patch_stages_physics_without_replacing_other_configuration(tmp_path,monkeypatch):
     deploy=release.Deployer(config(tmp_path));calls=[]
     monkeypatch.setattr(deploy,'kube',lambda *a,**kw:calls.append(a))
-    deploy.apply('api',{'api':'candidate-digest'},SHA)
+    deploy.apply('api',{'api':'candidate-digest','worker':'candidate-worker-digest'},SHA)
     patch=json.loads(calls[0][-1]);container=patch['spec']['template']['spec']['containers'][0]
     assert container=={'name':'api','image':'candidate-digest',
-        'env':[{'name':'QSIM_PHYSICS_ENABLED','value':'1','valueFrom':None}]}
+        'env':[{'name':'QSIM_PHYSICS_ENABLED','value':'1','valueFrom':None},
+               {'name':'QSIM_WORKER_IMAGE','value':'candidate-worker-digest','valueFrom':None}]}
     assert 'replicas' not in patch['spec'] and 'volumes' not in patch['spec']['template']['spec']
+
+
+@pytest.mark.parametrize('previous_image',[None,'registry.example.invalid/old@sha256:'+'c'*64])
+def test_fresh_api_process_admits_all_physics_with_patched_candidate_image(tmp_path,monkeypatch,previous_image):
+    import os,subprocess,sys
+    deploy=release.Deployer(config(tmp_path));calls=[]
+    monkeypatch.setattr(deploy,'kube',lambda *args,**kw:calls.append(args))
+    image='registry.example.invalid/candidate@sha256:'+'b'*64
+    deploy.apply('api',{'api':'candidate-api','worker':image},SHA)
+    container=json.loads(calls[0][-1])['spec']['template']['spec']['containers'][0]
+    env={'PATH':os.environ['PATH'],'QSIM_DATA':str(tmp_path/'api-data'),
+         'QSIM_TOKEN_FILE':str(tmp_path/'api-data/users.json'),
+         'OPENBLAS_NUM_THREADS':'1','OMP_NUM_THREADS':'1'}
+    if previous_image is not None:env['QSIM_WORKER_IMAGE']=previous_image
+    env.update({item['name']:item['value'] for item in container['env']})
+    code='''
+import json,sys
+from fastapi.testclient import TestClient
+from qsim import settings,store
+from qsim.api import app
+from qsim.auth import digest
+from qsim.release_probe import release_cases
+expected=sys.argv[1]
+settings.DATA.mkdir()
+settings.TOKEN_FILE.write_text(json.dumps([{'id':'smoke','active':True,'sha256':digest('synthetic-api-key')}]))
+with TestClient(app) as client:
+    for name in ('lindblad_spectrum','scqubits_spectrum','josim_sfq'):
+        body=release_cases()[name]
+        response=client.post('/api/jobs/'+body['engine'],json=body,
+            headers={'Authorization':'Bearer synthetic-api-key','Idempotency-Key':name})
+        assert response.status_code==202,response.text
+        with store.connect() as db:
+            context=json.loads(db.execute('SELECT profile_json FROM job_dispatch WHERE job_id=?',
+                (response.json()['id'],)).fetchone()[0])
+        assert context['worker_profile']['image']==expected
+'''
+    completed=subprocess.run([sys.executable,'-c',code,image],env=env,capture_output=True,text=True,timeout=30)
+    assert completed.returncode==0,completed.stderr
+
+
+def test_capture_preserves_api_worker_image_for_recovery(tmp_path,monkeypatch):
+    deploy=release.Deployer(config(tmp_path))
+    image='registry.example.invalid/prior@sha256:'+'c'*64
+    def kube(*args,**kwargs):
+        role=args[2]
+        return json.dumps({'spec':{'replicas':1,'strategy':{'type':'Recreate'},'template':{'spec':{'containers':[
+            {'name':role,'image':'prior-role','env':[{'name':'QSIM_WORKER_IMAGE','value':image},
+                {'name':'QSIM_PHYSICS_ENABLED','value':'0'}]}]}}}})
+    monkeypatch.setattr(deploy,'kube',kube)
+    assert deploy.capture()['api']=={'image':'prior-role','worker_image':image,'physics_enabled':'0'}

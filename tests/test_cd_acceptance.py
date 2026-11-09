@@ -142,6 +142,14 @@ def test_deployment_generation_and_pod_readiness_are_checked(tmp_path, monkeypat
            'status': {'containerStatuses': [{'name': role, 'ready': True, 'imageID': image} for role in release.ROLES]}}
     monkeypatch.setattr(verifier, 'kube', lambda *args: json.dumps(deployment if args[1] == 'deployment' else {'items': [pod]}))
     verifier.roles({target: image for target in release.TARGETS})
+    api=next(c for c in deployment['spec']['template']['spec']['containers'] if c['name']=='api')
+    for previous in (None,'worker:local','registry.example.invalid/old@sha256:'+'c'*64):
+        api['env']=[{'name':'QSIM_PHYSICS_ENABLED','value':'1'}]
+        if previous is not None:api['env'].append({'name':'QSIM_WORKER_IMAGE','value':previous})
+        with pytest.raises(ValueError,match='API worker image'):
+            verifier.roles({target:image for target in release.TARGETS})
+    api['env']=[{'name':'QSIM_PHYSICS_ENABLED','value':'1'},
+                {'name':'QSIM_WORKER_IMAGE','value':image}]
     deployment['status']['observedGeneration'] = 1
     with pytest.raises(ValueError):
         verifier.roles({target: image for target in release.TARGETS})

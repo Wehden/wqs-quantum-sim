@@ -269,10 +269,10 @@ class Acceptance:
             if role == 'api':
                 environment = {e['name']:e.get('value') for e in containers[mapping['container']].get('env',[])}
                 if environment.get('QSIM_PHYSICS_ENABLED')!='1':raise ValueError('Physics matrix not staged')
-            if role == 'controller':
+            if role in ('api', 'controller'):
                 environment = {e['name']: e.get('value') for e in containers[mapping['container']].get('env', [])}
                 if environment.get('QSIM_WORKER_IMAGE') != expected['worker']:
-                    raise ValueError('Controller worker image mismatch')
+                    raise ValueError(('API' if role == 'api' else 'Controller')+' worker image mismatch')
             if (spec.get('replicas') != 1 or status.get('observedGeneration', 0) < deployment['metadata']['generation']
                     or any(status.get(k) != 1 for k in ('replicas', 'readyReplicas', 'updatedReplicas', 'availableReplicas'))
                     or containers[mapping['container']]['image'] != image):

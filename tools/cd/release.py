@@ -302,7 +302,7 @@ class Deployer:
             result[role] = {'image': container['image']}
             if role == 'api':
                 result[role]['physics_enabled'] = next((e.get('value') for e in container.get('env',[]) if e['name']=='QSIM_PHYSICS_ENABLED'),None)
-            if role == 'controller':
+            if role in ('api', 'controller'):
                 result[role]['worker_image'] = next((e.get('value') for e in container.get('env', []) if e['name'] == 'QSIM_WORKER_IMAGE'), None)
         return result
 
@@ -311,7 +311,8 @@ class Deployer:
         container = {'name': mapping['container'], 'image': images[ROLES[role]]}
         if role == 'api':
             # The owning hold is already durable before candidate deployment.
-            container['env'] = [{'name':'QSIM_PHYSICS_ENABLED','value':'1','valueFrom':None}]
+            container['env'] = [{'name':'QSIM_PHYSICS_ENABLED','value':'1','valueFrom':None},
+                                {'name':'QSIM_WORKER_IMAGE','value':images['worker'],'valueFrom':None}]
         if role == 'controller':
             container['env'] = [{'name': 'QSIM_WORKER_IMAGE', 'value': images['worker'], 'valueFrom': None}]
         patch = {'spec': {'template': {'metadata': {'annotations': {'wqsim-release-sha': sha}},

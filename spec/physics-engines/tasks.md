@@ -2188,3 +2188,16 @@ full circuit envelopes through the generic `/api/jobs` route. Explicit Stim/QASM
 routes have narrower bodies. The mandatory image lane now executes all eight
 legacy release cases in the actual packaged worker; the normal host lane retains
 its existing isolated-host checks. No circuit API contract is changed or waived.
+
+### PR #81 first review correction, 2026-11-09
+
+The first automatic review found a valid P1: physics activation updated the
+controller's worker digest but omitted the API admission process. Both now
+receive the same candidate `QSIM_WORKER_IMAGE`; acceptance checks the API value
+before submissions and recovery capture retains its previous explicit value.
+Regression tests reject missing/default/stale API values. Fresh isolated API
+processes starting with a missing or old digest accept all three physics
+backends and persist only the candidate digest after applying the CD patch.
+All 146 focused CD/acceptance tests pass. Existing credentials, backup gates,
+worker numerics and unrelated workloads are unchanged. The corrective push
+uses automatic review round 2; no manual review request is sent.
