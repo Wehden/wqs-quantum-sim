@@ -157,3 +157,25 @@ input expected by their pinned older worker when that header is absent. New
 workers receive the sealed envelope, including for version-1 jobs, and still
 verify its original admission digest and profile. Unknown protocol versions
 are rejected. Public request bodies and idempotency hashes are unchanged.
+
+## Tranche B release qualification
+
+The version-2 release verifier has 21 named cases, retaining all eight circuit
+cases and adding 13 physics cases. The actual packaged physics cases pass all
+13 tests. Published examples pass 38 tests with zero skips, including all 11
+native examples, seeded repetition and actual scqubits-export-to-Lindblad
+execution. Their inspected local image is
+`sha256:fa3baecfdfadae5b8a0f9d9233e82438edc32aeb308628cd8da96f2051a01c10`.
+Its scheduler reference is synthetic and is not registry or live-placement proof.
+
+The independent verifier checks analytic phase/decay, density physicality,
+Hilbert/Liouville propagators, charge-basis Transmon eigenpairs/operators, the
+actual returned numeric export and the original frozen JoSIM waveform. MC
+relaxation uses independently derived PCG64 jump thresholds, not repetition
+alone. The JoSIM exact time/trace digest retains native output selection and
+does not impose a fabricated uniform grid. Historical circuit receipts remain
+valid only for their original scope.
+
+The [validation ledger](../validation.md) records requirement coverage and the
+remaining exact-release/real-SkyPilot/backup obligations. Qualification tests do
+not open production admission.

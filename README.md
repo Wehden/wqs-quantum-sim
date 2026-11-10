@@ -1,8 +1,8 @@
 # wqsim
 
 CPU quantum simulation service built with FastAPI, SkyPilot, and Kubernetes.
-Submit a circuit, follow its durable job status, and download measurement samples
-or selected basis probabilities. Clifft, Google qsim and Qiskit Aer share the same API,
+Submit a circuit or a supported physical model, follow its durable job status,
+and download numeric results. Clifft, Google qsim and Qiskit Aer share the same API,
 invitation authentication, and worker pool.
 
 ## Supported inputs
@@ -59,6 +59,80 @@ See the [developer guide](qsim/static/index.html), [agent API guide](qsim/static
 and [deployment guide](docs/deployment.md). Example addresses use reserved domains
 and must be configured for your installation.
 
+## Physics models
+
+Physics routes are implemented for the CPU matrix below. Production activation is gated by exact-release acceptance. Check authenticated `GET /api/capabilities` on your deployment; an omitted engine is unavailable, and new physics submissions return `503` while activation is off. A source merge or image build does not establish production availability.
+
+| Engine | Submit | Generic input format | Authenticated schema |
+| --- | --- | --- | --- |
+| QuTiP 5.3.1 Lindblad | `POST /api/jobs/lindblad` | `lindblad_model` | `GET /api/schemas/lindblad/1.json` |
+| scqubits 4.3.1 | `POST /api/jobs/scqubits` | `scqubits_model` | `GET /api/schemas/scqubits/1.json` |
+| Patched JoSIM v2.7 | `POST /api/jobs/josim` | `josim_netlist` | `GET /api/schemas/josim/1.json` |
+
+Lindblad covers SE/ME/MC evolution, SE/ME propagators, static spectra and unique
+steady states. scqubits supports Transmon, TunableTransmon, Fluxonium and
+FluxQubit spectra, matrix elements and numeric export to Lindblad. JoSIM accepts
+the tested self-contained superconducting transient subset. The first physics
+matrix is CPU-only; no GPU capability or automatic GPU fallback is advertised.
+
+Use integer `schema_version: 1`, bearer authentication and a saved
+`Idempotency-Key`. This two-level example keeps number expectation one while
+the excited-state phase rotates; submit it to `POST /api/jobs/lindblad`:
+
+<!-- example: physics-lindblad-evolve-se -->
+```json
+{
+  "engine": "lindblad",
+  "input_format": "lindblad_model",
+  "schema_version": 1,
+  "operation": "evolve",
+  "model": {
+    "modes": [
+      {
+        "name": "q",
+        "kind": "oscillator",
+        "dimension": 2,
+        "frequency": 0.017
+      }
+    ]
+  },
+  "solver": "se",
+  "times": [
+    0.0,
+    0.5,
+    1.0
+  ],
+  "initial_state": {
+    "kind": "product",
+    "modes": {
+      "q": {
+        "kind": "fock",
+        "index": 1
+      }
+    }
+  },
+  "observables": [
+    {
+      "name": "n",
+      "operator": {
+        "kind": "product",
+        "factors": {
+          "q": "n"
+        }
+      }
+    }
+  ],
+  "store_states": "all"
+}
+```
+
+The [physics developer guide](docs/physics-engines.md) contains tested JSON for
+all operation/solver families, schema URLs, GHz/ns/SI units, result array shapes,
+resource/error behavior and the scqubits export-to-Lindblad client sequence.
+Requests contain numeric JSON data, never Python, native options or resource
+selectors. Poll/SSE and authenticated NPZ downloads use the existing job paths;
+load archives with `allow_pickle=False`. Clients manage batches and state.
+
 ## Classical conditions with Qiskit Aer
 
 Select `"engine": "aer"` and `"operation": "sample"` on `/api/jobs/qasm2` or `/api/jobs/qasm3`. Check `/api/capabilities` first. Aer 0.17.2 runs CPU statevector simulation in double precision, imported by Qiskit 2.6.0 and QASM3 importer 0.6.0. This is an explicit engine choice; requests never switch simulators automatically.
@@ -113,9 +187,12 @@ uv sync --frozen --extra worker --extra controller
 bash tools/ci/check.sh
 ```
 
-The checks run all three native simulator engines, API authorization and idempotency,
-SSE replay, worker lifecycle logic, and JavaScript console tests. They do not
-launch cloud or Kubernetes resources. See [CI](docs/ci.md) for local and hosted lanes.
+The host checks cover circuit/physics schemas, API authorization and idempotency,
+SSE replay, lifecycle logic and JavaScript console tests. Docker-based
+`bash tools/ci/check-worker.sh` additionally runs the packaged native physics
+examples and joined HTTP/worker checks. Those image checks are mandatory in CI;
+a skipped image-only test in a host run is not native acceptance. The checks do
+not launch cloud or Kubernetes resources. See [CI](docs/ci.md) for local and hosted lanes.
 
 ## Run the API
 
@@ -171,4 +248,7 @@ This service uses the [MIT license](LICENSE). Dependencies retain their own
 licenses. Thanks to [Unitary Foundation's Clifft](https://github.com/unitaryfoundation/clifft),
 [Google qsim](https://github.com/quantumlib/qsim) (Apache 2.0),
 [Qiskit Aer](https://github.com/Qiskit/qiskit-aer) (Apache 2.0),
-[Cirq](https://github.com/quantumlib/Cirq), and [SkyPilot](https://github.com/skypilot-org/skypilot).
+[Cirq](https://github.com/quantumlib/Cirq),
+[QuTiP](https://qutip.readthedocs.io/en/stable/),
+[scqubits](https://scqubits.readthedocs.io/en/latest/),
+[JoSIM](https://github.com/JoeyDelp/JoSIM), and [SkyPilot](https://github.com/skypilot-org/skypilot).

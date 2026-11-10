@@ -1,0 +1,76 @@
+# Physics validation and release ledger
+
+PR #80 is merged at `87304d249005ad65db6a256bf970e04ede1c1288`. Exact-main
+push CI `42535051613` passed, including Standpunkt child `42535074189` and hosted
+image/runner checks. Tranche B adds versioned promotion qualification; its own
+PR CI/review and production acceptance are separate pending stages.
+
+## Requirement coverage
+
+| Requirement | Executed component evidence | Release obligation |
+| --- | --- | --- |
+| PHY-001 compatibility | Frozen compatibility baseline, transactions, worker lifecycle, all eight circuit cases retained | Eight circuit cases in version-2 live receipt |
+| PHY-002 one job system | Placement and joined HTTP/native lifecycle tests | Real SkyPilot job IDs, cleanup and owned admission |
+| PHY-003 submissions | Physics API normalization, explicit/generic-route replay and owner tests | Named canonical request and smoke-owner binding |
+| PHY-004 input boundary | Schema/model, pointer, finite/shape and raw-preflight tests | Current deployed schemas and admission |
+| PHY-005 no caller code | JoSIM security, strict model/operator allowlists and callback archive negatives | Pinned worker/native identity |
+| PHY-006 units | Analytic Lindblad phase/decay, charge-basis scqubits and JoSIM SI/SFQ checks | Same independent math in live verifier |
+| PHY-007 models | Lindblad operators, Hermiticity, tensor order and drive tests | Certified CPU profile/context |
+| PHY-008 states | Pure/density/thermal-state tests; release density trace/PSD checks | Real native fixture output |
+| PHY-009 evolution | SE/ME/MC native families; MC PCG64 survival and seeded-repeat checks | Named evolve and repeat cases |
+| PHY-010 other operations | Native spectrum, unique steady state and Hilbert/Liouville propagators | All four operation families in receipt |
+| PHY-011 resources | Constrained CPU image certificates, workspace queries and raw-input preflight | Actual refreshed CPU allocation and immutable profile |
+| PHY-012 results | Result/schema/security tests and actual complex/Unicode encrypted recovery | Download/store artifact digest equality |
+| PHY-013 transport | Stored-plan callback/header/byte tests; final-callback-loss reconciliation | Complete results and native cleanup |
+| PHY-014 discovery | API schema/capability solver-free checks; documented-schema tests | Runtime capabilities remain authority |
+| PHY-015 docs and CI | Published JSON/schema tests and all 11 packaged documented examples | Exact-head configured CI and protected checks |
+| PHY-016 additional engines | All four scqubits classes/export; JoSIM frozen/history/capacity proofs | scqubits/export round trip and JoSIM SFQ |
+| PHY-017 scqubits API | Spectrum/matrix/export native and owner/idempotency tests | Independent charge-Hamiltonian/eigenpair checks |
+| PHY-018 JoSIM API | Allowlisted netlist, original/candidate exact equivalence and real SFQ | Full native waveform digest, trace units/order and SFQ math |
+| PHY-019 GPU discovery | Prior SkyPilot GPU discovery; corrected timing and fallback evidence | Empty enabled-GPU matrix, no new GPU pass claim |
+| PHY-020 placement | Immutable image/profile, pool separation, capacity retry and native reconciliation | Refreshed actual worker image/resources and native completion |
+
+The named joined tests are `test_joined_lindblad_operation_families`,
+`test_joined_scqubits_native_spectrum_and_matrix_elements`,
+`test_joined_scqubits_export_to_lindblad_is_a_client_sequence`,
+`test_joined_josim_sfq_and_circuit_pool_separation`, callback-loss/tamper tests and
+actual native-result backup/restore. The package executes original/candidate
+JoSIM source equivalence and largest-shape CPU proof separately.
+
+## Version-2 release contract
+
+`qsim.release_probe.release_cases()` defines 21 named requests: eight unchanged
+circuit cases, seven Lindblad solver/operation families, an additional MC seeded
+repeat, scqubits spectrum/matrix elements/export, the dependent exported
+Lindblad request, and JoSIM SFQ. The inventory controls the probe bound. It is
+not an arbitrary caller-provided job list or a new global job cap.
+
+The export child is submitted only after validating the parent's actual returned
+numeric handoff. MC acceptance derives survival from eight PCG64 thresholds,
+`mean(threshold < exp(-t/3))`, in addition to exact seeded repetition. For JoSIM,
+the frozen original row-major network-byte-order double digest is
+`698addcdc6ff152b94d4d908fd4023738560622fc31ab306a2b0e407fe5beb04`.
+This preserves native output-time selection, including its nonuniform retained
+cadence; no uniform resampling or waveform tolerance was introduced.
+
+Missing/extra/false case members, a historical/unknown receipt version, wrong
+owner/image/profile/source/result identity, pending/failed native work and
+incomplete cleanup fail promotion. Acknowledgement/final-persistence failures
+attempt owned-hold recovery and leave failed receipts. Unknown recovery is not
+green.
+
+## Commands and evidence scope
+
+Canonical commands remain `bash tools/ci/check.sh`,
+`bash tools/ci/check-worker.sh` and `bash tools/ci/check-release.sh`.
+The image harness mandatorily executes lifecycle, release-case and documented
+example modules, rejects unittest skips/expected failures/zero execution, and
+requires no skipped pytest proofs plus actual successful native-process counts.
+CI retains that JUnit receipt even on failure. Standpunkt-first routing,
+protected names and hosted fallback remain unchanged.
+
+Local packaged proofs use inspected Docker image identity and an explicitly
+synthetic SkyPilot placement reference. They do not prove a live cluster or
+registry deployment. Exact-main artifacts, real backup/recovery and actual
+SkyPilot acceptance remain TASK-034. Current credentials and all existing
+backup/release gates are unchanged.

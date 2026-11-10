@@ -29,8 +29,21 @@ def config(tmp_path):
 
 
 def evidence():
-    return {'sha': SHA, 'roles_healthy': sorted(release.ROLES), 'controller_progress': True,
-            'cases': {name: True for name in release.SMOKE_CASES}}
+    image='registry.example.invalid/worker@sha256:'+'b'*64
+    result={'schema':2,'matrix':'cpu-physics-v1','gpu_cells':[],'sha':SHA,'worker_image':image,
+            'roles_healthy':sorted(release.ROLES),'controller_progress':True,
+            'cases':{name:True for name in release.SMOKE_CASES},'jobs':{}}
+    from qsim.release_probe import release_cases
+    for i,(name,body) in enumerate(release_cases().items(),1):
+        body=body or {'engine':'lindblad','operation':'spectrum'}
+        physics=name not in release.CIRCUIT_CASES
+        result['jobs'][name]={'id':f'{i:032x}','owner':'verifier','source_sha':SHA,
+            'engine':body['engine'],'operation':body['operation'],'request_sha256':'c'*64,
+            'result_sha256':'d'*64,'worker_image':image,'profile_id':'physics-cpu-v1' if physics else 'circuit',
+            'context_sha256':'e'*64 if physics else None,'cleaned':True,'mathematics_verified':True,
+            'cluster':'qs-'+'0'*20,'native_job_id':i,'native_status':'SUCCEEDED',
+            'allocation':{'worker_image':image,'cpus':2.,'memory_gib':4.,'backend':'cpu'}}
+    return result
 
 
 def bundle(tmp_path):
@@ -151,7 +164,7 @@ def test_partial_rollout_keeps_hold_and_blocks_blind_retry(tmp_path, services, f
 
 
 def test_failed_smoke_keeps_admission_closed(tmp_path, services, monkeypatch):
-    monkeypatch.setattr(release, 'verify_acceptance', lambda *args: (_ for _ in ()).throw(ValueError('bad result')))
+    monkeypatch.setattr(release, 'verify_acceptance', lambda *args, **kwargs: (_ for _ in ()).throw(ValueError('bad result')))
     deploy = Fake(config(tmp_path))
     with pytest.raises(ValueError):
         deploy.deploy(bundle(tmp_path), SHA, '123')
@@ -499,3 +512,149 @@ def test_cli_keeps_unclassified_private_exception_redacted(tmp_path, monkeypatch
     with pytest.raises(SystemExit) as failed:
         release.main()
     assert str(failed.value) == 'Release failed: ValueError; inspect private state'
+
+
+def test_physics_promotion_rejects_historical_circuit_receipt():
+    historical={'sha':SHA,'roles_healthy':sorted(release.ROLES),'controller_progress':True,
+                'cases':{name:True for name in release.CIRCUIT_CASES}}
+    with pytest.raises(ValueError):release.verify_acceptance(historical,SHA)
+    release.verify_acceptance(historical,SHA,require_physics=False)
+
+
+def test_physics_contract_inventory_has_all_operation_families():
+    from qsim.release_probe import release_cases
+    inventory=release_cases()
+    assert len(inventory)==21
+    assert release.CIRCUIT_CASES < set(inventory)
+    assert set(inventory)==release.SMOKE_CASES
+    assert inventory['scqubits_export_lindblad'] is None
+    assert len({(b['operation'],b.get('solver')) for b in inventory.values()
+                if b and b['engine']=='lindblad'})==7
+
+
+@pytest.mark.parametrize('member',sorted(release.SMOKE_CASES))
+def test_missing_or_false_matrix_member_cannot_promote(member):
+    for section in ('cases','jobs'):
+        value=evidence();value[section].pop(member)
+        with pytest.raises(ValueError):release.verify_acceptance(value,SHA)
+    value=evidence();value['cases'][member]=1
+    with pytest.raises(ValueError):release.verify_acceptance(value,SHA)
+
+
+@pytest.mark.parametrize('field,value',[
+    ('source_sha','b'*40),('worker_image','registry.example.invalid/old@sha256:'+'f'*64),
+    ('owner','different'),('profile_id','gpu'),('context_sha256',None),('request_sha256',''),
+    ('result_sha256',''),('native_status','RUNNING'),('native_status','FAILED_SETUP'),
+    ('native_job_id',True),('cleaned',False),('mathematics_verified',False),
+    ('allocation',{'worker_image':'wrong','cpus':2,'memory_gib':4,'backend':'cpu'})])
+def test_wrong_physics_evidence_retains_promotion_gate(field,value):
+    receipt=evidence();receipt['jobs']['lindblad_spectrum'][field]=value
+    with pytest.raises(ValueError):release.verify_acceptance(receipt,SHA)
+
+
+def test_unknown_receipt_matrix_gpu_and_duplicate_native_identity_fail():
+    import copy
+    for mutate in (lambda r:r.update(schema=3),lambda r:r.update(schema=True),
+                   lambda r:r.update(matrix='other'),lambda r:r.update(gpu_cells=['unproven']),
+                   lambda r:r['cases'].update(extra=True),
+                   lambda r:r['jobs']['lindblad_spectrum'].update(id=r['jobs']['josim_sfq']['id']),
+                   lambda r:r['jobs']['lindblad_spectrum'].update(native_job_id=r['jobs']['josim_sfq']['native_job_id'])):
+        receipt=copy.deepcopy(evidence());mutate(receipt)
+        with pytest.raises(ValueError):release.verify_acceptance(receipt,SHA)
+
+
+def test_standalone_stdlib_release_gate_has_no_application_import_dependency(tmp_path):
+    import subprocess,sys
+    result=subprocess.run([sys.executable,'-I','tools/cd/release.py','--help'],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+
+
+@pytest.mark.parametrize('failure',['final-receipt','version-receipt','unknown-open-ack'])
+def test_post_acceptance_failure_reestablishes_owned_hold(tmp_path,services,monkeypatch,failure):
+    deploy=Fake(config(tmp_path));original_write=release.write_record;original_control=deploy.control
+    triggered=False
+    def write(path,record):
+        nonlocal triggered
+        if (not triggered and record.get('status')=='verified' and
+                ((failure=='final-receipt' and path.name=='deployment.json') or
+                 (failure=='version-receipt' and path.name==SHA+'.json'))):
+            triggered=True;raise OSError('synthetic fsync failure')
+        return original_write(path,record)
+    def control(action,sha):
+        value=original_control(action,sha)
+        if failure=='unknown-open-ack' and action=='open':raise TimeoutError('synthetic acknowledgement loss')
+        return value
+    monkeypatch.setattr(release,'write_record',write);monkeypatch.setattr(deploy,'control',control)
+    with pytest.raises((OSError,TimeoutError)):deploy.deploy(bundle(tmp_path),SHA,'123')
+    record=json.loads((tmp_path/'state/deployment.json').read_text())
+    assert deploy.held and deploy.calls[-1]=='hold'
+    assert record['status']=='failed' and record['hold_recovery']=='verified'
+    assert json.loads((tmp_path/'state'/ (SHA+'.json')).read_text())['status']=='failed'
+
+
+def test_consistently_wrong_receipt_owner_is_rejected_at_deployment_boundary():
+    receipt=evidence()
+    for record in receipt['jobs'].values():record['owner']='different'
+    with pytest.raises(ValueError,match='owner'):
+        release.verify_acceptance(receipt,SHA,smoke_owner='verifier')
+
+
+def test_api_candidate_patch_stages_physics_without_replacing_other_configuration(tmp_path,monkeypatch):
+    deploy=release.Deployer(config(tmp_path));calls=[]
+    monkeypatch.setattr(deploy,'kube',lambda *a,**kw:calls.append(a))
+    deploy.apply('api',{'api':'candidate-digest','worker':'candidate-worker-digest'},SHA)
+    patch=json.loads(calls[0][-1]);container=patch['spec']['template']['spec']['containers'][0]
+    assert container=={'name':'api','image':'candidate-digest',
+        'env':[{'name':'QSIM_PHYSICS_ENABLED','value':'1','valueFrom':None},
+               {'name':'QSIM_WORKER_IMAGE','value':'candidate-worker-digest','valueFrom':None}]}
+    assert 'replicas' not in patch['spec'] and 'volumes' not in patch['spec']['template']['spec']
+
+
+@pytest.mark.parametrize('previous_image',[None,'registry.example.invalid/old@sha256:'+'c'*64])
+def test_fresh_api_process_admits_all_physics_with_patched_candidate_image(tmp_path,monkeypatch,previous_image):
+    import os,subprocess,sys
+    deploy=release.Deployer(config(tmp_path));calls=[]
+    monkeypatch.setattr(deploy,'kube',lambda *args,**kw:calls.append(args))
+    image='registry.example.invalid/candidate@sha256:'+'b'*64
+    deploy.apply('api',{'api':'candidate-api','worker':image},SHA)
+    container=json.loads(calls[0][-1])['spec']['template']['spec']['containers'][0]
+    env={'PATH':os.environ['PATH'],'QSIM_DATA':str(tmp_path/'api-data'),
+         'QSIM_TOKEN_FILE':str(tmp_path/'api-data/users.json'),
+         'OPENBLAS_NUM_THREADS':'1','OMP_NUM_THREADS':'1'}
+    if previous_image is not None:env['QSIM_WORKER_IMAGE']=previous_image
+    env.update({item['name']:item['value'] for item in container['env']})
+    code='''
+import json,sys
+from fastapi.testclient import TestClient
+from qsim import settings,store
+from qsim.api import app
+from qsim.auth import digest
+from qsim.release_probe import release_cases
+expected=sys.argv[1]
+settings.DATA.mkdir()
+settings.TOKEN_FILE.write_text(json.dumps([{'id':'smoke','active':True,'sha256':digest('synthetic-api-key')}]))
+with TestClient(app) as client:
+    for name in ('lindblad_spectrum','scqubits_spectrum','josim_sfq'):
+        body=release_cases()[name]
+        response=client.post('/api/jobs/'+body['engine'],json=body,
+            headers={'Authorization':'Bearer synthetic-api-key','Idempotency-Key':name})
+        assert response.status_code==202,response.text
+        with store.connect() as db:
+            context=json.loads(db.execute('SELECT profile_json FROM job_dispatch WHERE job_id=?',
+                (response.json()['id'],)).fetchone()[0])
+        assert context['worker_profile']['image']==expected
+'''
+    completed=subprocess.run([sys.executable,'-c',code,image],env=env,capture_output=True,text=True,timeout=30)
+    assert completed.returncode==0,completed.stderr
+
+
+def test_capture_preserves_api_worker_image_for_recovery(tmp_path,monkeypatch):
+    deploy=release.Deployer(config(tmp_path))
+    image='registry.example.invalid/prior@sha256:'+'c'*64
+    def kube(*args,**kwargs):
+        role=args[2]
+        return json.dumps({'spec':{'replicas':1,'strategy':{'type':'Recreate'},'template':{'spec':{'containers':[
+            {'name':role,'image':'prior-role','env':[{'name':'QSIM_WORKER_IMAGE','value':image},
+                {'name':'QSIM_PHYSICS_ENABLED','value':'0'}]}]}}}})
+    monkeypatch.setattr(deploy,'kube',kube)
+    assert deploy.capture()['api']=={'image':'prior-role','worker_image':image,'physics_enabled':'0'}

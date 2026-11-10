@@ -1,33 +1,39 @@
 # Physics simulation engines
 
-Status: reconciled on 2026-11-02 against main `8d8b2d0486e0feba6b0cc7514836f67256d83cb5`, including merged PRs #60 through #64. Requirements/design and the original task plan are approved; G1 was accepted on 2026-10-26. G2 implementation is in progress. The owner confirmed that the JoSIM TASK-035/036 plan is already approved for execution. Physics worker/API integration and production acceptance remain gated.
+Requirements, design and G1 decisions are approved. Tranche A is merged in
+PR #80 at `87304d249005ad65db6a256bf970e04ede1c1288`; exact-main CI passed with
+Standpunkt tests and hosted image/runner checks. All three CPU backends now
+share the existing API, queue, SkyPilot dispatcher, isolated packaged worker,
+callback/result validation and encrypted recovery path.
 
-The FluxxedUp proposal describes three device-level backends, rather than an executable simulator: QuTiP/Lindblad, scqubits and JoSIM. These complement the existing gate-level engines. The owner confirmed on 2026-10-25 that all three backends are in scope. Implementation may proceed in dependency order, but completion of this flow requires all three. GPU suitability is also in scope following the owner's explicit request; placement remains under WQS/SkyPilot control.
+The owner approved the [integrated delivery tranches](tasks.md#integrated-delivery-tranches-approved-2026-11-08).
+Tranche B combines release qualification, tested public documentation and the
+combined audit in one PR. Production physics is not certified by a source merge
+or local image test. Runtime `/api/capabilities` remains the availability authority.
 
-| Gate | Artifact | Status |
-| --- | --- | --- |
-| Context and requirements | [requirements.md](requirements.md) | Approved on 2026-10-25 |
-| Design | [design.md](design.md), [JoSIM bounded-history amendment](discovery/josim-workspace.md) | Base approved on 2026-10-25; G1 amendment approved on 2026-10-26; JoSIM bounded-history direction approved |
-| Capability discovery | [baseline](discovery/baseline.md), [Lindblad](discovery/lindblad.md), [scqubits](discovery/scqubits.md), [JoSIM](discovery/josim.md), [GPU](discovery/gpu.md) | Current compatibility and all-three constrained CPU references pass; declared-case GPU discovery is complete through SkyPilot. G1 decisions approved on 2026-10-26 |
-| G1 review packet | [decisions](decisions.md), [module exports](interfaces.json), [import boundaries](module-boundaries.json) | Approved on 2026-10-26; TASK-007 onward authorized |
-| Tasks | [tasks.md](tasks.md) | Original plan approved on 2026-10-25; owner confirmed existing TASK-035/036 execution approval on 2026-10-30 |
-| Implementation | [Reconciled task ledger](tasks.md#execution-checklist-reconciled-2026-11-02) | Native Lindblad operators/states/drive grids, certified scqubits spectra/matrix elements, and the bounded JoSIM history patch/proof are merged. Solvers and final native admission certificates remain open |
-| G2 CPU acceptance | TASK-011 through TASK-026 and approved TASK-035/036 | Open: solvers, numeric export, final native admission certification, worker/API integration and final combined-image proof remain |
-| G3 GPU acceptance | TASK-027 through TASK-029 | Discovery decisions accepted; runtime/profile acceptance remains open. GPU work uses SkyPilot |
-| G4 release acceptance | TASK-030 through TASK-034 and existing guarded CD | Open: physics CI/docs, combined audit and exact-release live acceptance follow runtime integration |
+| Gate | Status and evidence |
+| --- | --- |
+| Requirements/design/G1 | Approved; [requirements](requirements.md), [design](design.md), [decisions](decisions.md) |
+| G2 CPU integration | Tranche A merged. All Lindblad families, four scqubits classes/export, JoSIM native/history proofs and joined lifecycle/recovery are implemented; [CPU evidence](discovery/cpu-acceptance.md) |
+| G3 device disposition | Approved CPU-only first release; empty enabled-GPU matrix and scoped prior discovery conclusions in [GPU acceptance](discovery/gpu-acceptance.md) |
+| G4 qualification | Tranche B implements mandatory no-skip proofs, the version-2 21-case acceptance contract, tested docs and [author security audit](security.md); current-head CI/review and owner merge remain required |
+| TASK-034 production | Pending exact-main CI artifacts, real fresh encrypted backup/recovery gates, held deployment, restricted real-SkyPilot smoke, full matrix/native cleanup and durable verified receipt before general admission |
 
-TASK-012 (bounded Lindblad drive grids) and TASK-036 (bounded native JoSIM history)
-are complete and merged. The next parallel lanes are TASK-013 deterministic
-Lindblad evolution and the remaining TASK-020 JoSIM admission certificate, under
-their existing disjoint write leases. Scqubits export, TASK-019, waits for the TASK-016 Lindblad static
-solver. No new approval gate is required for these already-approved tasks;
-material scope or numerical-contract changes still return for review.
+[Validation](validation.md) maps PHY-001 through PHY-020 to component evidence
+and the remaining live-release obligations. [Tasks](tasks.md) retain original
+IDs as traceability units, not separate PR boundaries. TASK-030/031/032/033 and
+the conditional GPU disposition are consolidated in Tranche B; TASK-034 is the
+existing controlled CD rollout after its merge, not another feature lane.
 
-The existing circuit release at `8d8b2d0` passed all eight live cases, native
-SkyPilot checks and cleanup after recorded capacity recovery. Its CD receipt is
-recorded in the [latest reconciliation](tasks.md#merged-stage-and-operational-receipt-2026-11-02).
-Physics runtime and release acceptance remain separate gates.
+Public documentation is the [developer guide](../../qsim/static/index.html),
+[physics API guide](../../docs/physics-engines.md) and downloadable
+[agent instructions](../../qsim/static/agents.md). Examples are executed against
+the packaged worker. Numerical compatibility and source/build provenance remain
+separate from production placement and recovery acceptance.
 
-Specifications stay local for review until implementation, following the established WQS spec workflow. Implementation uses PRs, automatic review, at most two review rounds unless the owner grants an exception, and owner merges. CI defaults to Standpunkt with hosted fallback. Existing backup/bootstrap gates and credentials remain in place.
-
-Primary proposal: `jheckey/fluxxedup`, commit `ae0cea45d244f9a6ee3204516fe6aef44340a34f`, `docs/cluster/job-design.md` and `agent-instructions.md`. WQS owns the integration architecture. The adaptation decisions in the design take precedence over unimplemented suggestions in that proposal once approved.
+The source proposal is `jheckey/fluxxedup` commit
+`ae0cea45d244f9a6ee3204516fe6aef44340a34f`. WQS retains its existing architecture.
+All GPU work uses SkyPilot; no GPU cell is advertised for this first release.
+Existing credentials, recovery keys, backup/release gates and unrelated
+workloads remain unchanged. Automatic reviews remain limited to two rounds
+unless the owner authorizes an exception; the owner merges PRs.

@@ -1,12 +1,13 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>wqsim</title><meta name="description" content="Run CPU quantum simulations with Clifft from Unitary Foundation or Google’s qsim. Request an API key or explore other simulators and quantum hardware services."><link rel="alternate" type="text/markdown" href="/agents.md" title="wqsim agent API guide"><link rel="stylesheet" href="/static/style.css"><script defer src="/static/key-request.js"></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>wqsim</title><meta name="description" content="Run CPU circuit and physical-model quantum simulations through a durable API. Request an API key or explore other simulators and quantum hardware services."><link rel="alternate" type="text/markdown" href="/agents.md" title="wqsim agent API guide"><link rel="stylesheet" href="/static/style.css"><script defer src="/static/key-request.js"></script></head>
 <body><a class="skip-link" href="#content">Skip to content</a>
 <header><a href="/" class="brand">wqsim<span> / quantum simulation</span></a><nav class="top-nav" aria-label="Main navigation"><a href="#start">Developer guide</a><a href="#reference">API reference</a><a class="nav-cta" href="#keys">Request API key</a></nav></header>
 <main id="content"><section class="hero" aria-labelledby="hero-title"><div class="hero-copy"><h1 id="hero-title">Quantum simulation on CPU</h1>
-<p><strong>Clifft 0.11</strong> is an <strong>exact simulator for near-Clifford circuits</strong>: circuits built mostly from efficiently simulatable Clifford gates, with additional non-Clifford operations such as T gates. It keeps the actively simulated part of the quantum state compact. Runtime and memory depend on this active width and the circuit’s structure, so qubit count alone does not tell you how difficult a simulation will be.</p>
+<p><strong>Clifft 0.12.0</strong> is an <strong>exact simulator for near-Clifford circuits</strong>: circuits built mostly from efficiently simulatable Clifford gates, with additional non-Clifford operations such as T gates. It keeps the actively simulated part of the quantum state compact. Runtime and memory depend on this active width and the circuit’s structure, so qubit count alone does not tell you how difficult a simulation will be.</p>
 <p><strong>Google’s qsim 0.22.1</strong> is a full state-vector simulator. It supports general unitary circuits, including circuits with many non-Clifford gates. Memory grows exponentially with the total qubit count. Our CPU service supports measurement sampling and selected basis probabilities through tested OpenQASM 2 and 3 subsets, using single-precision simulation. <a href="#google-qsim">Try the qsim example.</a></p>
 <p>Use Stim or Google qsim QASM circuits for sampling, or supported unitary QASM circuits for basis probabilities. Explore algorithm prototypes and error-correction experiments, then collect results from your own scripts. Measurement samples still have finite-shot statistical variation, even with an exact simulator.</p>
 <p><strong>Qiskit Aer 0.17.2</strong> runs conditional circuits on CPUs in double precision. Use a measurement result to control a later gate, or reset and measure inside a branch. Choose Aer explicitly through the same durable job API. <a href="#aer">Try classical conditions.</a></p>
+<p><strong>Physical models:</strong> explore Lindblad dynamics with QuTiP, superconducting qubit spectra with scqubits, and Josephson-circuit transients with JoSIM. These CPU APIs become available after guarded release acceptance; check capabilities for availability. <a href="#physics">Explore the physics API guide.</a></p>
 <p class="credit">With thanks to <a href="https://unitary.foundation/">Unitary Foundation</a>, which builds and maintains <a href="https://github.com/unitaryfoundation/clifft">Clifft</a>, and to its open-source contributors. Google’s <a href="https://github.com/quantumlib/qsim" target="_blank" rel="noopener noreferrer">qsim project ↗</a> is available under the Apache 2.0 license.</p>
 <div class="supported-modes" aria-labelledby="supported-modes-title"><h2 id="supported-modes-title">Supported Modes</h2><p class="mode-links"><a href="#stim-sampling">Stim API</a> <span aria-hidden="true">|</span> <a href="#qasm2-probabilities">OpenQASM2 API</a> <span aria-hidden="true">|</span> <a href="#qasm3">OpenQASM3 API</a></p><p><strong>Stim:</strong> Use measurement samples to explore outcome frequencies, noisy circuits, and quantum error correction. Each run can return measurements, detectors, and observables.</p><p><strong>OpenQASM 2:</strong> Get probabilities for selected bitstrings from supported unitary circuits. Useful for checking circuit behavior or calculating expectation values in algorithms such as VQE. Choose Google qsim and an explicit sample operation for measurement circuits. OpenQASM 3 also supports bound numeric inputs.</p><p>New to circuit syntax? <a href="#write-circuits">Learn to write a request with worked examples.</a></p><p class="project-links">Public project sites: <a href="https://github.com/quantumlib/Stim" target="_blank" rel="noopener noreferrer">Stim project ↗</a> <span aria-hidden="true">|</span> <a href="https://openqasm.com/" target="_blank" rel="noopener noreferrer">OpenQASM project ↗</a></p></div><div class="getting-started"><h2>A short path to your first result</h2><ol><li><strong>Request access.</strong> Tell us what you plan to simulate.</li><li><strong>Receive your key.</strong> Approved requests receive a key by email.</li><li><strong>Run a circuit.</strong> Follow the developer example, then download your results.</li></ol></div><p class="returning">Already have a key? <a href="#start">Open the developer quick start →</a></p></div>
 <section id="keys" class="access-card" aria-labelledby="access-title"><p class="eyebrow">GET STARTED</p><h2 id="access-title">Request an API key</h2><p>Tell us what you want to simulate. We’ll review your request and email your key if approved.</p>
@@ -17,7 +18,7 @@
 <li><h3><a href="https://quantum.cloud.ibm.com/">IBM Quantum Platform</a></h3><p>Access IBM quantum computers, with Qiskit documentation and learning resources to help you build and run circuits.</p></li>
 <li><h3><a href="https://github.com/unitaryfoundation/clifft">Run Clifft yourself</a></h3><p>Install the open-source simulator on your own machine and work directly with its Python API. Explore the upstream documentation for its full capabilities.</p></li></ul>
 <p class="note">These are separate tools and services, accessed through their own APIs and accounts. wqsim does not submit jobs to quantum hardware.</p></section>
-<div class="layout"><nav class="docs-nav" aria-label="Developer documentation"><span class="eyebrow">DEVELOPER GUIDE</span><a href="#start">Quick start</a><a href="#python">Python client</a><a href="#write-circuits">Writing circuits</a><a href="#formats">Stim &amp; OpenQASM</a><a href="#aer">Classical conditions (Aer)</a><a href="#streaming">Streaming &amp; retries</a><a href="#reference">API reference</a><a href="#execution">Execution &amp; limits</a></nav><div class="documentation">
+<div class="layout"><nav class="docs-nav" aria-label="Developer documentation"><span class="eyebrow">DEVELOPER GUIDE</span><a href="#start">Quick start</a><a href="#python">Python client</a><a href="#write-circuits">Writing circuits</a><a href="#formats">Stim &amp; OpenQASM</a><a href="#aer">Classical conditions (Aer)</a><a href="#physics">Physical-model APIs</a><a href="#streaming">Streaming &amp; retries</a><a href="#reference">API reference</a><a href="#execution">Execution &amp; limits</a></nav><div class="documentation">
 <section id="start"><p class="eyebrow">DEVELOPER DOCUMENTATION</p><h2 class="developer-title">Your first simulation</h2><p class="lead">Run simulations from your scripts and applications. Submit a circuit, watch its progress, and download samples or exact basis probabilities when the job completes.</p><div class="endpoint"><span>BASE URL</span><code>https://simulation.example.invalid</code></div><p>Have your API key ready. The examples below take you from a circuit to a downloaded result. <a href="#keys">Need a key? Request access.</a></p>
 <h3>Choose your task</h3><p>For measurement samples, submit a <strong>Stim</strong> circuit or select <strong>Google qsim QASM sampling</strong>. For probabilities of selected basis strings, submit a supported unitary <strong>OpenQASM 2 or 3</strong> circuit. Each submission runs independently; your application coordinates multiple jobs.</p><h2>Quick start: sample a Bell pair</h2><p>Use an invitation key. The shell examples need <code>curl</code>, <code>jq</code>, and <code>uuidgen</code>. Read your key into an environment variable instead of putting it in a URL.</p><pre><code>read -rsp &quot;wqsim API key: &quot; QSIM_API_KEY
 export QSIM_API_KEY
@@ -163,8 +164,339 @@ ry(pi/3) q[0];</code></pre><p>Send this JSON body to <code>POST /api/jobs/qasm2<
 <p>QASM3 bindings accept at most 256 entries, with names of 1–256 characters. Oversized mappings are rejected before a job is stored.</p><h3>Read QASM sample results</h3><p>The summary reports <code>result_schema="qasm-samples/1"</code>. The NPZ contains <code>classical_memory</code>, a <code>uint8</code> array shaped <code>[shots,total_classical_bits]</code>. Registers appear in declaration order, with ascending bit indices; <code>summary.registers</code> gives each name, size and offset. Count keys use this same left-to-right column order. Unwritten bits are zero; repeated writes retain the last value. Measurement-event history is not returned.</p><p>The complete artifact contains every shot. JSON shows at most the first 20 shots and 256 count entries, ordered by descending count with lexicographic ties. Each collection has a 512 KiB JSON budget and retains only complete rows or count keys. Check <code>counts_truncated</code> and <code>preview_truncated</code>; very wide registers can leave either collection empty.</p>
 <h3>Broader QASM subset limits</h3><p>On Google qsim QASM2 sampling and QASM3 paths, includes are limited to packaged <code>qelib1.inc</code> and <code>stdgates.inc</code>. Conditions, unsupported control flow, file/network includes, executable Python and exponent expressions using <code>^</code> are rejected. Custom gates allow up to 65,536 expanded operations and nesting depth 32. Numeric literals must be finite with absolute value at most <code>1e100</code>; resolved gate values must remain valid and finite. Clifft stays the default; unsupported requests never switch engines automatically.</p>
 </section>
+<section id="physics"><h2>Physical-model APIs</h2>
+<p><strong>Release availability:</strong> Lindblad, scqubits and JoSIM CPU routes are implemented and staged behind guarded exact-release acceptance. Use authenticated <code>GET /api/capabilities</code> to see the enabled matrix; an omitted engine is unavailable and new requests return <code>503</code> while physics activation is off. A source merge or image build is not production acceptance.</p>
+<p>Follow states, dissipation and drives with QuTiP; calculate superconducting qubit energies/operators with scqubits; or simulate a Josephson circuit transient with JoSIM. All three use CPU float64/complex128, the same API keys and durable jobs. GPU execution and automatic GPU fallback are not enabled.</p>
+<div class="table-wrap"><table><thead><tr><th>Engine</th><th>Submit</th><th>Schema</th></tr></thead><tbody>
+<tr><td>lindblad</td><td><code>POST /api/jobs/lindblad</code></td><td><code>GET /api/schemas/lindblad/1.json</code></td></tr>
+<tr><td>scqubits</td><td><code>POST /api/jobs/scqubits</code></td><td><code>GET /api/schemas/scqubits/1.json</code></td></tr>
+<tr><td>josim</td><td><code>POST /api/jobs/josim</code></td><td><code>GET /api/schemas/josim/1.json</code></td></tr>
+</tbody></table></div>
+<p>Fetch schemas using your bearer key. Use integer <code>schema_version: 1</code> and a persisted <code>Idempotency-Key</code>. The generic <code>/api/jobs</code> route accepts matching <code>engine</code>/<code>input_format</code>: <code>lindblad_model</code>, <code>scqubits_model</code> or <code>josim_netlist</code>. Its header remains optional for compatibility. Requests contain finite numeric JSON, not Python, symbolic code, native options or resource selectors. Names default to <code>Untitled simulation</code>; physics has no shots field.</p>
+<h3>Lindblad dynamics and static models</h3><p>Use <code>evolve</code> with <code>solver=se</code> for pure-state evolution, <code>me</code> for density evolution, or <code>mc</code> for seeded serial quantum trajectories. <code>propagator</code> supports SE and ME. Static <code>spectrum</code> returns energies/vectors; <code>steadystate</code> returns a unique stationary density and observables. Static operations omit solver controls. MC requires a pure input and nonzero collapse; ME without collapse still returns density matrices.</p>
+<p>Times and T1/Tphi are <strong>ns</strong>; Hamiltonian entries and frequencies are linear <strong>GHz</strong>, converted by the service to angular frequency once. Phases are radians and collapse rates are 1/ns. Complex numbers are finite numbers or objects with real/imaginary fields. Tensor order follows <code>model.modes</code>. Mode kinds are oscillator, duffing and explicit matrix. Drives use numeric constant, square, gaussian, flattop_cosine or linearly sampled envelopes; DRAG and positive square rise are unavailable in v1.</p>
+<p>Evolution returns <code>times</code>, optional <code>expectations[T,O]</code> and retained <code>states</code> with <code>state_times</code>. SE states are [R,D]; ME/MC states are ensemble densities [R,D,D]. <code>store_states</code> is none, final or all. Propagators are [T,D,D] or [T,D²,D²], begin at identity and reference the first requested time; ME acts on column-stacked density matrices. Spectra return GHz eigenvalues and optional vectors. MC seed defaults to 42, trajectories to one; same-image seeded repetition is tested.</p>
+<details><summary>Worked JSON for every Lindblad operation and solver family</summary>
+<h4>SE evolution: number expectation one; rotating excited-state phase</h4><pre id="example-physics-lindblad-evolve-se"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;evolve&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ]
+  },
+  &quot;solver&quot;: &quot;se&quot;,
+  &quot;times&quot;: [
+    0.0,
+    0.5,
+    1.0
+  ],
+  &quot;initial_state&quot;: {
+    &quot;kind&quot;: &quot;product&quot;,
+    &quot;modes&quot;: {
+      &quot;q&quot;: {
+        &quot;kind&quot;: &quot;fock&quot;,
+        &quot;index&quot;: 1
+      }
+    }
+  },
+  &quot;observables&quot;: [
+    {
+      &quot;name&quot;: &quot;n&quot;,
+      &quot;operator&quot;: {
+        &quot;kind&quot;: &quot;product&quot;,
+        &quot;factors&quot;: {
+          &quot;q&quot;: &quot;n&quot;
+        }
+      }
+    }
+  ],
+  &quot;store_states&quot;: &quot;all&quot;
+}</code></pre>
+<h4>ME evolution: excited population exp(-t/3)</h4><pre id="example-physics-lindblad-evolve-me"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;evolve&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ],
+    &quot;collapse&quot;: [
+      {
+        &quot;kind&quot;: &quot;relaxation&quot;,
+        &quot;mode&quot;: &quot;q&quot;,
+        &quot;T1&quot;: 3.0
+      }
+    ]
+  },
+  &quot;solver&quot;: &quot;me&quot;,
+  &quot;times&quot;: [
+    0.0,
+    0.5,
+    1.0
+  ],
+  &quot;initial_state&quot;: {
+    &quot;kind&quot;: &quot;product&quot;,
+    &quot;modes&quot;: {
+      &quot;q&quot;: {
+        &quot;kind&quot;: &quot;fock&quot;,
+        &quot;index&quot;: 1
+      }
+    }
+  },
+  &quot;observables&quot;: [
+    {
+      &quot;name&quot;: &quot;n&quot;,
+      &quot;operator&quot;: {
+        &quot;kind&quot;: &quot;product&quot;,
+        &quot;factors&quot;: {
+          &quot;q&quot;: &quot;n&quot;
+        }
+      }
+    }
+  ],
+  &quot;store_states&quot;: &quot;all&quot;
+}</code></pre>
+<h4>MC evolution: same-image seeded ensemble</h4><pre id="example-physics-lindblad-evolve-mc"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;evolve&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ],
+    &quot;collapse&quot;: [
+      {
+        &quot;kind&quot;: &quot;relaxation&quot;,
+        &quot;mode&quot;: &quot;q&quot;,
+        &quot;T1&quot;: 3.0
+      }
+    ]
+  },
+  &quot;solver&quot;: &quot;mc&quot;,
+  &quot;times&quot;: [
+    0.0,
+    0.5,
+    1.0
+  ],
+  &quot;initial_state&quot;: {
+    &quot;kind&quot;: &quot;product&quot;,
+    &quot;modes&quot;: {
+      &quot;q&quot;: {
+        &quot;kind&quot;: &quot;fock&quot;,
+        &quot;index&quot;: 1
+      }
+    }
+  },
+  &quot;observables&quot;: [
+    {
+      &quot;name&quot;: &quot;n&quot;,
+      &quot;operator&quot;: {
+        &quot;kind&quot;: &quot;product&quot;,
+        &quot;factors&quot;: {
+          &quot;q&quot;: &quot;n&quot;
+        }
+      }
+    }
+  ],
+  &quot;store_states&quot;: &quot;all&quot;,
+  &quot;trajectories&quot;: 8,
+  &quot;seed&quot;: 42
+}</code></pre>
+<h4>SE propagators</h4><pre id="example-physics-lindblad-propagator-se"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;propagator&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ]
+  },
+  &quot;solver&quot;: &quot;se&quot;,
+  &quot;times&quot;: [
+    0.0,
+    0.5,
+    1.0
+  ]
+}</code></pre>
+<h4>ME propagators</h4><pre id="example-physics-lindblad-propagator-me"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;propagator&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ],
+    &quot;collapse&quot;: [
+      {
+        &quot;kind&quot;: &quot;relaxation&quot;,
+        &quot;mode&quot;: &quot;q&quot;,
+        &quot;T1&quot;: 3.0
+      }
+    ]
+  },
+  &quot;solver&quot;: &quot;me&quot;,
+  &quot;times&quot;: [
+    0.0,
+    0.5,
+    1.0
+  ]
+}</code></pre>
+<h4>Spectrum: [0, 0.017] GHz</h4><pre id="example-physics-lindblad-spectrum"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;spectrum&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ]
+  },
+  &quot;evals_count&quot;: 2,
+  &quot;return_vectors&quot;: true
+}</code></pre>
+<h4>Steady state: the ground density</h4><pre id="example-physics-lindblad-steadystate"><code>{
+  &quot;engine&quot;: &quot;lindblad&quot;,
+  &quot;input_format&quot;: &quot;lindblad_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;steadystate&quot;,
+  &quot;model&quot;: {
+    &quot;modes&quot;: [
+      {
+        &quot;name&quot;: &quot;q&quot;,
+        &quot;kind&quot;: &quot;oscillator&quot;,
+        &quot;dimension&quot;: 2,
+        &quot;frequency&quot;: 0.017
+      }
+    ],
+    &quot;collapse&quot;: [
+      {
+        &quot;kind&quot;: &quot;relaxation&quot;,
+        &quot;mode&quot;: &quot;q&quot;,
+        &quot;T1&quot;: 3.0
+      }
+    ]
+  },
+  &quot;return_state&quot;: true,
+  &quot;observables&quot;: [
+    {
+      &quot;name&quot;: &quot;n&quot;,
+      &quot;operator&quot;: {
+        &quot;kind&quot;: &quot;product&quot;,
+        &quot;factors&quot;: {
+          &quot;q&quot;: &quot;n&quot;
+        }
+      }
+    }
+  ]
+}</code></pre>
+</details><h3>scqubits spectra, matrix elements and export</h3><p>Supported classes are <code>Transmon</code>, <code>TunableTransmon</code>, <code>Fluxonium</code> and <code>FluxQubit</code>, using strict numeric constructor fields. Energies are GHz; charge offsets and flux fractions are dimensionless. The client checks cutoff convergence.</p><p><code>spectrum</code> returns ascending energies and optional vectors. <code>matrix_elements</code> returns a complex matrix for one allowed operator. <code>export_for_lindblad</code> returns ground-shifted energies, diagonal Hamiltonian and selected operators in one shared eigensystem, plus a numeric <code>metadata_json.lindblad_request</code>. Submit that body as a separate job with a new key, preserving its basis and GHz units. Do not multiply by 2*pi again. Phi operators are in radians; other returned charge/trigonometric operators are dimensionless. Operator names and class parameters are listed by the schema.</p>
+<details><summary>Worked scqubits JSON and numeric export</summary>
+<h4>Spectrum and eigenvectors</h4><pre id="example-physics-scqubits-spectrum"><code>{
+  &quot;engine&quot;: &quot;scqubits&quot;,
+  &quot;input_format&quot;: &quot;scqubits_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;spectrum&quot;,
+  &quot;evals_count&quot;: 4,
+  &quot;model&quot;: {
+    &quot;qubit&quot;: &quot;Transmon&quot;,
+    &quot;params&quot;: {
+      &quot;EJ&quot;: 15.0,
+      &quot;EC&quot;: 0.3,
+      &quot;ng&quot;: 0.0,
+      &quot;ncut&quot;: 30
+    }
+  },
+  &quot;return_vectors&quot;: true
+}</code></pre>
+<h4>Matrix elements</h4><pre id="example-physics-scqubits-matrix-elements"><code>{
+  &quot;engine&quot;: &quot;scqubits&quot;,
+  &quot;input_format&quot;: &quot;scqubits_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;matrix_elements&quot;,
+  &quot;evals_count&quot;: 4,
+  &quot;model&quot;: {
+    &quot;qubit&quot;: &quot;Transmon&quot;,
+    &quot;params&quot;: {
+      &quot;EJ&quot;: 15.0,
+      &quot;EC&quot;: 0.3,
+      &quot;ng&quot;: 0.0,
+      &quot;ncut&quot;: 30
+    }
+  },
+  &quot;operator&quot;: &quot;n_operator&quot;
+}</code></pre>
+<h4>Export into a separate Lindblad request</h4><pre id="example-physics-scqubits-export"><code>{
+  &quot;engine&quot;: &quot;scqubits&quot;,
+  &quot;input_format&quot;: &quot;scqubits_model&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;export_for_lindblad&quot;,
+  &quot;evals_count&quot;: 4,
+  &quot;model&quot;: {
+    &quot;qubit&quot;: &quot;Transmon&quot;,
+    &quot;params&quot;: {
+      &quot;EJ&quot;: 15.0,
+      &quot;EC&quot;: 0.3,
+      &quot;ng&quot;: 0.0,
+      &quot;ncut&quot;: 30
+    }
+  },
+  &quot;operators&quot;: [
+    &quot;n_operator&quot;
+  ]
+}</code></pre>
+</details><h3>JoSIM superconducting transient</h3><p>The pinned patched JoSIM v2.7 accepts self-contained numeric R/L/B circuits, DC/PWL sources, one numeric JJ model with RTYPE=1, one <code>.TRAN</code>, selected <code>.PRINT DEVV</code>/<code>DEVI</code>/<code>PHASE</code> and terminal <code>.END</code>. Includes, external paths, subcircuits, expressions, noise options and arbitrary native controls are rejected. The returned <code>times</code> are seconds and <code>traces</code> use volts, amperes or radians according to ordered metadata. Adaptive integration can produce fewer rows than the reserved ceiling; use the returned rows.</p><details><summary>Tested SFQ pulse JSON, with upstream MIT notice</summary>
+<pre id="example-physics-josim-sfq"><code>{
+  &quot;engine&quot;: &quot;josim&quot;,
+  &quot;input_format&quot;: &quot;josim_netlist&quot;,
+  &quot;schema_version&quot;: 1,
+  &quot;operation&quot;: &quot;transient&quot;,
+  &quot;netlist&quot;: &quot;* Source: https://github.com/JoeyDelp/JoSIM/blob/02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224/test/ex_jtl_basic.cir\n* MIT License\n* \n* Copyright (c) 2020 Johannes Delport\n* \n* Permission is hereby granted, free of charge, to any person obtaining a copy\n* of this software and associated documentation files (the \&quot;Software\&quot;), to deal\n* in the Software without restriction, including without limitation the rights\n* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n* copies of the Software, and to permit persons to whom the Software is\n* furnished to do so, subject to the following conditions:\n* \n* The above copyright notice and this permission notice shall be included in all\n* copies or substantial portions of the Software.\n* \n* THE SOFTWARE IS PROVIDED \&quot;AS IS\&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n* SOFTWARE.\n* Fixed single-pulse JTL fixture adapted from JoSIM v2.7 ex_jtl_basic (MIT).\nB01        3          7          jmitll     area=2.16\nB02        6          8          jmitll     area=2.16\nIB01       0          1          pwl(0      0 5p 280u)\nL01        4          3          2p        \nL02        3          2          2.425p    \nL03        2          6          2.425p    \nL04        6          5          2.031p    \nLP01       0          7          0.086p    \nLP02       0          8          0.096p    \nLPR01      2          1          0.278p    \nLRB01      7          9          0.086p    \nLRB02      8          10         0.086p    \nRB01       9          3          5.23      \nRB02       10         6          5.23      \nROUT       5          0          2         \nVIN        4          0          pwl(0 0 100p 0 102.5p 827.13u 105p 0)\n.model jmitll jj(rtype=1, vg=2.8mV, cap=0.07pF, r0=160, rN=16, icrit=0.1mA)\n.tran 0.25p 250p\n.print DEVV B01\n.print PHASE B01\n.print DEVV B02\n.print PHASE B02\n.print DEVI ROUT\n.end\n&quot;
+}</code></pre>
+</details>
+<h3>Read results, handle refusals and sequence requests</h3><p>Accepted jobs use the existing polling, resumable SSE, cancellation and protected NPZ download routes. Load complete numeric arrays with <code>allow_pickle=False</code>; scalar Unicode <code>metadata_json</code> records units, versions, actual backend and work. SSE reports progress and final summaries, not incremental trajectories or traces. Your client manages sweeps, batches, dependencies and state handoffs; no persistent quantum session is created.</p>
+<p>Structural, finite, physical and allocation refusals return <code>422</code> before a job exists, with <code>detail[].pointer</code> identifying the JSON location. Unsupported output sizes may fail admission even below a dimension ceiling. Native convergence, nonunique stationary states, runtime/profile mismatch or incomplete results become bounded failed jobs. Never treat <code>202</code> as successful simulation. Same-body/key retries replay the owner’s existing job before changed current resource/image policy; a changed body conflicts with <code>409</code>.</p>
+<p>The CPU profile requests 2 CPU/4 GiB, with 3-GiB child address space and 12-MiB files. Lindblad total Hilbert dimension is at most 256, dense ME/steady state at most 32; requested times/combined knots at most 65,536 and serial MC trajectories at most 1,000. scqubits raw basis is at most 512 with at most 32 levels; export’s 64-KiB JSON metadata may admit fewer. JoSIM allows at most 32 devices, 16 node identifiers, eight selected traces, 4,096 predicted rows and stop time 1 μs. Physics output budgets are 6 MiB numeric, 64 KiB metadata, 9 MiB planned NPZ and 12 MiB callback. Allocation certificates can refuse a model within these ceilings. There is no new active-job deadline, global job cap or caller resource override.</p>
+<p>Upstream project references: <a href="https://qutip.readthedocs.io/en/stable/" target="_blank" rel="noopener noreferrer">QuTiP ↗</a> · <a href="https://scqubits.readthedocs.io/en/latest/" target="_blank" rel="noopener noreferrer">scqubits ↗</a> · <a href="https://joeydelp.github.io/JoSIM/" target="_blank" rel="noopener noreferrer">JoSIM ↗</a>. The WQS schema describes the subset accepted here.</p>
+</section>
 <section id="streaming"><h2>Transactional submission and streaming</h2>
-<p>All three format endpoints require an <code>Idempotency-Key</code>: 1–128 ASCII letters, digits, dots, underscores, colons, or hyphens. Generate one per intended job and persist it with the request body. Repeating that key with the same normalized body under the same API identity returns the same job ID, even after a connection timeout or process restart. Changing the body with that key returns <code>409</code>. Idempotency keys are scoped to each API identity.</p>
+<p>All explicit circuit and physics submission endpoints require an <code>Idempotency-Key</code>: 1–128 ASCII letters, digits, dots, underscores, colons, or hyphens. Generate one per intended job and persist it with the request body. Repeating that key with the same normalized body under the same API identity returns the same job ID, even after a connection timeout or process restart. Changing the body with that key returns <code>409</code>. Idempotency keys are scoped to each API identity.</p>
 <p>Acceptance returns <code>202</code>, a <code>Location</code> job URL, and <code>Idempotency-Replayed: true</code> or <code>false</code>. Acceptance means the job is durably queued, not that the circuit has compiled or succeeded. Retrying does not restart a failed or cancelled job; new work requires a new key. Reservations persist while the job exists and for at least 30 days from submission. During that window, retrying a deleted job returns <code>410</code>. After reservation expiry, an old key may create new work.</p>
 <h3>Watch progress with server-sent events</h3>
 <pre><code>curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
@@ -184,6 +516,8 @@ curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
 <tr><td>POST</td><td><code>/api/jobs/stim</code></td><td>Idempotent Stim sampling submission; requires Idempotency-Key.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs/qasm2</code></td><td>QASM2 probabilities by default or explicit qsim/Aer sampling; requires Idempotency-Key.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs/qasm3</code></td><td>qsim probabilities/sampling or Aer conditional sampling; explicit operation and Idempotency-Key required.</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/lindblad</code>, <code>/api/jobs/scqubits</code>, <code>/api/jobs/josim</code></td><td>Gated schema-v1 physical-model jobs; Idempotency-Key required.</td></tr>
+<tr><td>GET</td><td><code>/api/schemas/{engine}/1.json</code></td><td>Authenticated structural schema for each physics engine; semantic/admission checks also apply.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs</code></td><td>General submission; Idempotency-Key optional for compatibility. Without it each call creates new work.</td></tr>
 <tr><td>GET</td><td><code>/api/jobs/{id}/events</code></td><td>Resumable SSE progress and final result summary.</td></tr>
 <tr><td>GET</td><td><code>/api/jobs</code></td><td>List your saved jobs.</td></tr>
@@ -191,7 +525,7 @@ curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
 <tr><td>GET</td><td><code>/api/jobs/{id}/result</code></td><td>Download the successful job’s .npz artifact.</td></tr>
 <tr><td>POST</td><td><code>/api/jobs/{id}/cancel</code></td><td>Cancel a queued or active job; returns 202.</td></tr>
 <tr><td>DELETE</td><td><code>/api/jobs/{id}</code></td><td>Remove a terminal job after compute cleanup; returns 204.</td></tr>
-</tbody></table></div><h3>General submission body</h3><p>The general route also accepts <code>operation</code>: <code>sample</code> (default) or <code>basis_probabilities</code>. Probability queries require <code>bitstrings</code> and support <code>bit_order</code>. QASM sampling requires explicit <code>engine="qsim"</code> or <code>engine="aer"</code>; QASM3 always requires an explicit operation. Shots and seed apply only to sampling.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>
+</tbody></table></div><h3>General circuit submission body</h3><p>The general route also accepts <code>operation</code>: <code>sample</code> (default) or <code>basis_probabilities</code>. Probability queries require <code>bitstrings</code> and support <code>bit_order</code>. QASM sampling requires explicit <code>engine="qsim"</code> or <code>engine="aer"</code>; QASM3 always requires an explicit operation. Shots and seed apply only to sampling.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>
 <tr><td><code>circuit</code></td><td>Required text, 1–65,536 characters.</td><td>Required</td></tr>
 <tr><td><code>name</code></td><td>1–80 characters.</td><td>Untitled circuit</td></tr>
 <tr><td><code>engine</code></td><td><code>clifft</code>, <code>qsim</code>, or <code>aer</code>. Aer accepts QASM2/QASM3 sampling only; check capabilities for each engine.</td><td>clifft</td></tr>
@@ -215,4 +549,4 @@ curl -N --fail-with-body "$BASE/api/jobs/$JOB_ID/events" \
   &quot;seed&quot;: 42
 }</code></pre><p>Aer currently rejects probability queries, Stim, custom gate declarations, parameter bindings, nested conditions, loops, classical arithmetic, aliases, timing and external includes. Use finite numeric gate arguments and supported constant expressions; see the <a href="/agents.md">full gate and expression subset</a>. Existing qsim custom gates and bindings remain available with explicit qsim selection.</p><p>Aer uses one native CPU thread, at most 26 declared qubits and the existing process memory limit. Both branches count toward operation and possible-measurement budgets. Samples arrive as a complete artifact; incremental sample streaming is not supported.</p><p><a href="https://github.com/Qiskit/qiskit-aer" target="_blank" rel="noopener noreferrer">Qiskit Aer project ↗</a> · <a href="https://qiskit.github.io/qiskit-qasm3-import/" target="_blank" rel="noopener noreferrer">QASM3 importer reference ↗</a></p></section>
 <section id="execution"><h2>Execution &amp; limits</h2><p>Simulation execution is asynchronous. A submitted job may wait in the queue before it starts. Poll the returned job ID to follow progress.</p><ul><li>Simulations run concurrently as cluster capacity permits. Placement failures stay queued and retry automatically.</li><li>Idle compute is reused with a fresh simulation process per job. Cold starts still add latency.</li><li>No elapsed-time or CPU-time deadline for active simulations. Explicit cancellation remains available. Idle workers are removed after work finishes.</li><li>Clifft: at most 4,096 qubits, active width 22, and 1,000,000 output cells.</li><li>Google qsim: 1–26 declared qubits, single precision, two CPU threads. All engines use the 2 CPU / 4 GiB worker profile and a 3 GiB process memory limit.</li><li>New QASM sampling: shots × (total classical bits + measurement events) cannot exceed 1,000,000 cells. Repeated writes consume event cells even though the artifact retains only final values.</li><li>No fixed saved-job count cap or active-job concurrency limit.</li><li>Completed jobs expire after 30 days. Download results you need to retain.</li></ul><p>Clifft 0.12.0 provides CPU fixed-shot sampling and unitary basis-probability queries. Post-selection and experimental GPU backends are not exposed. Exact simulation still produces finite-shot statistical variation.</p></section>
-</div></div></main><footer><span>Clifft 0.12.0 + Google qsim 0.22.1 + Aer 0.17.2 · CPU simulation API</span><a href="/agents.md" download="qsim-agent-guide.md">Agent API reference (.md)</a></footer></body></html>
+</div></div></main><footer><span>CPU circuit and physical-model simulation API</span><a href="/agents.md" download="qsim-agent-guide.md">Agent API reference (.md)</a></footer></body></html>
