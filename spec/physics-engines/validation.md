@@ -74,3 +74,29 @@ synthetic SkyPilot placement reference. They do not prove a live cluster or
 registry deployment. Exact-main artifacts, real backup/recovery and actual
 SkyPilot acceptance remain TASK-034. Current credentials and all existing
 backup/release gates are unchanged.
+
+## Restored-cluster live attempt and launcher correction, 2026-11-10
+
+After the disk restore, exact-main CD run `42819837848` attempt 2 passed fresh
+encrypted creation/readback, deployed source `479fa99` and admitted only its smoke
+identity. Eight circuit cases succeeded. Twelve physics cases failed before
+callback, so the dependent export-to-Lindblad case was not submitted. Native
+SkyPilot job logs reported `bash: -n: command not found` (exit 127).
+
+The pinned SDK's `ALIAS_SUDO_TO_EMPTY_FOR_ROOT_CMD` defines `sudo()` as a
+pass-through for root shells. The existing bare `sudo -n` invoked that function.
+The correction uses the installed `/usr/bin/sudo` binary explicitly. Mandatory
+joined image tests now execute the controller's actual physics task command
+under that SDK prefix, starting with the trusted root launcher and checking the
+transition to UID 1000 before worker execution. Only test-launcher SETUID/SETGID
+capabilities are added; native simulation remains UID 1000 under the existing
+CPU, memory, file and child-environment constraints.
+
+Local correction evidence: 96 focused placement/dispatcher/worker tests passed;
+101 joined lifecycle, release and documentation image tests passed with zero
+failures/errors/skips in 235.37 seconds. This is still synthetic placement,
+not a successful new live release. All failed live smoke jobs settled and cleaned
+without forced cancellation; the owning hold remains and pending count is zero.
+Failed receipts, job/native identities and the original fresh backup evidence
+are retained privately. TASK-034 remains open pending reviewed correction,
+exact-main CI, controlled recovery and successful full live acceptance.

@@ -171,7 +171,7 @@ def test_legacy_schema_migration_preserves_jobs_and_ownership(tmp_path,monkeypat
 def test_profile_dispatch_uses_nonroot_account_and_only_scheduled_resources(client,sky,monkeypatch):
     ctx=context(monkeypatch);identifier=job(client,ctx);controller.tick()
     config=sky.calls[-1][2]
-    assert 'sudo -n -H -u qsim' in config['run']
+    assert config['run'].startswith('cd /opt/qsim && /usr/bin/sudo -n -H -u qsim ')
     assert '--preserve-env=QSIM_JOB_URL,QSIM_JOB_TOKEN,QSIM_EXECUTION_CONTEXT' in config['run']
     assert set(config['resources'])=={'cpus','memory','infra','image_id','labels'}
     assert 'accelerators' not in config['resources']
@@ -328,3 +328,11 @@ def test_native_ack_survives_api_request_expiration_without_reexecution(client,s
     assert client.get('/api/jobs/'+identifier,headers=auth()).json()['status']=='FAILED'
     with store.connect() as db:assert db.execute('SELECT cleaned FROM jobs WHERE id=?',(identifier,)).fetchone()[0]==1
     assert len([call for call in sky.calls if call[0] in ('launch','exec')])==1
+
+
+def test_skypilot_root_shell_function_breaks_bare_sudo_flags():
+    from sky.utils.command_runner import ALIAS_SUDO_TO_EMPTY_FOR_ROOT_CMD
+    assert 'function sudo() { "$@"; }' in ALIAS_SUDO_TO_EMPTY_FOR_ROOT_CMD
+    # Reproduce its effective root branch without needing host root privileges.
+    result=subprocess.run(['/bin/bash','-c','function sudo() { "$@"; }; sudo -n true'],capture_output=True,text=True)
+    assert result.returncode==127 and '-n: command not found' in result.stderr
