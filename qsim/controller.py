@@ -74,7 +74,8 @@ def task_config(row):
         config['resources'] = {**profile['resources'], 'image_id': 'docker:' + profile['image'],
                                'labels': {'workload': 'qsim'}}
         config['envs']['QSIM_EXECUTION_CONTEXT'] = row['profile_json']
-        config['run'] = ('cd /opt/qsim && sudo -n -H -u qsim '
+        # SkyPilot shadows bare sudo in root shells; bypass that function.
+        config['run'] = ('cd /opt/qsim && /usr/bin/sudo -n -H -u qsim '
                          '--preserve-env=QSIM_JOB_URL,QSIM_JOB_TOKEN,QSIM_EXECUTION_CONTEXT,'
                          'OPENBLAS_NUM_THREADS,OMP_NUM_THREADS '
                          '/opt/qsim-venv/bin/python -m qsim.worker')

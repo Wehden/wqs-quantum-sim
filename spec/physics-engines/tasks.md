@@ -2201,3 +2201,30 @@ backends and persist only the candidate digest after applying the CD patch.
 All 146 focused CD/acceptance tests pass. Existing credentials, backup gates,
 worker numerics and unrelated workloads are unchanged. The corrective push
 uses automatic review round 2; no manual review request is sent.
+
+### TASK-034 corrective launcher lease, 2026-11-10
+
+After cluster restoration, exact-main CD attempt 2 passed fresh encrypted backup
+and deployed the candidate, then failed live physics acceptance. All eight
+circuit cases succeeded; the twelve submitted physics jobs failed before their
+worker callback. SkyPilot native logs show `bash: -n: command not found`.
+The pinned SDK defines a root-shell `sudo()` function which executes its first
+argument; bare `sudo -n` therefore treats `-n` as a command.
+
+Corrective scope is the existing approved nonroot launcher, not a new isolation
+profile: use `/usr/bin/sudo` explicitly, and execute the actual task command under
+the pinned SkyPilot root-shell prefix in mandatory joined image tests. The
+coordinator owns `qsim/controller.py`, `tests/test_physics_placement.py`,
+`tests/test_physics_lifecycle.py`, this checklist and validation/security receipts.
+Budget: at most 6 files, no new production definitions or public interfaces.
+Credentials, numerical admission, CPU/GPU resources and backup/release gates
+are unchanged. Existing accepted jobs settle normally. The failed live receipt
+and owning hold are retained until reviewed correction and operator recovery.
+
+Launcher correction verification: 96 focused tests and all 101 joined packaged
+lifecycle/release/example tests passed, with zero joined skips. The first native
+case also passed the explicit UID-1000 assertion under the real SkyPilot root
+prefix. The production change is one command-path correction; no numerical
+algorithm, profile, authentication or gate semantics changed. The failed live
+attempt remains failed and held with zero pending jobs. A corrective PR and
+reviewed controlled recovery are required before another full live acceptance.

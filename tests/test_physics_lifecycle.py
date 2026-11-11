@@ -73,7 +73,7 @@ class DockerPlacement:
         env=dict(task['envs'])
         physics='QSIM_EXECUTION_CONTEXT' in env
         if physics:
-            assert 'sudo -n -H -u qsim' in task['run']
+            assert task['run'].startswith('cd /opt/qsim && /usr/bin/sudo -n -H -u qsim ')
             context=json.loads(env['QSIM_EXECUTION_CONTEXT'])
             assert context['worker_profile']['image']==self.scheduler_ref
             assert context['worker_profile']['isolation']['uid']==1000
@@ -95,7 +95,7 @@ class DockerPlacement:
         name='wqs-joined-'+uuid.uuid4().hex[:16]
         self.containers.append(name)
         command=['docker','run','--rm','--pull=never','--name',name,'--network','host',
-            '--user','1000:1000','--cpus','2','--memory','4g','--memory-swap','4g',
+            '--user','0:0' if physics else '1000:1000','--cpus','2','--memory','4g','--memory-swap','4g',
             '--read-only','--cap-drop','ALL','--security-opt','no-new-privileges',
             '--tmpfs','/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777',
             '--tmpfs','/home/qsim:rw,nosuid,nodev,size=16m,uid=1000,gid=1000,mode=700',
@@ -105,7 +105,16 @@ class DockerPlacement:
         for key,value in env.items():
             assert key in ('QSIM_JOB_URL','QSIM_JOB_TOKEN','QSIM_EXECUTION_CONTEXT')
             command.extend(['--env',key+'='+value])
-        command.extend(['--entrypoint','/opt/qsim-venv/bin/python',self.image_id,'-m','qsim.worker'])
+        if physics:
+            from sky.utils.command_runner import ALIAS_SUDO_TO_EMPTY_FOR_ROOT_CMD
+            # Model only the trusted launcher's UID/GID transition. Actual
+            # physics execution must still run as image UID 1000, never root.
+            command.extend(['--cap-add','SETUID','--cap-add','SETGID'])
+            identity='test "$(/usr/bin/sudo -n -H -u qsim /usr/bin/id -u)" = 1000'
+            script=ALIAS_SUDO_TO_EMPTY_FOR_ROOT_CMD+'; '+identity+' && '+task['run']
+            command.extend(['--entrypoint','/bin/bash',self.image_id,'-c',script])
+        else:
+            command.extend(['--entrypoint','/opt/qsim-venv/bin/python',self.image_id,'-m','qsim.worker'])
         process=subprocess.run(command,capture_output=True,timeout=120)
         self.output.append((process.stdout+process.stderr).decode(errors='replace'))
         self.placements.append(dict(kind=kind,cluster=cluster,job_id=identifier,
