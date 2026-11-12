@@ -100,3 +100,33 @@ without forced cancellation; the owning hold remains and pending count is zero.
 Failed receipts, job/native identities and the original fresh backup evidence
 are retained privately. TASK-034 remains open pending reviewed correction,
 exact-main CI, controlled recovery and successful full live acceptance.
+
+## Distributed native verification checkpoint, 2026-11-12
+
+PR #82 merged at `a058714`; exact-main CI `43044212765` attempt 2 passed, with
+101 joined image tests and zero failures/errors/skips. Controlled recovery kept
+admission held, preserved failure evidence and passed a fresh encrypted backup
+with exact storage readback and a durable locator before rolling out all roles.
+
+One native JoSIM setup failed on an incomplete SkyPilot SDK wheel ZIP. All 20
+submitted jobs settled and cleaned, including 19 successes. A complete unchanged
+image retry then produced 21 successful, cleaned jobs. This includes the actual
+scqubits export handoff, JoSIM and seeded Lindblad repeat. Final acceptance still
+failed: serial forced allocation refreshes exceeded the native probe's existing
+120-second bound. The release is held with zero pending jobs; no successful
+release receipt exists for this attempt.
+
+The correction submits queue reads asynchronously before waiting and performs
+one forced inventory refresh for the selected allocations. It preserves exact
+native job IDs, native status, image and per-allocation CPU/RAM/node/accelerator
+checks. Regression tests distribute the 21 named cases across distinct clusters,
+return inventory out of order and inject individual allocation/native failures.
+A read-only candidate diagnostic verified all 21 jobs on the actual 16
+allocations in 18.2 seconds. This measurement changes no installed source or
+admission and is not a completed production acceptance gate.
+
+TASK-034/G4 remain open until the correction reaches main, fresh exact-main CI
+passes and the standard full release verifier succeeds. See
+[the recovery checkpoint](../../docs/cd-recovery.md#physics-recovery-checkpoint-2026-11-12)
+for the preserved failure sequence and backup receipt handling. Existing
+credentials and backup/release gates remain unchanged.

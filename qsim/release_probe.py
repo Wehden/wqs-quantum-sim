@@ -165,26 +165,33 @@ def probe(sha, owner, job_ids, native=False, sky=None, worker_image=None):
         if not jobs or not result['cleaned']:raise ValueError('Completed smoke jobs required')
         if sky is None:import sky
         queues,handles={},{}
+        if any(not job['launch_id'] or not job['cluster'] for job in jobs.values()):
+            raise ValueError('Missing native job identity')
+        clusters=sorted({job['cluster'] for job in jobs.values()})
+        # Queue reads are asynchronous. Submit them together, and refresh the
+        # allocation inventory once so a distributed release fits the same
+        # bounded verifier budget as a release reusing one worker.
+        queue_requests={cluster:sky.queue(cluster,skip_finished=False,all_users=True) for cluster in clusters}
+        if versioned:
+            from sky.utils.common import StatusRefreshMode
+            statuses=sky.get(sky.status(cluster_names=clusters,refresh=StatusRefreshMode.FORCE,all_users=True))
+            for cluster in clusters:
+                matches=[r for r in statuses if r['name']==cluster]
+                if len(matches)!=1 or getattr(matches[0]['status'],'value',matches[0]['status'])!='UP':
+                    raise ValueError('Native allocation unavailable')
+                handle=matches[0]['handle'];resources=handle.launched_resources
+                image=resources.extract_docker_image()
+                cpus=float(str(resources.cpus).rstrip('+'));memory=float(str(resources.memory).rstrip('+'))
+                if image!=worker_image or handle.launched_nodes!=1 or resources.accelerators or cpus<2 or memory<4:
+                    raise ValueError('Native allocation profile/image mismatch')
+                handles[cluster]={'worker_image':image,'cpus':cpus,'memory_gib':memory,'backend':'cpu'}
         for name,job in jobs.items():
-            if not job['launch_id'] or not job['cluster']:raise ValueError('Missing native job identity')
             cluster=job['cluster']
             native_id=job['native_job_id']
             if native_id is None:native_id,_=sky.get(job['launch_id'])
             if type(native_id) is not int or native_id<1:raise ValueError('Missing native job id')
             if cluster not in queues:
-                queues[cluster]=sky.get(sky.queue(cluster,skip_finished=False,all_users=True))
-                if versioned:
-                    from sky.utils.common import StatusRefreshMode
-                    statuses=sky.get(sky.status(cluster_names=[cluster],refresh=StatusRefreshMode.FORCE,all_users=True))
-                    matches=[r for r in statuses if r['name']==cluster]
-                    if len(matches)!=1 or getattr(matches[0]['status'],'value',matches[0]['status'])!='UP':
-                        raise ValueError('Native allocation unavailable')
-                    handle=matches[0]['handle'];resources=handle.launched_resources
-                    image=resources.extract_docker_image()
-                    cpus=float(str(resources.cpus).rstrip('+'));memory=float(str(resources.memory).rstrip('+'))
-                    if image!=worker_image or handle.launched_nodes!=1 or resources.accelerators or cpus<2 or memory<4:
-                        raise ValueError('Native allocation profile/image mismatch')
-                    handles[cluster]={'worker_image':image,'cpus':cpus,'memory_gib':memory,'backend':'cpu'}
+                queues[cluster]=sky.get(queue_requests[cluster])
             matches=[r for r in queues[cluster] if r['job_id']==native_id]
             if len(matches)!=1:raise ValueError('Native smoke job not successful')
             status=getattr(matches[0]['status'],'value',matches[0]['status'])
