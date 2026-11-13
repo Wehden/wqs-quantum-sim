@@ -267,6 +267,62 @@ def test_named_probe_binds_requests_profiles_artifacts_and_actual_allocations(na
         release_probe.probe(SHA,'alice',selected,native=True,sky=sky,worker_image=image)
 
 
+@pytest.fixture
+def distributed_probe_jobs(named_probe_jobs):
+    selected,image,sky,rows,status=named_probe_jobs
+    allocations={};events=[]
+    for index,job in enumerate(selected.values(),1):
+        cluster='qs-'+format(index,'020x')
+        with store.connect() as db:
+            db.execute('UPDATE job_dispatch SET cluster=?,native_job_id=1 WHERE job_id=?',(cluster,job))
+        allocations[cluster]={**status,'name':cluster,'handle':copy.deepcopy(status['handle'])}
+    queues={cluster:[{'job_id':1,'status':'SUCCEEDED'}] for cluster in allocations}
+    def queue(cluster,**kwargs):
+        assert kwargs=={'skip_finished':False,'all_users':True}
+        events.append(('queue',cluster));return ('queue',cluster)
+    def refresh(**kwargs):
+        assert kwargs['all_users'] is True and kwargs['refresh'].name=='FORCE'
+        events.append(('refresh',kwargs['cluster_names']));return ('refresh',)
+    def get(request):
+        events.append(('get',request))
+        return list(reversed(list(allocations.values()))) if request[0]=='refresh' else queues[request[1]]
+    sky=SimpleNamespace(queue=queue,status=refresh,get=get)
+    return selected,image,sky,allocations,queues,events
+
+
+def test_named_probe_checks_21_allocations_with_one_refresh(distributed_probe_jobs):
+    selected,image,sky,allocations,queues,events=distributed_probe_jobs
+    result=release_probe.probe(SHA,'alice',selected,native=True,sky=sky,worker_image=image)
+    assert result['native_succeeded'] is True and len(result['jobs'])==21
+    assert {record['cluster'] for record in result['jobs'].values()}==set(allocations)
+    assert all(record['native_job_id']==1 and record['native_status']=='SUCCEEDED' for record in result['jobs'].values())
+    assert [event for event in events if event[0]=='refresh']==[('refresh',sorted(allocations))]
+    first_read=next(index for index,event in enumerate(events) if event[0]=='get')
+    assert {event[1] for event in events[:first_read] if event[0]=='queue'}==set(allocations)
+    assert len([event for event in events if event[0]=='queue'])==21
+
+
+@pytest.mark.parametrize('mutation',['missing','duplicate','down','image','cpu','memory','gpu','nodes','wrong-job','pending'])
+def test_distributed_probe_keeps_each_allocation_and_native_job_gate(distributed_probe_jobs,mutation):
+    selected,image,sky,allocations,queues,events=distributed_probe_jobs
+    cluster=next(reversed(allocations));allocation=allocations[cluster];resources=allocation['handle'].launched_resources
+    if mutation=='missing':allocations.pop(cluster)
+    if mutation=='duplicate':allocations['duplicate']={**allocation}
+    if mutation=='down':allocation['status']='STOPPED'
+    if mutation=='image':resources.extract_docker_image=lambda:'registry.example.invalid/wrong@sha256:'+'e'*64
+    if mutation=='cpu':resources.cpus='1'
+    if mutation=='memory':resources.memory='3'
+    if mutation=='gpu':resources.accelerators={'T4':1}
+    if mutation=='nodes':allocation['handle'].launched_nodes=2
+    if mutation=='wrong-job':queues[cluster]=[{'job_id':2,'status':'SUCCEEDED'}]
+    if mutation=='pending':
+        queues[cluster][0]['status']='RUNNING'
+        assert release_probe.probe(SHA,'alice',selected,native=True,sky=sky,worker_image=image)['native_succeeded'] is False
+        return
+    with pytest.raises(ValueError):
+        release_probe.probe(SHA,'alice',selected,native=True,sky=sky,worker_image=image)
+
+
 @pytest.mark.parametrize('mutation',['request','context','owner','native-failed','native-pending','missing-cluster','unclean','duplicate-selection','extra-case','partial-selection'])
 def test_named_probe_rejects_wrong_or_incomplete_evidence(named_probe_jobs,mutation):
     selected,image,sky,rows,status=named_probe_jobs

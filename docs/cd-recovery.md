@@ -14,7 +14,7 @@ that evidence and uses the same backup and acceptance checks as normal CD.
 | Admission and drain | `Deployer.control`, `Deployer.wait_drain` | Owning release hold and zero uncleaned jobs |
 | Pre-rollout backup | Configured backup command, `verify_creation` | New invocation ID, encrypted storage readback and durable private locator |
 | Rollout | `Deployer.apply` | Controller, observer, admin and API at expected immutable images |
-| Acceptance | Configured verification command, `tools/cd/acceptance.py` | Eight real cases, results, native completion, controller progress and cleanup |
+| Acceptance | Configured verification command, `tools/cd/acceptance.py` | All 21 circuit/CPU-physics cases, numerical results, native identity/completion, controller progress and cleanup |
 | Completion | `Deployer.deploy` | Verified private ledger/receipt, zero pending jobs, admission open and successful CD run |
 
 Tests default to the configured local runner path. The hosted test fallback is
@@ -43,6 +43,13 @@ private. `state_dir` below means the directory named by that configuration.
    `acceptance-<sha>.json` under unique private filenames. Use `write_record`
    from `tools/cd/release.py` for durable JSON transitions. Never claim that a
    preserved failed attempt was successful.
+   The snapshot's top-level `<sha>.json` inventory contains verified receipts
+   only. If it contains a failed receipt, verify that receipt's SHA/status and
+   preserve its exact bytes in a private recovery subdirectory, then move the
+   failed file there under the same lock. Fsync both directories. Keep the active
+   `deployment.json` ledger in place; this is not permission to remove or relabel
+   a failed deployment. A fresh backup must still validate every remaining
+   top-level release receipt and complete encrypted readback and locator creation.
 3. **Check backup provenance.** For an already-mutated release, verify its original
    pre-rollout backup locator: requested ID, bucket/object version, ciphertext
    size and SHA-256. Read that exact stored version and compare bytes/hash.
@@ -135,7 +142,41 @@ and [#63](https://github.com/Wehden/wqs-quantum-sim/pull/63).
   is zero, admission is open, and CD completed successfully. Existing credentials,
   unrelated workloads and backup/release gates were unchanged by this recovery.
 
-The eight required cases remain defined in `tools/cd/release.py::SMOKE_CASES`:
+The eight cases required for that historical circuit release were:
 Clifft Stim, Clifft QASM2 probabilities, Google qsim QASM2 samples/probabilities,
 Google qsim QASM3 samples/probabilities, and Aer QASM2/QASM3 samples. This record
 covers the existing circuit service. It does not enable gated physics backends.
+
+## Physics recovery checkpoint, 2026-11-12
+
+PR #82 reached main as `a058714`. Exact-main CI run `43044212765`, attempt 2,
+passed after a hosted package-server DNS failure on attempt 1. Its joined image
+receipt records 101 tests with no failures, errors or skips. Automatic CD run
+`43247611553` stopped at the retained failed ledger before production mutation.
+
+Authorized operator recovery preserved the old failed evidence and verified its
+exact stored backup version. It transferred the held release identity in one
+guarded database transaction, keeping general admission closed. Snapshot creation
+then rejected failed per-release diagnostics in the verified receipt inventory.
+After those diagnostics were archived as described above, a fresh encrypted
+backup passed readback and durable locator creation. All four roles deployed at
+the candidate's immutable images.
+
+The first acceptance attempt stopped when JoSIM's native SkyPilot setup received
+an incomplete SDK wheel ZIP. Nineteen other jobs succeeded; all 20 cleaned up.
+A full same-image retry produced 21 successful, cleaned jobs, including the
+exported scqubits-to-Lindblad request. The final native probe exceeded its
+120-second bound while refreshing allocations serially. The release therefore
+remains failed and held, with zero pending jobs. No verified receipt was issued.
+
+The correction submits native queue reads together and refreshes the complete
+allocation inventory once. Every named job still requires its exact native job
+ID and successful status; every allocation still requires the expected image,
+one node, at least 2 CPUs/4 GiB and no accelerator. A read-only diagnostic of the
+candidate verified all 21 native jobs across 16 allocations in 18.2 seconds. It
+changed no deployed files or admission state and does not certify a release.
+
+After this correction is merged, require fresh exact-main CI and the complete
+standard acceptance hook before reopening. Retain the earlier failures and the
+new release's fresh backup evidence. Existing credentials, recovery keys and
+unrelated workloads remain unchanged.

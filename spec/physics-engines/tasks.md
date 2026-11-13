@@ -2228,3 +2228,29 @@ prefix. The production change is one command-path correction; no numerical
 algorithm, profile, authentication or gate semantics changed. The failed live
 attempt remains failed and held with zero pending jobs. A corrective PR and
 reviewed controlled recovery are required before another full live acceptance.
+
+### TASK-034 distributed native-evidence correction, 2026-11-12
+
+PR #82 is merged at `a058714`; its exact-main CI passed with 101 mandatory image
+tests and no skips. Controlled recovery passed fresh encrypted backup/readback
+and deployed the immutable candidate images while keeping admission held. The
+full acceptance retry produced 21 successful, cleaned jobs. Its final native
+probe exceeded 120 seconds because each distinct allocation received a separate
+forced status refresh. The existing single-cluster test fixture missed that
+distributed cost. TASK-034 and final G4 acceptance remain open.
+
+This corrective lease covers `qsim/release_probe.py`,
+`tests/test_cd_acceptance.py`, `docs/cd-recovery.md`, this checklist and
+`validation.md`: at most five files, no new production definitions or interfaces.
+Submit queue reads together and refresh the complete allocation inventory once.
+Keep the existing deadline and all per-job/native-allocation requirements.
+Tests cover 21 distinct allocations, reordered inventory, missing/duplicate/down
+allocations, wrong image/resource shape and mismatched or pending native jobs.
+
+A read-only candidate diagnostic verified 21 native jobs on 16 allocations in
+18.2 seconds. It neither installs the candidate nor certifies production. The
+failed receipts and held admission remain intact. Merge, fresh exact-main CI,
+controlled recovery and the standard full acceptance hook are still required.
+The recovery record also documents separating failed diagnostics from the
+verified backup-receipt inventory without relaxing its validation. Credentials,
+backup gates, numerical admission and unrelated workloads remain unchanged.
