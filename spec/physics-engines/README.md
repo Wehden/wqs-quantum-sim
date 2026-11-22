@@ -1,5 +1,10 @@
 # Physics simulation engines
 
+[Larger GPU workload discovery](gpu-discovery/context.md) is approved for
+discovery. It covers scqubits and Google qsim, with an internal-first SkyPilot run
+sheet and a $25 Runpod cap. [Results](gpu-discovery/results.md) include the
+confirmed qsim CUDA case and the open qualification work.
+
 Requirements, design and G1 decisions are approved. Tranche A is merged in
 PR #80 at `87304d249005ad65db6a256bf970e04ede1c1288`; exact-main CI passed with
 Standpunkt tests and hosted image/runner checks. All three CPU backends now

@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "modules": {
+    "tests/fixtures/physics/gpu-scqubits/probe.py": {
+      "description": "Private fixture entry point for scqubits CPU and GPU discovery. No import contract.",
+      "public_exports": [],
+      "internal_only": []
+    },
+    "tests/fixtures/physics/gpu-qsim/probe.py": {
+      "description": "Private fixture entry point for qsim CPU and GPU discovery. No import contract.",
+      "public_exports": [],
+      "internal_only": []
+    }
+  }
+}
