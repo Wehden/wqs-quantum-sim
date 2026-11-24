@@ -1,0 +1,17 @@
+{
+  "models": {
+    "Transmon": {"EJ": 15.0, "EC": 0.3, "ng": 0.0},
+    "Fluxonium": {"EJ": 8.9, "EC": 2.5, "EL": 0.5, "flux": 0.3},
+    "FluxoniumHighRatio": {"EJ": 25.0, "EC": 2.5, "EL": 0.08, "flux": 0.47},
+    "FluxQubit": {"EJ1": 1.0, "EJ2": 1.0, "EJ3": 0.8, "ECJ1": 0.016, "ECJ2": 0.016, "ECJ3": 0.021, "ECg1": 0.83, "ECg2": 0.83, "ng1": 0.0, "ng2": 0.0, "flux": 0.4}
+  },
+  "screen": [
+    ["Transmon", 30, 8, "vectors"], ["Transmon", 255, 8, "vectors"],
+    ["Fluxonium", 512, 32, "operator"], ["Fluxonium", 1024, 8, "values"],
+    ["Fluxonium", 1024, 32, "vectors"], ["Fluxonium", 2048, 32, "operator"],
+    ["FluxQubit", 10, 32, "operator"], ["FluxQubit", 16, 8, "values"],
+    ["FluxQubit", 16, 32, "vectors"], ["FluxQubit", 22, 32, "operator"],
+    ["FluxoniumHighRatio", 1024, 32, "operator"], ["FluxoniumHighRatio", 2048, 32, "operator"],
+    ["Fluxonium", 4096, 32, "vectors"], ["FluxQubit", 32, 32, "vectors"]
+  ]
+}

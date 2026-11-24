@@ -1,0 +1,103 @@
+# GPU discovery results
+
+**Status:** Screening and targeted confirmation recorded on 2026-11-22. Some matrix cells remain open. Current production release baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
+
+## Placement and provenance
+
+SkyPilot reported four allocatable V100 slots. Host telemetry showed one actual 16 GiB V100 with an existing process using about 8.1 GiB, and the idle RTX 3060 had 12 GiB. Neither met the reviewed internal allocation requirements. All GPU work used the existing SkyPilot authority. The owned Runpod attempts used one quoted Secure A100 at $1.79/hour. A custom-image attempt stalled at provisioning and its registry returned HTTP 401 to an anonymous pull. That attempt was canceled and removed. A public standard-image attempt found no US capacity. A subsequent SkyPilot request acquired one Secure A100 in Canada.
+
+The successful allocation reported an NVIDIA A100 80 GB PCIe with 81,920 MiB VRAM and NVIDIA driver 595.112.07. The public Runpod base was pinned to `sha256:ffe1c3b1ec997f7eaaef8561c2a701792c79ece19754d528222a14ee25d24cb0`. SkyPilot transferred a hashed bundle containing synthetic fixtures, a discovery copy of the QASM adapter with only the width guard lifted to 30, and a wheel built from qsim `v0.22.1` (`8d7150a7f796e8f7ebbf7587e67e80ed2674a5d0`). The qsim wheel hash was `66407dddcd86812e5c1c03ee2825db773b8d3216bb6133e34794fb79b5ecd822`. Exact artifact, allocation and request details are retained privately. The run evaluated scqubits 4.3.1, CuPy 14.2.0 and qsimcirq 0.22.1 at the approved large discovery tier.
+
+The discovery task used one unprivileged child at a time and capped its address space at 48 GiB, output at 12 MiB and each trial at 120 seconds. It checked host and device resource bounds before running a cell. The trial RSS and sampled device-memory peaks below describe this A100 worker. The internal V100 remains untested.
+
+## CPU preparation
+
+The immutable dependency base from [TASK-005](../discovery/gpu.md) supplies scqubits and the Python runtime. The qsim build recipe pins CUDA 12.8.1 and compiles the CPU, native CUDA and cuStateVec modules from the same source. The worker used the resulting wheel and the frozen fixture bundle. The local CPU preparation passed 13 scqubits arms and 10 qsim arms. qsim CPU preparation included both OpenQASM dialects, asymmetric bit order, exact deterministic samples and a 24-qubit random circuit. Direct CUDA and cuStateVec mode requests on a CPU-only system raised a CUDA initialization error. The repository CI script also passed locally in a Bookworm container with 2,198 Python tests and three console tests. The workstation run hit a glibc static thread-local storage error loading the packaged OpenMP library.
+
+| Fixture | Driver SHA-256 | Manifest SHA-256 |
+| --- | --- | --- |
+| scqubits | `13f22a4383a33bb77409d6a3f76ed0cf4a60d780be70e63deecae12a5d228268` | `4e8374390da87d76811ed4dc8a06304c03cc668d19e505f519e88e7dc1e011d8` |
+| qsim | `fc629d404757729a6d03bad0c9543e497dccac698283b46f251395547307864e` | `f92ff96b8670b2cd69c3d9c1bde72e2d262200861974caa53771a0095e4dfcc2` |
+
+## scqubits outcome
+
+Dense CuPy executed native device operations and met the selected numerical checks on the completed cells. The GPU arm used one CPU thread. The comparison selects the fastest correct CPU arm from one-thread and eight-thread SciPy methods, including structure-aware methods where supported. Fresh-child time includes imports, model construction, solve and encoding. Provisioning and API latency are separate.
+
+| Fixture | Completed pairs | Fastest CPU median | Dense GPU median | Result |
+| --- | ---: | ---: | ---: | --- |
+| Transmon D61, 8 eigenpairs | 5 | 4.90 s | 5.74 s | GPU slower |
+| Transmon D511, 8 eigenpairs | 5 | 4.92 s | 5.76 s | GPU slower |
+| Fluxonium D512, 32 levels and operator | 5 | 5.01 s | 6.17 s | GPU slower |
+| Fluxonium D1024, 8 eigenvalues | 5 | 5.51 s | 8.31 s | GPU slower |
+| Fluxonium D2048, 32 levels and operator | 5 | 8.91 s | 27.93 s | GPU slower |
+| FluxQubit D441, 32 levels and operator | 5 | 4.93 s | 5.76 s | GPU slower |
+| FluxQubit D1089, 8 eigenvalues | 5 | 5.04 s | 5.87 s | GPU slower |
+| FluxQubit D2025, 32 levels and operator | 5 | 5.51 s | 6.23 s | GPU slower |
+| High-ratio Fluxonium D1024, 32 levels and operator | 5 | 5.57 s | 8.65 s | GPU slower |
+
+Peak sampled device memory across the scqubits lane was 849 MiB. The largest observed host RSS among the completed GPU cells was 1,186 MiB. Fluxonium D2048 showed a GPU solve median of 0.258 s versus 0.293 s in the fastest CPU arm. Construction and fresh process startup account for most of the latency. The sparse GPU solver failed the D511 Transmon energy tolerance on all five trials, missing a selected eigenvalue by about 0.00028 GHz. FluxQubit sparse trials failed with `CUSPARSE_STATUS_NOT_SUPPORTED`. These cells do not qualify.
+
+The independent CPU cutoff check found a 649 Hz maximum shift among the first 32 FluxQubit transition energies from D441 to D1089. The shift from D1089 to D2025 was below a millihertz for that fixture. For the pinned high-ratio Fluxonium fixture, the CPU energies at D1024 and D2048 agreed within a millihertz. This tests energy convergence for those fixtures. Operator convergence across basis cutoffs remains open.
+
+The run reached the 26-minute scqubits phase deadline. The high-ratio D2048 and 4K cells did not complete five pairs. The conditional 8K tier was not started. Keep CPU for the tested cells. Any further Fluxonium trial should include a GPU arm with threaded host Hamiltonian construction. The recorded GPU arm used one host thread and does not establish the speed of that alternate profile.
+
+## qsim outcome
+
+The timings compare five fresh children per arm after worker provisioning. The GPU arm used one host thread and the fastest passing CPU arm used two or eight threads. Both arms include imports, QASM preparation, native execution and output encoding. They use identical fusion and inputs. API latency and SkyPilot dispatch are excluded.
+
+The eight-qubit controls verified output ordering and deterministic terminal measurement. Both GPU backends met the simultaneous 99% confidence bound on the 4,096-shot GHZ control. The 256-shot deterministic control matched its analytic output exactly. Its generic pooled confidence interval was too wide to establish the stochastic equivalence bound.
+
+The 24-qubit probability case took about 6.9 s across all three backends. Native CUDA lowered the solve median from 0.621 s to 0.040 s, but process startup dominated. The 26-qubit, depth-60 probability case cleared the five-pair latency threshold in both GPU modes. Both matched the CPU amplitudes and probabilities. In CUDA, the native stage took 0.340 s versus 7.424 s on the eight-thread CPU arm. CUDA's full median was 7.401 s versus 13.930 s and the sample p90 was 7.571 s versus 14.229 s. The CUDA arm reached 939 MiB sampled VRAM and 578 MiB host RSS.
+
+The qsim probes recorded the selected native module and its SHA-256, synchronized the device after native execution and sampled device activity in the single assigned-GPU child interval. This established backend attribution for the screen. Separate kernel traces are required for full qualification.
+
+At 28 qubits and depth 60, the two-thread CPU reference timed out in all five trials. The eight-thread CPU and GPU children returned outputs, but the benchmark could not verify them against the frozen reference. This leaves the case unqualified and distinguishes a missing comparator from a numerical discrepancy.
+
+| Case and operation | CPU median | CUDA median | cuStateVec median | Verification |
+| --- | ---: | ---: | ---: | --- |
+| QASM2 8q control, probabilities | 6.33 s | 6.82 s | 6.88 s | Selected amplitudes and probabilities agreed |
+| QASM3 8q control, probabilities | 6.18 s | 6.76 s | 6.75 s | Selected amplitudes and probabilities agreed |
+| QASM2 8q control, 256 samples | 6.27 s | 6.84 s | 6.82 s | Exact deterministic support passed |
+| QASM3 8q GHZ, 4,096 samples | 6.28 s | 6.83 s | 6.86 s | Distribution bound passed |
+| QASM2 24q random, probabilities, depth 20 | 6.93 s | 6.97 s | 6.93 s | Selected amplitudes and probabilities agreed |
+| QASM3 26q random, probabilities, depth 60 | 13.93 s | 7.40 s | 7.44 s | Selected amplitudes and probabilities agreed |
+| QASM2 28q random, probabilities, depth 60 | n/a | n/a | n/a | Incomplete paired verification |
+| QASM2 24q random, 256 samples, depth 20 | 7.14 s | 9.22 s | 7.06 s | Distribution bound remains open |
+| QASM3 26q random, 4,096 samples, depth 20 | n/a | n/a | n/a | Incomplete paired verification |
+| QASM3 28q GHZ, 4,096 samples | 9.07 s | 43.57 s | 6.89 s | Distribution bound passed |
+
+The qsim phase reached its 43-minute deadline after one verified 26-qubit random sampling trial per arm. It did not reach the 30-qubit selected probabilities or the 28-qubit random 4,096-shot samples. The 28-qubit GHZ check verified terminal sampling on both GPU backends. CUDA was slower than CPU and cuStateVec's 1.32× improvement did not reach the latency threshold. The 24-qubit random 256-shot case passed output-shape checks but had insufficient sample count for the distribution bound. Neither sampling backend qualified for promotion.
+
+The combined job ended with both phase deadlines reached and SkyPilot status `FAILED`. Completed-cell evidence was collected before teardown. Neither phase achieved full matrix coverage.
+
+## qsim confirmation
+
+The best passing screening candidate is native CUDA on the frozen QASM3 26-qubit, depth-60 probability case. Confirmation repeats that cell and the verified QASM2 24-qubit, depth-20 neighbor on the same A100 profile. The frozen comparator is the eight-thread CPU arm for both cases, selected from the screening runs. The two cases change depth as well as width.
+
+The 26-qubit case passed 20 of 20 paired comparisons. The median fresh-child time was 13.996 s on CPU and 7.389 s on CUDA. The corresponding p90s were 14.205 s and 7.550 s. The 10,000-resample paired bootstrap gave a 95% interval of 1.87× to 1.92× for the median ratio and 6.51 s to 6.77 s for the time saved. The CUDA arm peaked at 939 MiB sampled VRAM and 579 MiB host RSS.
+
+The 24-qubit neighbor also passed 20 of 20 comparisons. CPU took 7.044 s and CUDA took 7.067 s. Their p90s were 7.224 s and 7.153 s. The median speed ratio was 0.997× with a 95% paired interval of 0.982× to 1.015×. The CUDA arm peaked at 555 MiB sampled VRAM and 578 MiB host RSS. The confirmation job succeeded and its allocated device and library identities matched the screening profile.
+
+## Allocation and cost
+
+SkyPilot reported all four trial allocations terminated, and refreshed status returned an empty result for those names. The elapsed durations include setup and teardown where represented by SkyPilot. Compute estimates use the highest compatible quote, $1.79/hr, across the allowed Runpod regions.
+
+| Attempt | SkyPilot elapsed | Quote-based compute |
+| --- | ---: | ---: |
+| Private-image provisioning stall | 323 s | $0.16 |
+| Standard-image US capacity miss | 2 s | Less than $0.01 |
+| Combined screen | 4,286 s | $2.13 |
+| CUDA confirmation | 1,790 s | $0.89 |
+| **Total** | **6,401 s** | **$3.18** |
+
+SkyPilot returned zero computed cost for both regional A100 sessions. The quote-based total accounts for their full reported durations. Adding the run sheet's $3 ancillary allowance gives a $6.18 planning estimate against the $25 cap. Provider invoice charges were not available through SkyPilot. Request IDs, actual assignments, setup logs, termination receipts and the execution bundle are retained in private operator storage.
+
+## Disposition
+
+| Engine and operation | Decision |
+| --- | --- |
+| scqubits dense or sparse eigensystems | Keep CPU at tested sizes. Dense CuPy passed the completed numerical cases without a fresh-child latency win. Sparse failures and the larger basis tiers remain open. |
+| qsim, selected probabilities | Retain the 26-qubit, depth-60 CUDA result as a candidate for a separate production design. The 24-qubit neighbor showed parity, and the 28-qubit case lacks a verified reference. The two fixtures cannot establish a width cutoff because depth also changed. |
+| qsim, terminal measurement sampling | Keep CPU. The completed cases show no qualifying win, and the wider random circuits lack complete evidence. |
+
+The time results apply to fresh local children on the benchmark worker. They exclude API queueing and provisioning. V100, larger basis tiers and qsim beyond the production width limit lack qualification. A production GPU profile still needs matched-depth characterization, separate kernel traces and exact-image acceptance through SkyPilot.

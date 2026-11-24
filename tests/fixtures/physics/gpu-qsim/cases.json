@@ -1,0 +1,19 @@
+{
+  "circuit_seed": 481516,
+  "measurement_seed": 2317,
+  "bitstring_count": 64,
+  "screen": [
+    ["qasm2", 8, 0, "basis_probabilities", 0, "control"],
+    ["qasm3", 8, 0, "basis_probabilities", 0, "control"],
+    ["qasm2", 8, 0, "sample", 256, "control"],
+    ["qasm3", 8, 0, "sample", 4096, "ghz"],
+    ["qasm2", 24, 20, "basis_probabilities", 0, "random"],
+    ["qasm3", 26, 60, "basis_probabilities", 0, "random"],
+    ["qasm2", 28, 60, "basis_probabilities", 0, "random"],
+    ["qasm3", 30, 60, "basis_probabilities", 0, "random"],
+    ["qasm2", 24, 20, "sample", 256, "random"],
+    ["qasm3", 26, 20, "sample", 4096, "random"],
+    ["qasm2", 28, 60, "sample", 4096, "random"],
+    ["qasm3", 28, 0, "sample", 4096, "ghz"]
+  ]
+}

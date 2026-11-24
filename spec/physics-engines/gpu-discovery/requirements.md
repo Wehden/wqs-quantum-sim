@@ -1,0 +1,15 @@
+# Requirements amendment
+
+**Status:** Approved for discovery on 2026-11-22. Extends the discovery evidence required by PHY-011, PHY-015 and PHY-017. Existing production requirements remain authoritative. [Parent requirements](../requirements.md)
+
+| ID | EARS requirement | Acceptance evidence |
+| --- | --- | --- |
+| GPU-001 | When a discovery allocation is requested, the operator shall use the existing Laminar SkyPilot authority, prefer eligible internal capacity and schedule at most one owned, non-preempting GPU allocation at a time. | Current catalog and reservation snapshot, resource request, SkyPilot IDs, actual assignment and termination status. |
+| GPU-002 | If internal placement cannot meet a specific benchmark cell, the operator shall use Runpod only through SkyPilot and shall keep cumulative initial-round Runpod charges at or below $25. | Rate and ancillary-cost estimate, deadlines and tested cleanup path before launch. Reconcile all attempts and charges before spending again. |
+| GPU-003 | When a scqubits result is measured, the runner shall compare identical physical inputs, basis sizes and requested outputs against a qualified CPU reference at float64/complex128. | Energy, eigenpair residual, orthogonality, subspace, operator and basis-convergence checks from the frozen manifest. |
+| GPU-004 | When a qsim result is measured, the runner shall preserve WQS QASM2/QASM3 format and result semantics for the selected operation, and shall compare at the existing qsim precision. | Bit order, selected amplitudes/probabilities, sampling validity and distribution checks against independently generated references where tractable and matched CPU results at larger sizes. |
+| GPU-005 | When the runner records an accelerator result, it shall identify the native backend, show device execution, and capture host and device resource peaks within an explicit discovery envelope. | Image/source digest, driver and library versions, native CUDA trace or equivalent attribution, RSS/VRAM peaks and capacity refusals. Backend failure shall produce a failed cell. |
+| GPU-006 | When a cell is evaluated for promotion, the report shall compare complete fresh-child execution against the fastest correct matched CPU reference, account for dispatch separately, and record cost and failures. | Paired trial evidence and a decision for each class/operation/backend/device/input range. Measurements inside a persistent process shall be labeled separately. |
+| GPU-007 | While discovery is pending or running, the benchmark runner shall use frozen synthetic inputs and owned temporary storage. The production interface, credentials, workloads and backup/release gates shall remain unchanged. | Source diff, allocation ledger and retained receipts. Any production GPU proposal requires a separate reviewed admission and acceptance design. |
+
+The benchmark matrix and numerical decision thresholds are in the [design](design.md). The owner reviews this packet before a discovery job can be submitted.

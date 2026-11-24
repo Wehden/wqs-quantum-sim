@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "boundaries": [
+    {
+      "module": "tests/fixtures/physics/gpu-scqubits/probe.py",
+      "description": "Numerical fixture with no cluster or service authority.",
+      "allowed_imports_from": ["numpy", "scipy", "scqubits", "cupy", "cupyx"],
+      "forbidden_imports_from": ["qsim.api", "qsim.auth", "qsim.controller", "qsim.store", "qsim.settings", "sky", "runpod"]
+    },
+    {
+      "module": "tests/fixtures/physics/gpu-qsim/probe.py",
+      "description": "Numerical fixture using the existing QASM preparation boundary.",
+      "allowed_imports_from": ["numpy", "cirq", "qsimcirq", "cupy", "qsim.qasm_adapter"],
+      "forbidden_imports_from": ["qsim.api", "qsim.auth", "qsim.controller", "qsim.store", "qsim.settings", "sky", "runpod"]
+    }
+  ]
+}
