@@ -148,7 +148,25 @@ for 14 days. Images are published only by the separately gated CD workflow; see
 
 For workflow dependency updates, dispatch CI with `hosted_tests: true` to exercise
 hosted Node/Python setup, the full suite and artifact upload. This explicit path
-skips Standpunkt; the default remains unchanged and manual runs cannot deploy.
+skips Standpunkt. The 2026-11-25 validation explicitly executed Node setup,
+the hosted tests, test-result upload and hosted image checks on exact main.
+The separately recorded main push used the local test route. Manual CI is
+ineligible for CD. [Hosted validation](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45727110240) ·
+[Local-first main CI](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45327906729)
+
+## Controlled SkyPilot release smoke
+
+Use the [release verifier](release-hooks.md) on the trusted deployment runner.
+It submits deterministic jobs through the existing release smoke identity to
+the exact candidate image. Record the dispatch request ID and its native job
+and cluster IDs. Confirm native success with a queue read and verify image,
+resource profile, numerical result and artifact identity before teardown.
+Check the cleaned state and refreshed allocation inventory after the
+controller's SkyPilot retirement. Report a missing callback, unclear native
+status or pending cleanup as a failed acceptance check. The verifier requires
+the full release matrix and no pending jobs before reopening admission.
+Replay of a verified receipt adds no new live evidence. The procedure uses
+the normal [CD recovery checks](cd-recovery.md) on failure.
 
 ## Main-branch integration gate
 

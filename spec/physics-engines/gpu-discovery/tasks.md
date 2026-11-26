@@ -61,13 +61,13 @@ TASK-037 and TASK-038 can prepare independently in their leases. Each lane must 
 - [x] Owner reviews the requirements, design and launch scope.
 - [x] Fixture, reference and image identities are pinned and CPU preparation passes.
 - [x] Live placement, compatibility and any Runpod quote are checked before submission.
-- [ ] Full cell evidence remains open. See the phase deadlines, missing references and kernel-trace gap in the results.
+- [ ] Full matrix evidence remains open for larger scqubits tiers, incomplete qsim cells and separate traces outside the confirmed RTX 3060 cases.
 - [x] Every owned allocation is reconciled. The quote-based estimate is below the cap, including the ancillary allowance. The provider invoice was unavailable through SkyPilot.
 - [x] Results and remaining qualification work are recorded for owner review.
 
 ## Execution Notes (tooling, environment, checkpoints)
 
-The [results](results.md) record the completed screening cells and gaps. TASK-037 and TASK-038 produced frozen recipes, CPU controls and the executed synthetic fixtures. TASK-039 reached both combined-job phase deadlines, retained the evidence and tore down its allocation. It completed the bounded qsim confirmation for the screened CUDA case and its neighbor. TASK-040 records the resulting CPU/GPU disposition for owner review.
+The [results](results.md) record the completed screening cells and gaps. The internal RTX 3060 confirmed the frozen 26-qubit case with 20 pairs, and the 24-qubit control missed the speed criterion. [Deployment plan](deployment-plan.md) covers subsequent exact-image acceptance. TASK-037 and TASK-038 produced frozen recipes, CPU controls and the executed synthetic fixtures. TASK-039 reached both combined-job phase deadlines, retained the evidence and tore down its allocation. It completed the bounded qsim confirmation for the screened CUDA case and its neighbor. TASK-040 records the resulting CPU/GPU disposition for owner review.
 
 Use current main and standalone fixtures under the task leases. Keep shared reporting with the coordinator. Existing production suites remain independent. Use the existing SkyPilot authority for all discovery GPU work and retain private run records without committing credentials, provider identifiers or hostnames. Report launch and teardown ID mismatches before further requests.
 

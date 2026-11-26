@@ -14,6 +14,11 @@ Image readback compared all810 `/app` files against the deployed native-admin ba
 
 Root's independent test review reported150 targeted tests passing, plus read-only container and cancellation checks. Simplification, security, docs and final correctness reviews all passed with no findings. No token policy, credential material, provider mount permissions, public endpoint, release/bootstrap flag or physics files changed.
 
-## Pending live acceptance
+## Live acceptance, 2026-11-25
 
-Required PR CI and human source merge remain pending. The exact private native-admin image-only promotion still needs concrete ship approval. After promotion, require native readiness, unchanged existing registry/token fields and actual welcome read-only PVC/WAL readiness, TLS/SAN/auth denials, capabilities and existing eligible recipient reads before central activation. Existing token validation is separately tracked. No production mail or key creation is part of these checks.
+PR #48 merged at `4b37df5b` and is an ancestor of main. The deployed native
+admin includes that change. The welcome provider is ready with a read-only
+data mount. Its configured central caller verified the TLS certificate and
+read live capability and eligible-recipient data. The same capability
+path denied requests without service authentication. See the
+[ON04A live reconciliation](../tenancy/on04a/verification.md#live-reconciliation-2026-11-25).

@@ -130,3 +130,15 @@ passes and the standard full release verifier succeeds. See
 [the recovery checkpoint](../../docs/cd-recovery.md#physics-recovery-checkpoint-2026-11-12)
 for the preserved failure sequence and backup receipt handling. Existing
 credentials and backup/release gates remain unchanged.
+
+## Verified CPU release, 2026-11-25
+
+PRs #83 and #84 are on main. The current release ledger records source
+`42a52154a9070c73eb16dc5820c402bc6726eeec`, fresh encrypted backup evidence
+and all 21 `cpu-physics-v1` cases with native results and cleanup. All four
+live roles matched that release, and admission was open with zero pending
+jobs. The [recorded release](../qasm-support/release.md) includes the worker
+digest and exact-main CI. CD attempt 2 replayed the verified record after
+recovery. This closes TASK-034 and G4 for the CPU matrix. The GPU matrix is
+empty. See the [separate discovery](gpu-discovery/results.md) for candidate
+GPU performance.

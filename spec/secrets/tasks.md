@@ -1,7 +1,6 @@
 # Secret-management implementation tasks
 
-Current reconciliation: existing circuit CD and application acceptance are verified
-through exact-main `8d8b2d0`; the run IDs and operator recovery are recorded below.
+Current reconciliation: the deployed CPU release at `42a52154` has fresh encrypted backup evidence and all 21 application cases verified. See the [current release record](../qasm-support/release.md).
 Dated checkpoints retain their historical scope. Credential rotation remains
 explicitly deferred, and no production restore was performed.
 
@@ -110,7 +109,7 @@ See [the implementation contract](../../docs/backup-recovery-v2.md).
 - [x] Actual v2 capture integration installed; normal CD verifies creation against each newly requested set ID.
 - [ ] Configure an explicit native destination for operational recovery when requested.
 - [x] Existing circuit release-control protocol and eight-case application acceptance verified.
-- [ ] Other protocol/runtime-parity obligations remain with their own specs; this circuit acceptance does not close them. Physics runtime acceptance remains in `spec/physics-engines`.
+- [x] The [physics release record](../physics-engines/validation.md#verified-cpu-release-2026-11-25) separately verifies the live CPU physics matrix.
 
 Source tests use disposable destinations and existing test-created identities;
 no production restore, credential rotation, or bootstrap/CD change is implied.

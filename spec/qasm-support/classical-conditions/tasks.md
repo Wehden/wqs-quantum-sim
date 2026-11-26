@@ -1,6 +1,6 @@
 # Implementation tasks: classical conditions
 
-Status: **TASK-011 through TASK-018 complete and integrated into main** (2026-10-14). The owner merged #18 with a merge commit; all contributing PR histories are ancestors of main `157d9bb46ff25b0ff5796ba8b85eca4e30488ed5`. Exact-main push CI passed. The owner accepted the final documentation nits. TASK-019 remains incomplete pending qualified deployable images and rollout acceptance; CD implementation is tracked separately.
+Status: **TASK-011 through TASK-018 complete and integrated into main** (2026-10-14). The owner merged #18 with a merge commit; all contributing PR histories are ancestors of main `157d9bb46ff25b0ff5796ba8b85eca4e30488ed5`. Exact-main push CI passed. The owner accepted the final documentation nits. TASK-019 is complete for the released Aer subset. See the [release handoff](../release.md) for the deployable worker and live acceptance evidence.
 
 Prepared against the System2 1.1.1 task-planner contract. Parent scope: [design](design.md), [requirements delta](requirements-delta.md), and [existing tasks](../tasks.md). Research evidence remains separate from implementation acceptance.
 
@@ -202,7 +202,7 @@ The initial chain is deliberately sequential: safety and native execution share 
 - [x] Authenticated API-to-worker examples and protected complete artifacts pass for Aer.
 - [x] All three engines and actual packaged image pass required PR CI; Standpunkt tests and hosted image checks passed.
 - [x] Owner merged #12–#14 and accepted the remaining documentation nits. Integration into main is tracked separately.
-- [ ] Complete rollout handoff recorded, with deployed acceptance clearly outstanding until authorized and verified.
+- [x] Rollout handoff and deployed acceptance recorded for explicit Aer in both QASM formats. [Release evidence](../release.md)
 
 ## Execution Notes (tooling, environment, checkpoints)
 

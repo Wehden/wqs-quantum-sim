@@ -3,7 +3,7 @@
 [Larger GPU workload discovery](gpu-discovery/context.md) is approved for
 discovery. It covers scqubits and Google qsim, with an internal-first SkyPilot run
 sheet and a $25 Runpod cap. [Results](gpu-discovery/results.md) include the
-confirmed qsim CUDA case and the open qualification work.
+confirmed qsim CUDA case and the open qualification work. The [CUDA deployment plan](gpu-discovery/deployment-plan.md) records the exact-image and release steps.
 
 Requirements, design and G1 decisions are approved. Tranche A is merged in
 PR #80 at `87304d249005ad65db6a256bf970e04ede1c1288`; exact-main CI passed with
@@ -21,11 +21,11 @@ or local image test. Runtime `/api/capabilities` remains the availability author
 | Requirements/design/G1 | Approved; [requirements](requirements.md), [design](design.md), [decisions](decisions.md) |
 | G2 CPU integration | Tranche A merged. All Lindblad families, four scqubits classes/export, JoSIM native/history proofs and joined lifecycle/recovery are implemented; [CPU evidence](discovery/cpu-acceptance.md) |
 | G3 device disposition | Approved CPU-only first release; empty enabled-GPU matrix and scoped prior discovery conclusions in [GPU acceptance](discovery/gpu-acceptance.md) |
-| G4 qualification | Tranche B implements mandatory no-skip proofs, the version-2 21-case acceptance contract, tested docs and [author security audit](security.md); current-head CI/review and owner merge remain required |
-| TASK-034 production | Pending exact-main CI artifacts, real fresh encrypted backup/recovery gates, held deployment, restricted real-SkyPilot smoke, full matrix/native cleanup and durable verified receipt before general admission |
+| G4 qualification | Tranche B implements mandatory no-skip proofs, the version-2 21-case acceptance contract, tested docs and [author security audit](security.md); merged through #81–#83 and verified on the live CPU release |
+| TASK-034 production | Verified for the CPU matrix. Exact-main #84 recovered and passed the encrypted backup, real SkyPilot smoke and native cleanup checks. [Live release evidence](validation.md#verified-cpu-release-2026-11-25) |
 
 [Validation](validation.md) maps PHY-001 through PHY-020 to component evidence
-and the remaining live-release obligations. [Tasks](tasks.md) retain original
+and the verified CPU release evidence. [Tasks](tasks.md) retain original
 IDs as traceability units, not separate PR boundaries. TASK-030/031/032/033 and
 the conditional GPU disposition are consolidated in Tranche B; TASK-034 is the
 existing controlled CD rollout after its merge, not another feature lane.

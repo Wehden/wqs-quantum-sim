@@ -1,6 +1,6 @@
 # ON04A verification gates
 
-Status: planned, no tests or production changes claimed by this document.
+Status: the single-scope read-only provider is merged and live. See the reconciliation below.
 
 | Gate | Evidence required |
 | --- | --- |
@@ -59,3 +59,13 @@ validation. Authentication now checks the verifier and immutable startup audienc
 and org before reading mapping records. A regression test asserts that invalid
 bearers and missing read scope cannot trigger the mapping reader. A separate
 configuration-race test verifies sanitized failure without leaking exception data.
+
+## Live reconciliation, 2026-11-25
+
+PR #21 and the WAL correction in #48 are ancestors of main. The central
+console has the WQS binding, and the provider uses a read-only data mount.
+From the central console using the configured CA, unauthenticated
+capabilities returned 401. The configured service identity returned 200 for
+`wqs-welcome/1` capabilities and enumerated three eligible contacts with no
+remaining page. This qualifies the configured read-only bootstrap scope.
+The parent tenancy/token-authority migration remains deferred.

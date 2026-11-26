@@ -11,8 +11,8 @@
 | Docs review | PASS | Owner lifetime and failure behavior documented |
 | Final correctness review | PASS | No findings on frozen source |
 | Agent evals | Skipped | No LLM/agent behavior changed |
-| Required PR CI | Pending | Must inspect actual submitted head |
-| Human source merge | Pending | WQS manual merge preference preserved |
-| Operational ship | Pending | Exact owner-only image promotion and central activation require concrete ship review |
+| Required PR CI | PASS | #48 reached main and is covered by the current verified release |
+| Source merge | PASS | #48 merged as `4b37df5b` |
+| Operational ship | PASS | Live read-only provider and central binding verified on 2026-11-25 |
 
 Root authorized bounded corrective implementation and these reviews under the user's instruction to address the activation block. No review correction cycles occurred. The source remains reviewable before any live mutation; no bootstrap gate exception or production mail was inferred.

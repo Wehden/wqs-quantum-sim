@@ -130,3 +130,10 @@ The specification, foundation, features and CI corrections are merged through PR
 Deployment must publish the approved worker image through the private baseline and ensure compatible worker selection before enabling the new API/controller code. Backout must close new admission and preserve capable workers until accepted jobs drain. No private configuration, public production hostnames or registry credentials are recorded here.
 
 Deferred: classical conditions, arbitrary QASM3 control flow, unsized/other input types, new-path exponent expressions, and incremental sample streaming. QASM2 probability semantics stay on their legacy path. New QASM2 sampling and QASM3 operations use the validated adapter.
+
+## Live release reconciliation, 2026-11-25
+
+The [release handoff](release.md) records the verified current CPU release, the
+worker digest and the complete live circuit and physics matrix. It supersedes
+the earlier pending rollout checkpoints. Engine boundaries remain specific
+to the documented format and operation.

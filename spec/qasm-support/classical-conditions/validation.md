@@ -131,3 +131,10 @@ Important merge topology: #12 reached main as `30692108986d0067604dc15db6183eb41
 ### Main integration verified
 
 On 2026-10-14, #18 merged with a merge commit as `157d9bb46ff25b0ff5796ba8b85eca4e30488ed5`. All 15 earlier merged PR merge commits and integration head `8c4e4692fb4f9bb12f8aa7a4d0b9347552b2c212` are ancestors of main. [Exact-main push CI](https://github.com/Wehden/wqs-quantum-sim/actions/runs/38666139157) passed. This closes TASK-018's integration gate and supersedes the pending-main note above. TASK-019 and original TASK-010 remain open until deployable image and live rollout evidence exist.
+
+## Live release reconciliation, 2026-11-25
+
+The [release handoff](../release.md) records the verified current CPU release, the
+worker digest and the complete live circuit and physics matrix. It supersedes
+the earlier pending rollout checkpoints. Engine boundaries remain specific
+to the documented format and operation.
