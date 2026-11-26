@@ -41,8 +41,10 @@ def test_physics_markers_preserve_existing_platforms_and_upstream_metadata():
             req = requirements[package]
             assert str(req.specifier) == '==' + expected
             assert req.marker is not None and req.marker.evaluate(environment) == (platform == 'linux')
-        for package in ('clifft', 'qsimcirq', 'qiskit', 'qiskit-aer', 'qiskit-qasm3-import'):
+        for package in ('clifft', 'qiskit', 'qiskit-aer', 'qiskit-qasm3-import'):
             assert requirements[package].marker is None
+        qsim_marker = requirements['qsimcirq'].marker
+        assert qsim_marker is not None and qsim_marker.evaluate(environment) == (platform != 'emscripten')
     base = {Requirement(text).name: Requirement(text) for text in manifest['project']['dependencies']}
     assert str(base['numpy'].specifier) == '==2.5.4' and base['numpy'].marker is None
     assert not set(PHYSICS_PINS) & set(base)

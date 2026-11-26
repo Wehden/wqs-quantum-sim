@@ -53,7 +53,19 @@ dependencies = [
 environments = ["sys_platform == 'linux'", "sys_platform != 'linux'"]
 ```
 
-The two sets are disjoint and their union is all platforms. Both the minimal project and the full project then resolve, preserving every preexisting version. Tests verify the marker boundary, coverage of Linux/Darwin/Windows/Emscripten/FreeBSD, existing unmarked engine requirements, cross-platform API NumPy, Linux-only resolved scqubits edges and the retained upstream Darwin restriction. There is no global Linux-only support declaration or metadata waiver.
+The two sets are disjoint and their union is all platforms. Both the minimal project and the full project then resolve, preserving every preexisting version. Tests verify the marker boundary, coverage of Linux/Darwin/Windows/Emscripten/FreeBSD, the circuit engine requirements, cross-platform API NumPy, Linux-only resolved scqubits edges and the retained upstream Darwin restriction.
+
+On November 26, 2026, Dependabot's uv 0.13.7 failed to relock because qsimcirq
+0.22.1 has no Emscripten distribution. The worker extra now omits that one
+requirement on Emscripten. The uv partitions and all other requirements retain
+their existing platform coverage. The lock keeps the same 149 package versions
+and distribution hashes.
+
+A replay of the failed update commands in isolated copies resolved nine
+candidates. Uvicorn 0.54.0 still conflicts with the controller dependency's
+`>=0.33.0,<0.36.0` requirement, including with the proposed SkyPilot 0.14.3
+update. The [failed Dependabot run](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45871560674)
+records the original resolution failure.
 
 ## Installed notices and JoSIM boundary
 
