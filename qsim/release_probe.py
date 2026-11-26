@@ -7,6 +7,12 @@ import re
 import time
 
 
+OBSERVER_REFRESH_PENDING = 'observer_refresh_pending'
+
+
+class ObserverRefreshPending(Exception):
+    """A healthy observer is collecting a fresh batch of queue observations."""
+
 
 # Fixed MIT-licensed upstream fixture, identical to the numerical proof fixture.
 SFQ_NETLIST = '* Source: https://github.com/JoeyDelp/JoSIM/blob/02a34ee5e7a3a6952b21ccc726fbf7a6d5e2b224/test/ex_jtl_basic.cir\n* MIT License\n* \n* Copyright (c) 2020 Johannes Delport\n* \n* Permission is hereby granted, free of charge, to any person obtaining a copy\n* of this software and associated documentation files (the "Software"), to deal\n* in the Software without restriction, including without limitation the rights\n* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n* copies of the Software, and to permit persons to whom the Software is\n* furnished to do so, subject to the following conditions:\n* \n* The above copyright notice and this permission notice shall be included in all\n* copies or substantial portions of the Software.\n* \n* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n* SOFTWARE.\n* Fixed single-pulse JTL fixture adapted from JoSIM v2.7 ex_jtl_basic (MIT).\nB01        3          7          jmitll     area=2.16\nB02        6          8          jmitll     area=2.16\nIB01       0          1          pwl(0      0 5p 280u)\nL01        4          3          2p        \nL02        3          2          2.425p    \nL03        2          6          2.425p    \nL04        6          5          2.031p    \nLP01       0          7          0.086p    \nLP02       0          8          0.096p    \nLPR01      2          1          0.278p    \nLRB01      7          9          0.086p    \nLRB02      8          10         0.086p    \nRB01       9          3          5.23      \nRB02       10         6          5.23      \nROUT       5          0          2         \nVIN        4          0          pwl(0 0 100p 0 102.5p 827.13u 105p 0)\n.model jmitll jj(rtype=1, vg=2.8mV, cap=0.07pF, r0=160, rN=16, icrit=0.1mA)\n.tran 0.25p 250p\n.print DEVV B01\n.print PHASE B01\n.print DEVV B02\n.print PHASE B02\n.print DEVI ROUT\n.end\n'
@@ -102,10 +108,12 @@ def probe(sha, owner, job_ids, native=False, sky=None, worker_image=None):
     now = time.time()
     fresh = lambda value: isinstance(value, (int, float)) and 0 <= now - value <= 180
     if (not fresh(heartbeat) or not fresh(observation.get('observed_at'))
-            or not fresh(observation.get('queues_observed_at'))
-            or observation.get('last_error') or observation.get('queue_errors')
-            or observation.get('queues_complete') is not True):
+            or observation.get('last_error') or observation.get('queue_errors')):
         raise ValueError('Controller or observer not healthy')
+    if observation.get('queues_complete') is False and observation.get('queue_errors') == []:
+        raise ObserverRefreshPending
+    if observation.get('queues_complete') is not True or not fresh(observation.get('queues_observed_at')):
+        raise ValueError('Controller or observer queues not healthy')
     result = {'heartbeat':heartbeat,'observer_at':observation['observed_at'],
               'cleaned':all(j['cleaned'] and j['status']=='SUCCEEDED' for j in jobs.values())}
     records = {}
@@ -217,6 +225,8 @@ def main():
         with contextlib.redirect_stdout(io.StringIO()):
             result = probe(args.release, args.owner, json.loads(args.jobs), args.native, worker_image=args.worker_image)
         print(json.dumps(result))
+    except ObserverRefreshPending:
+        print(json.dumps({'status': OBSERVER_REFRESH_PENDING}))
     except Exception:
         raise SystemExit('Release probe failed; admission unchanged.') from None
 
