@@ -61,7 +61,8 @@ TASK-037 and TASK-038 can prepare independently in their leases. Each lane must 
 - [x] Owner reviews the requirements, design and launch scope.
 - [x] Fixture, reference and image identities are pinned and CPU preparation passes.
 - [x] Live placement, compatibility and any Runpod quote are checked before submission.
-- [ ] Full matrix evidence remains open for larger scqubits tiers, incomplete qsim cells and separate traces outside the confirmed RTX 3060 cases.
+- [x] Independent CPU cutoff comparisons cover the tested scqubits operators. The eight-thread CPU reference for the 28-qubit qsim fixture fits the trial deadline.
+- [ ] Full matrix evidence remains open for larger scqubits GPU tiers, incomplete qsim cells and additional traces. The latest SkyPilot attempts found insufficient host CPU or unavailable Runpod capacity.
 - [x] Every owned allocation is reconciled. The quote-based estimate is below the cap, including the ancillary allowance. The provider invoice was unavailable through SkyPilot.
 - [x] Results and remaining qualification work are recorded for owner review.
 

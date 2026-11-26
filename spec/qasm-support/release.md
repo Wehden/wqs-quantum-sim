@@ -41,6 +41,17 @@ incremental measurement streaming outside this release. The pinned tests
 exercise custom gates, bindings, entangled reset and teleportation-style
 correction beyond the small live smoke circuits.
 
+## Incremental measurement streaming
+
+On 2026-11-25, a separate CPU check exercised upstream Clifft 0.14.0 with a
+seeded Bell circuit. Its documented Python sampler returned a completed
+`SampleResult` with 128 rows. Repeating the 128-shot call reproduced the array,
+while concatenating two 64-shot calls with the original seed yielded a different
+array. WQS retains progress and final-result events. Incremental measurement
+delivery still needs a native streaming interface or a chunk contract that
+defines seed semantics and reproduces the final artifact across retries.
+[Upstream sampling guide](https://unitaryfoundation.github.io/clifft/stable/guide/simulation/)
+
 ## Promotion and backout
 
 Build and validate the worker alongside the exact-main API and controller in

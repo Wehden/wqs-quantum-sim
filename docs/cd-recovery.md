@@ -180,3 +180,32 @@ After this correction is merged, require fresh exact-main CI and the complete
 standard acceptance hook before reopening. Retain the earlier failures and the
 new release's fresh backup evidence. Existing credentials, recovery keys and
 unrelated workloads remain unchanged.
+
+## Observer refresh recovery, 2026-11-25
+
+[PR #85](https://github.com/Wehden/wqs-quantum-sim/pull/85) reached main as
+`56863f1d5c864cb3b228277ee76d37a4e35cf98b`. The first CD attempt created
+and verified its encrypted backup and installed all four roles, but failed
+during the acceptance hook. All 21 jobs reached success and finished
+cleanup. A later exact native probe confirmed their allocations and job
+IDs. A read-only observation also captured the incomplete snapshot published
+during routine queue refresh.
+
+Recovery retained the failed records under the release lock, read back the
+exact recorded ciphertext version, and checked the candidate's live role
+and worker images. The full acceptance retry passed all 21 numerical cases,
+exact native checks and cleanup before admission reopened. The subsequent
+CD rerun replayed that verified receipt. [CI](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45732391279)
+· [CD](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45734809324)
+
+[PR #86](https://github.com/Wehden/wqs-quantum-sim/pull/86) lets the acceptance
+hook wait for a healthy observer to finish an in-progress refresh within
+the existing deadline. Completion still requires fresh queue evidence and
+every original numerical, native execution and cleanup check.
+
+The fix reached main as `10af09311e93ed0da9ed6339420c9ead513c992b`.
+The normal CD workflow passed on its first attempt after exact-main CI.
+It created and verified a fresh encrypted backup before rollout. The
+private receipt confirmed all four role images, all 21 cases, and zero
+pending jobs at reopened admission. [Main CI](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45739375759)
+· [Automated CD](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45741723887)
