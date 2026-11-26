@@ -76,6 +76,27 @@ def test_probe_requires_smoke_owner_fresh_observer_and_does_not_change_hold(clie
     assert release_control.control('status', SHA)['release'] == SHA
 
 
+@pytest.mark.parametrize('failure', [None, 'stale', 'queue_error', 'observer_error', 'incomplete'])
+def test_probe_reports_only_a_fresh_queue_refresh_as_pending(client, failure):
+    healthy_files()
+    release_control.control('hold', SHA)
+    release_control.control('smoke', SHA, 'alice')
+    observation = {'observed_at': time.time(), 'queues_complete': False, 'queue_errors': []}
+    if failure == 'stale':
+        observation['observed_at'] -= 181
+    elif failure == 'queue_error':
+        observation['queue_errors'] = [{'error': 'RuntimeError'}]
+    elif failure == 'observer_error':
+        observation['last_error'] = 'RuntimeError'
+    elif failure == 'incomplete':
+        observation.pop('queue_errors')
+    (settings.DATA / 'skypilot-observation.json').write_text(json.dumps(observation))
+    expected = ValueError if failure else release_probe.ObserverRefreshPending
+    with pytest.raises(expected):
+        release_probe.probe(SHA, 'alice', [])
+    assert release_control.control('status', SHA)['release'] == SHA
+
+
 def test_probe_native_identity_matches_exact_job_not_other_success(client):
     healthy_files()
     release_control.control('hold', SHA)
@@ -111,6 +132,39 @@ def test_hook_rejects_wrong_ledger_before_any_network(tmp_path, monkeypatch):
     monkeypatch.setattr(verifier, 'request', lambda *args, **kwargs: pytest.fail('network called'))
     with pytest.raises(ValueError, match='ledger'):
         verifier.execute()
+
+
+@pytest.mark.parametrize('native', [False, True])
+def test_hook_rechecks_after_observer_refresh(tmp_path, monkeypatch, native):
+    verifier = hook(tmp_path)
+    evidence = {'cleaned': True, 'heartbeat': 25}
+    responses = iter([{'status': release_probe.OBSERVER_REFRESH_PENDING}, evidence])
+    requests = []
+    pauses = []
+
+    def kube(*args, timeout):
+        requests.append((args, timeout))
+        return json.dumps(next(responses))
+
+    monkeypatch.setattr(verifier, 'kube', kube)
+    monkeypatch.setattr(acceptance.time, 'sleep', pauses.append)
+    assert verifier.probe(native=native) == evidence
+    assert requests[0] == requests[1]
+    assert ('--native' in requests[0][0]) is native
+    assert pauses == [2]
+
+
+def test_hook_observer_refresh_retry_uses_the_acceptance_deadline(tmp_path, monkeypatch):
+    verifier = hook(tmp_path)
+
+    def kube(*args, timeout):
+        verifier.deadline = time.monotonic() - 1
+        return json.dumps({'status': release_probe.OBSERVER_REFRESH_PENDING})
+
+    monkeypatch.setattr(verifier, 'kube', kube)
+    monkeypatch.setattr(acceptance.time, 'sleep', lambda _: pytest.fail('deadline exceeded'))
+    with pytest.raises(TimeoutError):
+        verifier.probe()
 
 
 def test_redirects_do_not_forward_credentials():

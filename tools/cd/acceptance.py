@@ -249,6 +249,8 @@ class Acceptance:
         return data
 
     def probe(self, native=False):
+        from qsim.release_probe import OBSERVER_REFRESH_PENDING
+
         role = self.config['roles']['controller' if native else 'api']
         args = ['exec', 'deployment/' + role['deployment'], '-c', role['container'], '--',
                 'python', '-m', 'qsim.release_probe', '--release', self.sha,
@@ -256,7 +258,11 @@ class Acceptance:
                 '--worker-image', self.worker_image]
         if native:
             args.append('--native')
-        return json.loads(self.kube(*args, timeout=120 if native else 30))
+        while True:
+            result = json.loads(self.kube(*args, timeout=120 if native else 30))
+            if result != {'status': OBSERVER_REFRESH_PENDING}:
+                return result
+            time.sleep(self.remaining(2))
 
     def roles(self, expected):
         for role, mapping in self.config['roles'].items():

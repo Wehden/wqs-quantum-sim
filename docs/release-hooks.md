@@ -33,16 +33,19 @@ must match the expected immutable images; runtime image IDs are not compared to
 OCI index digests because runtimes may report the selected platform manifest.
 The controller's worker-image setting must match the release ledger too.
 
-It checks API readiness and admin health, then submits eight tiny deterministic
-cases: Clifft Stim and QASM2 probabilities; Google qsim sampling and probabilities
-for QASM2 and QASM3; Aer sampling for both formats. Aer cases include reset and
-classical feed-forward. Probability requests omit shots and seed. Each result's
+It checks API readiness and admin health, then submits the 21-case circuit and
+CPU physics matrix. The eight circuit cases cover Clifft Stim and QASM2
+probabilities, Google qsim sampling and probabilities in both QASM formats, and
+Aer sampling with reset and classical feed-forward. The physics cases cover
+Lindblad, scqubits, the scqubits-to-Lindblad handoff, and JoSIM. Each result's
 engine, operation and numerical summary must match the downloaded NPZ arrays.
 Artifacts are bounded and loaded with NumPy pickle support disabled. HTTP
 redirects are rejected, so bearer credentials are not forwarded to another URL.
 
 Local read-only probes require controller heartbeat and complete observer queues
-no older than 180 seconds. The final probe runs in the controller image, resolves
+no older than 180 seconds. The hook polls during a fresh observer queue refresh
+within its existing deadline. It still requires the completed snapshot and rejects
+stale observations and explicit errors. The final probe runs in the controller image, resolves
 each owned dispatch request to its native SkyPilot job ID, and checks that exact
 job in its native queue, including finished jobs. A callback alone cannot pass.
 Controller progress and completed dispatcher cleanup are required. A missing or
@@ -56,9 +59,9 @@ operator can investigate an uncertain submission. It does not acquire the
 parent's held lock. Only the final sanitized acceptance JSON goes to stdout;
 raw API/kubectl errors and secret values are suppressed.
 
-Installation and live acceptance remain pending. The deployed runner stays at
-zero replicas and `WQS_CD_ENABLED=false`. The runtime-overlay/protocol bootstrap,
-dedicated smoke identity, complete backup and recovery gates remain independent.
+Production CD runs this hook after release preflight, encrypted backup readback
+and rollout. The [recovery runbook](cd-recovery.md) records how to verify live
+acceptance and recover a failed deployment while preserving the admission hold.
 
 ## Backup integration checkpoint, 2026-10-19
 
