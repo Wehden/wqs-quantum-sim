@@ -37,7 +37,7 @@ Dense CuPy executed native device operations and met the selected numerical chec
 
 Peak sampled device memory across the scqubits lane was 849 MiB. The largest observed host RSS among the completed GPU cells was 1,186 MiB. Fluxonium D2048 showed a GPU solve median of 0.258 s versus 0.293 s in the fastest CPU arm. Construction and fresh process startup account for most of the latency. The sparse GPU solver failed the D511 Transmon energy tolerance on all five trials, missing a selected eigenvalue by about 0.00028 GHz. FluxQubit sparse trials failed with `CUSPARSE_STATUS_NOT_SUPPORTED`. These cells do not qualify.
 
-The independent CPU cutoff check found a 649 Hz maximum shift among the first 32 FluxQubit transition energies from D441 to D1089. The shift from D1089 to D2025 was below a millihertz for that fixture. For the pinned high-ratio Fluxonium fixture, the CPU energies at D1024 and D2048 agreed within a millihertz. This tests energy convergence for those fixtures. Operator convergence across basis cutoffs remains open.
+The independent CPU cutoff check found a 649 Hz maximum shift among the first 32 FluxQubit transition energies from D441 to D1089. The shift from D1089 to D2025 was below a millihertz for that fixture. For the pinned high-ratio Fluxonium fixture, the CPU energies at D1024 and D2048 agreed within a millihertz. The separate cutoff check below adds operator convergence for these fixtures.
 
 The run reached the 26-minute scqubits phase deadline. The high-ratio D2048 and 4K cells did not complete five pairs. The conditional 8K tier was not started. Keep CPU for the tested cells. Any further Fluxonium trial should include a GPU arm with threaded host Hamiltonian construction. The recorded GPU arm used one host thread and does not establish the speed of that alternate profile.
 
@@ -166,3 +166,45 @@ The confirmation and trace allocations ran for 2,124 s and 104 s
 respectively in SkyPilot’s accounting. Both were terminated and returned no
 cloud compute charges. Native traces and full raw result receipts remain in
 private operator storage.
+
+## scqubits basis convergence with operator output
+
+A separate CPU check computed the lowest 33 eigenpairs of the frozen models
+with SciPy's EVR driver, then compared the lowest 32 after aligning phases in
+their shared basis. The extra eigenpair checked the final gap. Fluxonium used
+the common oscillator basis and FluxQubit used the common centered charge
+grid. The comparison used scqubits 4.3.1 and SciPy 1.18.1.
+
+| Model and dimensions | Maximum transition shift | Relative operator infinity-norm error |
+| --- | ---: | ---: |
+| High-ratio Fluxonium D1024 → D2048 | 0.00049 Hz | (5.65 × 10^{-13}) |
+| High-ratio Fluxonium D2048 → D4096 | 0.00077 Hz | (8.77 × 10^{-13}) |
+| FluxQubit D441 → D1089 | 649 Hz | (7.46 × 10^{-6}) |
+| FluxQubit D1089 → D2025 | 0.000020 Hz | (5.11 × 10^{-12}) |
+| FluxQubit D2025 → D4225 | 0.000028 Hz | (7.96 × 10^{-12}) |
+
+The tested 32-level operator met the (10^{-8}) tolerance from D1024 on
+high-ratio Fluxonium and from D1089 on FluxQubit. D441 missed that tolerance.
+This closes operator convergence for these fixed models and operators. Larger
+bases remain useful for measuring solver scaling.
+
+## Remaining GPU measurements
+
+The frozen 28-qubit, depth-60 qsim circuit completed one local CPU reference
+with eight threads in 26.78 seconds. This gives the next same-worker trial a
+comparator within the 120-second bound. The large scqubits CPU preparation
+also passed on the D2048 high-ratio Fluxonium, D4096 Fluxonium and D4225
+FluxQubit fixtures. Neither check establishes GPU performance.
+
+The internal RTX 3060 offered free GPU slots but did not have eight vCPUs and
+16 GiB of host RAM available for the matched-depth comparison. The V100
+passed SkyPilot's resource dry run, then Kubernetes reported insufficient
+CPU for the real request. The two quoted A100 PCIe regions and the A100 SXM
+fallback returned no capacity. SkyPilot reported all four attempts
+terminated and none produced a benchmark. It estimated $0.003 combined for
+the three Runpod requests. Provider invoice charges remain unverified.
+
+Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
+release canary. The matched-depth RTX 3060 screen, additional sampling,
+larger-basis GPU timings and the exact packaged-image canary still need
+execution. [Deployment plan](deployment-plan.md)
