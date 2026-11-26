@@ -1641,7 +1641,6 @@ dependencies = [
     { name = "httpx" },
     { name = "numpy" },
     { name = "pyyaml" },
-    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -1696,7 +1695,6 @@ requires-dist = [
     { name = "scipy", marker = "sys_platform == 'linux' and extra == 'worker'", specifier = "==1.18.1" },
     { name = "scqubits", marker = "sys_platform == 'linux' and extra == 'worker'", specifier = "==4.3.1" },
     { name = "skypilot", extras = ["kubernetes"], marker = "extra == 'controller'", specifier = "==0.14.0" },
-    { name = "uvicorn", specifier = "==0.35.0" },
 ]
 provides-extras = ["backup", "worker", "controller"]
 

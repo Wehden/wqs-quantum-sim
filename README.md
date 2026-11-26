@@ -197,13 +197,16 @@ not launch cloud or Kubernetes resources. See [CI](docs/ci.md) for local and hos
 ## Run the API
 
 ```sh
-uv run python scripts/invite.py developer --output var/developer.key
-uv run uvicorn qsim.api:app --host 127.0.0.1 --port 8080
+uv run --locked --project deploy/api python scripts/invite.py developer --output var/developer.key
+uv run --locked --project deploy/api uvicorn qsim.api:app --host 127.0.0.1 --port 8080
 ```
 
-The API alone queues jobs. Execution requires a configured SkyPilot controller
-and a worker image reachable by the cluster. Do not start the controller until
-its deployment settings are supplied.
+The API project has its own lockfile so its HTTP server can update independently.
+SkyPilot supplies its compatible Uvicorn version in the controller environment.
+When shared dependencies in the root manifest change, run
+`uv lock --project deploy/api` as well as `uv lock`.
+The API alone queues jobs. Execution requires a configured controller and a
+worker image reachable by the cluster.
 
 Submit with your invitation key in the `Authorization: Bearer` header.
 `POST /api/jobs/stim`, `/api/jobs/qasm2` and `/api/jobs/qasm3` require an `Idempotency-Key`.
