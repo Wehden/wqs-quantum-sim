@@ -253,6 +253,40 @@ high-ratio Fluxonium and from D1089 on FluxQubit. D441 missed that tolerance.
 This closes operator convergence for these fixed models and operators. Larger
 bases remain useful for measuring solver scaling.
 
+## A100 large-basis scqubits screen
+
+On 2026-11-26, the internal V100 reported about 8.1 GiB already in use.
+SkyPilot placed one Secure A100 80 GB PCIe on Runpod. It reported 81,920 MiB
+of physical VRAM, zero use at startup and NVIDIA driver 595.112.07. The
+run used scqubits 4.3.1, CuPy 14.2.0 and the frozen scqubits manifest
+listed above. It requested eight vCPUs, at least 64 GiB of host RAM and
+50 GB of ephemeral storage.
+
+The eight-thread SciPy subset solver was the fastest correct CPU arm in all
+three cells. Each cell recorded five matched pairs. The probe compared
+energies and aligned eigenspaces, checked eigenpair residuals and orthogonality,
+and compared the transformed operator in the operator case.
+
+| Model and returned data | CPU median / p90 | A100 median / p90 | Speedup (95% interval) |
+| --- | --- | --- | --- |
+| High-ratio Fluxonium D2048, 32 levels and operator | 11.41 / 11.57 s | 9.74 / 11.26 s | 1.17× (0.85–1.24×) |
+| Fluxonium D4096, 32 eigenpairs | 37.25 / 51.30 s | 37.61 / 42.60 s | 0.99× (0.87–1.43×) |
+| FluxQubit D4225, 32 eigenpairs | 9.87 / 11.05 s | 7.58 / 7.87 s | 1.30× (1.21–1.55×) |
+
+The one-thread Fluxonium D4096 CPU arm reached the 120-second limit in all
+five trials. Its eight-thread reference passed. All 15 eight-thread CPU/GPU
+pairs met the numerical checks. None met the 1.5× median latency criterion.
+Peak device occupancy sampled by NVIDIA telemetry was 2,115 MiB. Maximum
+GPU-child host RSS was about 2.85 GiB. Keep the tested scqubits operations
+on CPU.
+
+The native job succeeded, and SkyPilot's refreshed status confirmed removal of
+the paid allocation. SkyPilot recorded 1,679 seconds. At the $1.79/hour quote,
+the run's compute estimate is $0.83. Counting all prior tracked attempts at
+the conservative $2.50/hour ceiling plus the $3 ancillary allowance brings the
+round's planning estimate to $8.65 against the $25 cap. The provider invoice
+was unavailable through SkyPilot. Full receipts are retained privately.
+
 ## Remaining GPU measurements
 
 The frozen 28-qubit, depth-60 qsim circuit completed one local CPU reference
@@ -272,4 +306,5 @@ Runpod charges. Provider invoice charges remain unverified.
 
 Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
 release canary. Service-level latency, additional sampling, larger-basis GPU
-timings and the exact packaged-image canary still need execution. [Deployment plan](deployment-plan.md)
+timings beyond the three completed dense cells and the exact packaged-image
+canary still need execution. [Deployment plan](deployment-plan.md)
