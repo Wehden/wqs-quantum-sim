@@ -1,6 +1,6 @@
 # GPU discovery results
 
-**Status:** A100 screening and targeted confirmation recorded on 2026-11-22, with internal RTX 3060 confirmation on 2026-11-25. The A100 comparison used source baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
+**Status:** A100 screening and targeted confirmation recorded on 2026-11-22, with internal RTX 3060 confirmation on 2026-11-25 and a four-cell follow-up on 2026-11-26. The A100 comparison used source baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
 
 ## Placement and provenance
 
@@ -167,6 +167,42 @@ respectively in SkyPilot’s accounting. Both were terminated and returned no
 cloud compute charges. Native traces and full raw result receipts remain in
 private operator storage.
 
+### Matched-depth screen
+
+On 2026-11-26, SkyPilot placed one internal 12 GiB RTX 3060 with eight vCPUs
+and 16 GB of host RAM. The device reported 12,288 MiB of physical memory,
+zero use at startup and NVIDIA driver 580.178.04. The AMD Ryzen 5 5500
+host ran both CPU arms. The job used the pinned qsim 0.22.1 wheel above
+and discovery manifest
+`fe92d68065081dd34e628539502a384e32099f2a90cf494121811032c2a553f0`.
+It excluded the startup smoke from all timings.
+
+Each fixture ran five fresh-child trials on each of the two- and eight-thread
+CPU arms and the native CUDA arm. Every trial passed the selected-amplitude
+and probability checks. The two-thread CPU arm had the faster median in each
+cell. The ratios compare median timings on the same worker. The intervals
+come from 10,000 paired bootstrap resamples within each cell.
+
+| OpenQASM | Qubits | Depth | Verified pairs | CPU median / p90 | CUDA median / p90 | Speedup (95% interval) | Peak sampled VRAM |
+| --- | ---: | ---: | ---: | --- | --- | --- | ---: |
+| 2 | 24 | 20 | 5 | 7.01 / 7.21 s | 5.30 / 5.47 s | 1.32× (1.26–1.41×) | 243 MiB |
+| 2 | 24 | 60 | 5 | 11.70 / 11.87 s | 5.66 / 5.92 s | 2.07× (1.96–2.14×) | 243 MiB |
+| 3 | 26 | 20 | 5 | 14.89 / 14.99 s | 5.60 / 5.63 s | 2.66× (2.59–2.73×) | 627 MiB |
+| 3 | 26 | 60 | 5 | 34.68 / 34.89 s | 6.33 / 6.54 s | 5.48× (5.27–5.56×) | 627 MiB |
+
+CUDA peaked at 503 MiB host RSS. Three of the four cells cleared the 1.5×
+screening threshold. Both 24-qubit circuits use OpenQASM 2 and both 26-qubit
+circuits use OpenQASM 3. Each circuit seed is fixed at `481516 + width + depth`.
+At both widths, the depth-60 fixture showed a greater speedup than the depth-20
+fixture. A routing rule still needs replicated seeds, a common circuit dialect,
+and cold and ready-worker API timings. The earlier 20-pair confirmation
+remains the basis for the fixed canary.
+
+The native job succeeded. SkyPilot terminated the owned allocation, and a
+refreshed status check returned no matching worker. The full receipt was
+captured before teardown. The internal session lasted 973 seconds and used no
+paid cloud capacity.
+
 ## scqubits basis convergence with operator output
 
 A separate CPU check computed the lowest 33 eigenpairs of the frozen models
@@ -196,8 +232,8 @@ comparator within the 120-second bound. The large scqubits CPU preparation
 also passed on the D2048 high-ratio Fluxonium, D4096 Fluxonium and D4225
 FluxQubit fixtures. Neither check establishes GPU performance.
 
-The internal RTX 3060 offered free GPU slots but did not have eight vCPUs and
-16 GiB of host RAM available for the matched-depth comparison. The V100
+An earlier attempt at the matched-depth comparison found free RTX 3060 slots
+without the required host CPU and RAM. The V100
 passed SkyPilot's resource dry run, then Kubernetes reported insufficient
 CPU for the real request. The quoted A100 PCIe and SXM requests returned no
 capacity. SkyPilot also tried the eligible L40 offering across all 14 quoted
@@ -206,6 +242,5 @@ terminated, with no benchmark allocation remaining, and $0.013 in estimated
 Runpod charges. Provider invoice charges remain unverified.
 
 Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
-release canary. The matched-depth RTX 3060 screen, additional sampling,
-larger-basis GPU timings and the exact packaged-image canary still need
-execution. [Deployment plan](deployment-plan.md)
+release canary. A second circuit seed, additional sampling, larger-basis
+GPU timings and the exact packaged-image canary still need execution. [Deployment plan](deployment-plan.md)
