@@ -202,3 +202,10 @@ CD rerun replayed that verified receipt. [CI](https://github.com/Wehden/wqs-quan
 hook wait for a healthy observer to finish an in-progress refresh within
 the existing deadline. Completion still requires fresh queue evidence and
 every original numerical, native execution and cleanup check.
+
+The fix reached main as `10af09311e93ed0da9ed6339420c9ead513c992b`.
+The normal CD workflow passed on its first attempt after exact-main CI.
+It created and verified a fresh encrypted backup before rollout. The
+private receipt confirmed all four role images, all 21 cases, and zero
+pending jobs at reopened admission. [Main CI](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45739375759)
+· [Automated CD](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45741723887)

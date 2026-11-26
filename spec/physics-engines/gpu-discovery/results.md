@@ -199,10 +199,11 @@ FluxQubit fixtures. Neither check establishes GPU performance.
 The internal RTX 3060 offered free GPU slots but did not have eight vCPUs and
 16 GiB of host RAM available for the matched-depth comparison. The V100
 passed SkyPilot's resource dry run, then Kubernetes reported insufficient
-CPU for the real request. The two quoted A100 PCIe regions and the A100 SXM
-fallback returned no capacity. SkyPilot reported all four attempts
-terminated and none produced a benchmark. It estimated $0.003 combined for
-the three Runpod requests. Provider invoice charges remain unverified.
+CPU for the real request. The quoted A100 PCIe and SXM requests returned no
+capacity. SkyPilot also tried the eligible L40 offering across all 14 quoted
+regions without finding capacity. SkyPilot reported all five requests
+terminated, with no benchmark allocation remaining, and $0.013 in estimated
+Runpod charges. Provider invoice charges remain unverified.
 
 Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
 release canary. The matched-depth RTX 3060 screen, additional sampling,
