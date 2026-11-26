@@ -14,6 +14,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      # The API project resolves qsim from the root of this repository.
+      - dependency-name: qsim
   - package-ecosystem: github-actions
     directory: /
     schedule:
