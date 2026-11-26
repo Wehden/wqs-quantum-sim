@@ -9,6 +9,11 @@ updates:
       minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+  - package-ecosystem: uv
+    directory: /deploy/api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
   - package-ecosystem: github-actions
     directory: /
     schedule:
