@@ -1,6 +1,6 @@
 # ON04A tasks and approval gate
 
-Status: implementation and reviews approved on 2026-10-16; see [approval receipt](approval.md). Merge and operational actions remain gated.
+Status: the read-only bootstrap provider is merged and deployed. See the [live verification](verification.md) and original [approval receipt](approval.md).
 
 ## Write lease / budget
 

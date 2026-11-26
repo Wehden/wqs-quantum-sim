@@ -1,6 +1,6 @@
 # WQS console parity correction
 
-Status: operator approved implementation and reviews, 2026-10-20. Deployment requires the final gate.
+Status: merged and deployed for the bootstrap scope. Live metadata parity was reverified on 2026-11-25.
 Baseline: LaminarAuth `origin/main` at `2bc4c76761351c1205fe92b75640075fe721189a`.
 
 ## Evidence and cause
@@ -132,8 +132,23 @@ ID automatically. Raw key values remain entirely within WQS authority.
 - [x] Durable, attributed command intent; create-only invitation and existing actions.
 - [x] Native approval/CAS/delivery semantics retained; no duplicate SMTP worker.
 - [x] Focused owner approval, welcome-provider and new management regression tests.
-- [ ] Independent security/regression review and final correction verification.
-- [ ] Deployment approval with exact tested image/config/rollback evidence.
+- [x] Exact-head automatic code review was clean. Credential and command regressions passed in the main suite.
+- [x] Production provider and central binding are deployed. Authenticated inventory and capabilities passed below.
 
 No live invitation, registry mutation, mail send, merge or deployment is authorized
 by this implementation receipt. A later live invitation needs the approved recipient.
+
+## Live reconciliation, 2026-11-25
+
+WQS PR #32 and LaminarAuth PR #35 were merged. The running central console
+has the WQS management binding and uses verified TLS to the available
+provider. The live GET operations reported `wqs-admin/1` with all eight
+configured operations. Registry enumeration returned all six identities,
+including two with no request history. The independent request queue
+returned four rows. This closes the previously pending deployment and
+inventory-parity checkpoint.
+
+The released command regressions exercise create-only issuance, conflicts
+and replay using synthetic identities. The live reconciliation exercised
+read operations. Command acceptance that issues a real key or delivers mail
+requires an intended recipient under the existing invitation workflow.

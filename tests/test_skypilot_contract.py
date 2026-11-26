@@ -3,6 +3,7 @@ import copy
 import inspect
 import json
 import sky
+from sky.utils.common import StatusRefreshMode
 from qsim import controller, settings
 
 
@@ -24,6 +25,8 @@ def test_used_sdk_signatures_and_errors():
         ('launch', (None,), {'cluster_name': 'test', 'idle_minutes_to_autostop': 10, 'down': True}),
         ('exec', (None,), {'cluster_name': 'test'}),
         ('down', ('test',), {}),
+        ('queue', ('test',), {'skip_finished': False, 'all_users': True}),
+        ('status', (), {'cluster_names': ['test'], 'refresh': StatusRefreshMode.FORCE, 'all_users': True}),
         ('api_cancel', ('request',), {'silent': True}),
         ('api_status', (), {'request_ids': ['request'], 'fields': ['request_id', 'status']}),
         ('api_status', (), {'all_status': True, 'cluster_name': 'test'}),

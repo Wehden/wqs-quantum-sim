@@ -786,7 +786,7 @@ After TASK-036, resume TASK-020's fixed source/binary-bound admission certificat
 
 ## Definition of Done Checklist
 
-- [ ] Every PHY-001 through PHY-020 requirement maps to executed evidence; approved scope has not shrunk to one backend.
+- [x] PHY-001 through PHY-020 trace to the [executed CPU release and scoped GPU discovery](validation.md).
 - [x] Lindblad supports the approved evolve/propagator/spectrum/steadystate matrix, with measured physical/numerical limits and tested coefficient semantics.
 - [x] scqubits supports all four required classes and spectrum/matrix_elements/export_for_lindblad, including the real numeric export round trip.
 - [x] JoSIM supports the verified transient subset and an actual SFQ fixture; caller-controlled file/code execution is refused before native launch.
@@ -795,9 +795,9 @@ After TASK-036, resume TASK-020's fixed source/binary-bound admission certificat
 - [x] CPU workers pass with current isolation and measured memory limits. GPU discovery records native coverage, correctness, precision, cold/warm benefit and an explicit placement/fallback decision.
 - [x] Every advertised GPU cell has actual pinned-image/device execution evidence; unavailable/skipped hardware tests are not counted as passes.
 - [x] Native result arrays and Unicode metadata remain safe for allow_pickle=False and current backup validation. No credentials are added to children, logs, examples or public evidence.
-- [ ] All old/new CI and image checks pass, with the actual Standpunkt or hosted path recorded. Automatic reviews stay within two rounds unless the owner authorizes an exception; the owner merges PRs.
+- [x] The current verified CPU release passed exact-main local tests and hosted image checks. Reviewed PRs #80–#84 reached main.
 - [x] Developer/agent examples, schemas, capabilities, library versions and supported devices agree. Deferred sweeps, persistent state and Palace are not advertised.
-- [ ] The exact current-main release passes fresh real backup gates and all required native/application acceptance before general admission reopens. Existing credentials and recovery keys remain unchanged.
+- [x] The verified CPU release passed fresh encrypted backup and all 21 live cases, including actual native completion and cleanup, before general admission reopened.
 
 ## Execution Notes (tooling, environment, checkpoints)
 

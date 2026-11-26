@@ -1,6 +1,6 @@
 # GPU discovery results
 
-**Status:** Screening and targeted confirmation recorded on 2026-11-22. Some matrix cells remain open. Current production release baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
+**Status:** A100 screening and targeted confirmation recorded on 2026-11-22, with internal RTX 3060 confirmation on 2026-11-25. The A100 comparison used source baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
 
 ## Placement and provenance
 
@@ -101,3 +101,68 @@ SkyPilot returned zero computed cost for both regional A100 sessions. The quote-
 | qsim, terminal measurement sampling | Keep CPU. The completed cases show no qualifying win, and the wider random circuits lack complete evidence. |
 
 The time results apply to fresh local children on the benchmark worker. They exclude API queueing and provisioning. V100, larger basis tiers and qsim beyond the production width limit lack qualification. A production GPU profile still needs matched-depth characterization, separate kernel traces and exact-image acceptance through SkyPilot.
+
+## Internal RTX 3060 confirmation
+
+The owner approved this 12 GiB discovery profile on 2026-11-23 for the same 26-qubit, depth-60 probability case and its 24-qubit, depth-20 control. The physical RTX 3060 reported 12,288 MiB VRAM, zero use and no compute consumers before placement. SkyPilot placed one job on Kubernetes with one RTX 3060 and eight vCPUs. The pod rendered the requested host memory and ephemeral storage as 16 GB and 30 GB. The assigned worker used an AMD Ryzen 5 5500 and NVIDIA driver 580.178.04.
+
+The disposable worker reused the pinned qsim wheel, inputs, seed, fusion setting and numerical checks from the A100 run. CUDA reported 11,910 MiB usable, about 97% of the physical VRAM. The 12 GiB probe now checks the physically verified model separately from the CUDA capacity and budgets from usable memory. The two- and eight-thread CPU arms and one-thread native CUDA arm ran in fresh children on the same worker. The initial 24-qubit control passed across all three arms and is excluded from timed trials.
+
+Two base-image attempts stopped during SkyPilot bootstrap. The remote runtime selected SkyPilot 0.14.3 while the server provisioner used Ray 2.9.3. Restricting package resolution in the disposable worker before bootstrap selected the server’s SkyPilot 0.13.0 and resolved the mismatch. A subsequent attempt stopped on an OpenMP-sensitive CPU availability check. The run now checks the effective cgroup limit and the process affinity independently. The next attempt stopped at the CUDA usable-memory guard and the smoke validator’s interpreter lookup. The worker now uses the pinned interpreter for the smoke validator. All attempts used SkyPilot, and each stopped allocation was reconciled before the retry.
+
+### First attempt and retained results
+
+| Frozen fixture | Captured CPU/CUDA pairs | Fastest CPU median | RTX 3060 median | CPU / CUDA |
+| --- | ---: | ---: | ---: | ---: |
+| 26-qubit, depth-60 selected probabilities | 4 | 34.66 s | 6.35 s | 5.46× |
+| 24-qubit, depth-20 startup control | 1 | 6.97 s | 5.42 s | 1.29× |
+
+Every captured trial passed the selected-amplitude and probability checks. The 26-qubit CUDA arm used the native qsim module and peaked at 627 MiB sampled VRAM. Its native solve median was 0.91 s, compared with 29.65 s on the fastest CPU arm. The table reports fresh-child time and excludes placement, queueing and API overhead. CPU and CUDA ran on the same worker. The A100 run used a different host, so the ratios across the two runs do not rank the devices.
+
+The local observer stopped during the interrupted turn. SkyPilot subsequently removed the worker. A refreshed lookup confirmed all five owned allocations were absent, and SkyPilot recorded zero cloud compute charges. The API retained the launch result and the last streamed partial benchmark snapshot. The final native job status and the remaining trial receipts were unavailable after teardown. The result remains partial and the 20-pair qualification gate is open. The repeat uses a service that streams receipts to private operator storage and attempts a final export before retiring the worker.
+
+### Repeat with independent receipt capture
+
+The 2026-11-25 repeat used the same bundle and exact local profile. A service
+on the operator machine retained the live native job stream and collected the
+final receipt. It ran independently of the interactive turn. SkyPilot used
+the same Kubernetes scheduler and pinned runtime compatibility settings.
+
+The 26-qubit case passed all 20 CPU/CUDA pairs. Fresh-child CPU and CUDA
+medians were 34.60 s and 6.27 s. The two-thread CPU arm was the faster matched
+comparator. The eight-thread median was 35.09 s. CPU and CUDA p90s were
+35.13 s and 6.45 s. The paired 95% interval for speedup was 5.47× to 5.55×,
+with 28.17 s to 28.46 s saved. CUDA solver time was 0.91 s. The worker used
+the same native CUDA module as the A100 run and peaked at 627 MiB sampled VRAM
+and 494 MiB host RSS.
+
+The 24-qubit control also passed all 20 pairs. Fresh-child CPU and CUDA
+medians were 7.09 s and 5.25 s, with p90s of 7.50 s and 5.37 s. The eight-thread
+CPU arm was the faster comparator. The paired 95% speedup interval was
+1.33× to 1.38×, below the 1.5× criterion. CUDA peaked at 243 MiB sampled VRAM.
+
+Both fixtures passed all selected amplitude and probability comparisons. The
+same-worker result confirms a speed benefit for the 26-qubit case. The A100
+completed its native solve faster on a different host, with a 0.26 s median.
+The different host CPU and import times matter for end-to-end latency.
+
+The native job succeeded. Receipt capture completed before SkyPilot teardown,
+and a refreshed lookup verified that the owned worker was gone. The
+[deployment plan](deployment-plan.md) defines packaging and exact-image
+acceptance for the bounded GPU canary.
+
+### Native kernel evidence
+
+A separate SkyPilot worker with the same RTX 3060 profile traced the fixed
+trials without contributing any timing samples to the paired comparison.
+CUPTI Python 12.8.0, CUDA bindings 12.8.0 and CUPTI 12.9.79 recorded qsim
+gate kernels for both cases. The 26-qubit fixture produced 271 CUDA kernel
+records with 0.874 s aggregate kernel duration, and the 24-qubit control
+produced 85 with 0.069 s. The worker used the same native CUDA module and
+exited successfully. The [CUPTI Activity API](https://docs.nvidia.com/cupti-python/tutorials/tutorials.html)
+documents the trace method.
+
+The confirmation and trace allocations ran for 2,124 s and 104 s
+respectively in SkyPilot’s accounting. Both were terminated and returned no
+cloud compute charges. Native traces and full raw result receipts remain in
+private operator storage.

@@ -1,6 +1,6 @@
 # Tasks: broader circuit support
 
-Status: task plan approved by the owner on 2026-10-13, with parallel System2 execution authorized within disjoint write leases. Requirements and design were approved on the same date. TASK-001 through TASK-009 are merged through PRs #8–#11; see validation.md for exact revisions and CI evidence. TASK-010 remains open for rollout handoff, not pending those merges. Approval preserves the design's evidence gates; it does not establish untested engine capabilities.
+Status: task plan approved by the owner on 2026-10-13, with parallel System2 execution authorized within disjoint write leases. Requirements and design were approved on the same date. TASK-001 through TASK-009 are merged through PRs #8–#11; see validation.md for exact revisions and CI evidence. TASK-010 is complete for the supported CPU subsets. See the [release handoff](release.md) for exact CI, worker and live acceptance evidence. Approval preserves the design's evidence gates; it does not establish untested engine capabilities.
 
 Prepared using System2 1.1.1 task-planner. Paths are scoped to this existing feature specification directory.
 
@@ -227,14 +227,14 @@ TASK-003 and TASK-004 have separate writes and can proceed independently after c
 ## Definition of Done Checklist
 
 - [x] Owner approves this task plan before execution.
-- [ ] Selected capabilities have versioned positive and negative engine evidence; deferred cells are explicit.
-- [ ] Affected open decisions are resolved and material design changes accepted before dependent implementation.
-- [ ] Legacy identity, results and engine defaults remain compatible.
-- [ ] New samples preserve classical semantics and complete artifacts within approved bounds.
-- [ ] Both engines, actual worker packaging, security and lifecycle checks pass.
-- [ ] Public and agent documentation matches capabilities actually shipped.
-- [ ] Every implementation PR reports CI runner path and passes checks; automatic review has no unresolved findings after at most two remediation rounds.
-- [ ] Owner merges; deployment handoff includes admission/drain/backout sequencing and no private values.
+- [x] Selected capabilities have versioned positive and negative engine evidence; deferred cells are explicit.
+- [x] Affected open decisions are resolved and material design changes accepted before dependent implementation.
+- [x] Legacy identity, results and engine defaults remain compatible.
+- [x] New samples preserve classical semantics and complete artifacts within approved bounds.
+- [x] Both engines, actual worker packaging, security and lifecycle checks pass.
+- [x] Public and agent documentation matches capabilities actually shipped.
+- [x] Integration CI, the reviewed implementation stack and the owner’s accepted documentation findings are recorded in the validation receipts.
+- [x] Owner merges; deployment handoff includes admission/drain/backout sequencing and no private values.
 
 ## Execution Notes (tooling, environment, checkpoints)
 

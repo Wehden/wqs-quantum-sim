@@ -14,6 +14,12 @@ At 08:17 PST on 2026-11-22, the live Laminar Grafana catalog (dashboard v18, pan
 
 Both profiles use Linux x86_64, pinned images and synthetic simulation fixtures. There is no inference model or context. Internal storage means a verified bounded scratch mount or ephemeral budget available through SkyPilot. No persistent volume or preemption is requested. Ask for resources and let SkyPilot place the workload. The V100 path does not require the current cuStateVec releases. [NVIDIA cuStateVec support](https://docs.nvidia.com/cuda/cuquantum/latest/custatevec/index.html)
 
+## RTX 3060 confirmation profile
+
+On 2026-11-23, the owner approved an internal 12 GiB VRAM profile for the existing 26-qubit, depth-60 probability fixture and the 24-qubit, depth-20 control. Request one RTX 3060 through SkyPilot on Kubernetes, with eight vCPUs, 16 GB host RAM and 30 GB bounded ephemeral storage as rendered in Kubernetes. Confirm the physical card has 12 GiB and is free of existing consumers. There is no Runpod fallback for this run.
+
+Use the pinned qsim wheel, dependency set and frozen fixtures from the A100 confirmation. Allow 12 GiB child address space, 12 MiB output and 120 seconds per trial. Verify 12 GiB of physical VRAM with NVML and check that CUDA reports at least 95% of that as usable with 90% of its usable capacity free. Size buffers from CUDA’s usable capacity. Verify CUDA initialization, native backend selection and one correct control pair before the full run. Run 20 fresh-child trials per fixture on one worker, with native CUDA and the two- and eight-thread CPU arms. Compare CUDA against the fastest correct CPU arm and apply the existing numerical and latency thresholds. Allow 65 minutes for the full matrix and begin teardown by 90 minutes from submission. Stream receipts to private operator storage from a process that survives the chat connection. Export the final receipt before teardown and reconcile the exact allocation after teardown.
+
 ## Run order and time budget
 
 | Window | Limit | Actions and output |

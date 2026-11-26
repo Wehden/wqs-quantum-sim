@@ -75,7 +75,12 @@ def child(args):
         assert cp.cuda.runtime.getDeviceCount() == 1
         cp.cuda.runtime.free(0)
         free, total = cp.cuda.runtime.memGetInfo()
-        assert total >= args.vram_gib*GIB*.98 and free >= total*.90
+        # The worker verifies physical VRAM with NVML. CUDA can reserve a
+        # larger fraction of the smaller card before reporting usable memory.
+        usable_fraction = .95 if args.vram_gib == 12 else .98
+        assert total >= args.vram_gib*GIB*usable_fraction and free >= total*.90, (
+            f"CUDA reports {free / 2**20:.0f} MiB free of {total / 2**20:.0f} MiB usable"
+        )
         assert 2*state_bytes + GIB <= total*.75
     imported = time.monotonic()
     request, indices = request_for(args.child, args.trial)
@@ -123,6 +128,7 @@ def child(args):
                       'output_s':finished-executed,'native_module':native.__name__,
                       'native_sha256':hashlib.sha256(Path(native.__file__).read_bytes()).hexdigest(),
                       'gpu_base_bytes':used_before if gpu else None,
+                      'gpu_usable_bytes':total if gpu else None,
                       'rss_peak_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
                       'bytes':args.output.stat().st_size}))
 
@@ -232,7 +238,7 @@ if __name__ == '__main__':
     p.add_argument('--threads', type=int, choices=(1,2,8),default=2)
     p.add_argument('--as-gib', type=int, choices=(12,48),default=12)
     p.add_argument('--ram-gib', type=int, choices=(16,64),default=16)
-    p.add_argument('--vram-gib', type=int, choices=(16,24,80),default=16)
+    p.add_argument('--vram-gib', type=int, choices=(12,16,24,80),default=16)
     p.add_argument('--cases',default='all')
     p.add_argument('--trials',type=int,choices=(1,5,20),default=5)
     p.add_argument('--gpu',choices=('cuda','custatevec'),action='append',default=[])

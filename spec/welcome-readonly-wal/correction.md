@@ -1,6 +1,6 @@
 # Live read-only welcome SQLite correction
 
-Status: proposed bounded corrective implementation; no production deployment from this packet alone. Current human instruction authorizes addressing WQS activation and verifying existing tokens. Existing token validation is a separate read-only task.
+Status: the bounded correction merged in #48 and passed [live read-only verification](verification.md). The remaining design text records the original proposal and implementation boundaries.
 
 ## Context and reproduced failure
 
