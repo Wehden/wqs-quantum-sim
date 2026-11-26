@@ -2,7 +2,7 @@
 
 ## Decision and scope
 
-The first accelerator candidate is native qsim CUDA selected-basis probabilities on one 12 GiB RTX 3060. Use the frozen 26-qubit, depth-60 fixture and its 24-qubit, depth-20 control for qualification. The four-cell follow-up shows how the selected-probability timings changed with circuit depth on the same hardware. Collect a second seed and service-level timings before defining a broader routing rule. [Discovery results](results.md)
+The first accelerator candidate is native qsim CUDA selected-basis probabilities on one 12 GiB RTX 3060. Use the frozen 26-qubit, depth-60 fixture and its 24-qubit, depth-20 control for qualification. The two-seed OpenQASM 2 screen confirmed that circuit depth changes the fresh-child speedup on this hardware. Measure service-level latency before defining a broader routing rule. [Discovery results](results.md)
 
 The production canary should send only the dedicated release verifier's fixed fixture to a GPU profile. Existing public job routing uses the CPU profiles while that canary runs. GPU selection stays with the server. Keep the current API request and artifact formats, precision, bit order and probability tolerances.
 
@@ -14,7 +14,18 @@ The production canary should send only the dedicated release verifier's fixed fi
 | Package | Build a separate CUDA worker image from pinned qsim source, CUDA toolkit, and runtime libraries. Reuse the existing QASM parser and probability artifact writer. Add an internal, immutable GPU execution profile and allow it only for the verifier's frozen circuit and output shape. | CPU worker, API and controller continue to pass existing CI. Hosted CI validates the new image’s source labels, native imports, dependency resolution, and artifact contents. A worker presented with a GPU profile rejects an image, backend, device or fixture mismatch. |
 | Stage | Publish the verified CI-built image by digest. Launch the exact image through SkyPilot on one RTX 3060, with eight vCPUs, at least 16 GB RAM and 30 GB ephemeral storage. | One visible RTX 3060, 12 GiB physical VRAM, sufficient free CUDA memory, matching image and native module, synchronized kernel execution, and passing QASM/NPZ checks on the frozen cases. Record complete wall time, peak RSS and VRAM, timeout behavior, and confirmed cleanup. |
 | Release canary | Extend the image build, archive validation and release verifier to recognize the separate GPU artifact and the fixed GPU acceptance cell. Pin the accepted image and resource profile in the persisted dispatch context. Allow one GPU canary job during the release hold for the configured smoke identity. | Exact-main artifact identity, fresh encrypted backup and readback, all existing CPU cases, and the new GPU case with its live native job identity and teardown evidence. Write the verified release record before reopening admission. [Release procedure](../../../docs/releases.md) |
-| Extend | Repeat the 24- and 26-qubit matched-depth matrix with at least two seeds per cell in a common circuit dialect and enough CPU/GPU pairs to establish the crossover. Measure end-to-end latency with cold provisioning and with an already-ready worker. | Specify an operation and circuit envelope supported by end-to-end evidence before opening the new profile to public jobs. Record queue and scheduling behavior under one-worker capacity. |
+| Extend | Use the two-seed matrix to select which cells to repeat on the verified candidate image. Measure end-to-end latency with cold provisioning and with an already-ready worker. | Specify an operation and circuit envelope supported by end-to-end evidence before opening the new profile to public jobs. Record queue and scheduling behavior under one-worker capacity. |
+
+## CUDA image scope
+
+The first candidate needs the native `qsim_cuda` module for selected
+probabilities. Build it from the pinned qsim source for the RTX 3060 target.
+The discovery wheel also contains a cuStateVec module, which links
+`libcustatevec.so.1` and `libcublas.so.12`. Leave that backend out of the
+candidate because its sampling cells did not qualify. Check the candidate's
+ELF dependencies and Python imports in CI. On the allocated device, require
+the requested CUDA module, a successful driver initialization and a completed
+kernel before accepting the artifact.
 
 ## Integration tests
 

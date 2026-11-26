@@ -1,6 +1,6 @@
 # GPU discovery results
 
-**Status:** A100 screening and targeted confirmation recorded on 2026-11-22, with internal RTX 3060 confirmation on 2026-11-25 and a four-cell follow-up on 2026-11-26. The A100 comparison used source baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
+**Status:** A100 screening and targeted confirmation recorded on 2026-11-22, with internal RTX 3060 confirmation on 2026-11-25 and two matched-depth screens on 2026-11-26. The A100 comparison used source baseline `cb3e557459421e6b4f33e5b412b50719609ac55b`.
 
 ## Placement and provenance
 
@@ -203,6 +203,35 @@ refreshed status check returned no matching worker. The full receipt was
 captured before teardown. The internal session lasted 973 seconds and used no
 paid cloud capacity.
 
+### Two-seed OpenQASM 2 screen
+
+A second internal SkyPilot allocation repeated the four cells using OpenQASM 2
+throughout. The seed bases were `481516` and `961748`. The generator adds the
+width and depth to each base. The frozen manifests have SHA-256 digests
+`d93865f2e7b113738de28b393ec9b5e56ab599bf34d861cd6e55dade9c3fd10b`
+and `5e604846284e0e1df6d8fa9498a2a82b7c7d228715e088d44fdf190992121e54`.
+The same worker ran five paired trials per seed and cell. All 40 pairs passed
+the same numerical and resource checks, including native CUDA attribution.
+
+| Qubits | Depth | Base seed | Fastest CPU threads | CPU median / p90 | CUDA median / p90 | Speedup (95% interval) |
+| ---: | ---: | ---: | ---: | --- | --- | --- |
+| 24 | 20 | 481516 | 8 | 7.23 / 7.38 s | 5.16 / 5.46 s | 1.40× (1.31–1.44×) |
+| 24 | 20 | 961748 | 2 | 6.99 / 7.25 s | 5.25 / 5.29 s | 1.33× (1.32–1.40×) |
+| 24 | 60 | 481516 | 2 | 11.91 / 12.01 s | 5.64 / 5.77 s | 2.11× (2.02–2.18×) |
+| 24 | 60 | 961748 | 8 | 11.61 / 11.84 s | 5.56 / 5.70 s | 2.09× (2.02–2.14×) |
+| 26 | 20 | 481516 | 2 | 14.72 / 15.12 s | 5.53 / 5.60 s | 2.66× (2.59–2.75×) |
+| 26 | 20 | 961748 | 8 | 14.78 / 15.04 s | 5.46 / 5.59 s | 2.71× (2.55–2.79×) |
+| 26 | 60 | 481516 | 2 | 34.79 / 35.10 s | 6.34 / 6.38 s | 5.48× (5.43–5.61×) |
+| 26 | 60 | 961748 | 2 | 34.56 / 35.19 s | 6.41 / 6.46 s | 5.39× (5.32–5.61×) |
+
+The three faster cells exceeded 1.5× at both seeds. The shallow 24-qubit
+cell missed the threshold both times. Peak sampled device memory was 243
+MiB at 24 qubits and 627 MiB at 26 qubits. CUDA host RSS remained below
+501 MiB. The native job succeeded. The full receipt was captured before
+teardown, then a fresh SkyPilot query verified the allocation was absent.
+The internal session lasted about 30 minutes and used no paid cloud
+capacity. These times exclude API and provisioning latency.
+
 ## scqubits basis convergence with operator output
 
 A separate CPU check computed the lowest 33 eigenpairs of the frozen models
@@ -242,5 +271,5 @@ terminated, with no benchmark allocation remaining, and $0.013 in estimated
 Runpod charges. Provider invoice charges remain unverified.
 
 Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
-release canary. A second circuit seed, additional sampling, larger-basis
-GPU timings and the exact packaged-image canary still need execution. [Deployment plan](deployment-plan.md)
+release canary. Service-level latency, additional sampling, larger-basis GPU
+timings and the exact packaged-image canary still need execution. [Deployment plan](deployment-plan.md)
