@@ -16,6 +16,69 @@ The production canary should send only the dedicated release verifier's fixed fi
 | Release canary | Extend the image build, archive validation and release verifier to recognize the separate GPU artifact and the fixed GPU acceptance cell. Pin the accepted image and resource profile in the persisted dispatch context. Allow one GPU canary job during the release hold for the configured smoke identity. | Exact-main artifact identity, fresh encrypted backup and readback, all existing CPU cases, and the new GPU case with its live native job identity and teardown evidence. Write the verified release record before reopening admission. [Release procedure](../../../docs/releases.md) |
 | Extend | Use the two-seed matrix to select which cells to repeat on the verified candidate image. Measure end-to-end latency with cold provisioning and with an already-ready worker. | Specify an operation and circuit envelope supported by end-to-end evidence before opening the new profile to public jobs. Record queue and scheduling behavior under one-worker capacity. |
 
+## Canary tasks and evidence
+
+**QSIM-CUDA-001 — Package and check the native CUDA worker.** Build a separate
+`worker-qsim-cuda` target from the same worker source and lock as the CPU
+target. Build the pinned qsim commit for SM 8.6 from the pinned CUDA 12.8.1
+toolkit. Lock its build inputs. Keep the regular worker as the default build
+target. The private canary accepts two fixed probability cases and an 8-qubit
+bit-order control. Its host checks exercise the normal parser and NPZ writer.
+The packaging checks confirm the
+wheel contains native CUDA, the CPU modules and their required libraries.
+
+**QSIM-CUDA-002 — Qualify the candidate digest in isolation.** Save and hash
+the build artifact and record the commit and image ID. Publish the candidate to
+the approved private staging registry. Invoke that immutable digest through
+SkyPilot on one RTX 3060, with eight vCPUs, 16 GiB RAM and 30 GiB ephemeral
+storage. Use a wall-time bound for the experiment and verify teardown. Require
+one visible device, its 12 GiB physical capacity, enough free memory, and
+successful native CUDA execution. Match each NPZ against the same-image CPU
+result and an independent bit-order control. Retain device, native module,
+memory, timing and failure receipts. A local package run provides candidate
+evidence. A production release still needs the eligible CI artifact by digest.
+
+**QSIM-CUDA-003 — Run the API timing study on an isolated service.** Use the
+candidate API and existing dispatcher with a disposable state directory, a
+synthetic invite identity and private callback reachability. Use the fixed
+26-qubit depth-60 case and 24-qubit depth-20 control from discovery. First
+collect three cold and ten ready-worker samples per case and backend. Run one
+simulation at a time. Submit fresh idempotency keys for each sample. Include a
+separate interrupted-client replay and a two-job queue check. A cold sample
+requires SkyPilot `launch` and proof that no compatible worker existed at
+submission. A ready sample requires `exec` on the same available worker and a
+fresh numerical child. Alternate CPU and CUDA cohort order across blocks and
+report actual host identities privately. Do not claim a same-host comparison
+unless SkyPilot placed both cohorts on the same host.
+
+A cold trial starts with a new worker allocation. The runtime may already
+have its immutable image cached. Record that distinction with the placement
+receipt. Ready trials keep one verified worker and execute each request in a
+fresh worker child. The queue check exercises the study's single-worker
+constraint. It does not measure capacity of the production pool.
+
+Record client monotonic time before POST, after the 202 response, on each SSE
+state transition and after the result download. Join it to the persisted job,
+SkyPilot request and native queue timestamps. Report API admission, queue wait,
+placement and setup, execution, callback, result download, total latency,
+median and p90 together with all failed or timed-out trials. Three cold
+samples are for screening. Repeat at a larger sample size before treating
+their p90 as an operational estimate. Use the existing CPU service profile
+as the primary comparator. Keep the same 1.5× and 0.5-second fresh-child
+screening thresholds and record any provisioning cost separately.
+
+**QSIM-CUDA-004 — Integrate the release verifier.** Once the candidate and API
+checks pass, add the held-release policy for the single fixed canary, a
+persisted context tied to the image digest, and validation of its actual
+SkyPilot assignment, native result and retirement. The release must pass the
+existing CPU cases and fresh encrypted backup gate. The production verifier
+owns admission and reopening. An absent or mismatched GPU case fails a release
+that requests the canary. Keep normal client dispatch on the CPU policy.
+
+Stages 001–003 use only owned temporary resources and synthetic inputs. Keep
+provider identifiers, private URLs, credentials and raw receipts out of Git.
+Record each qualified cell and every unmet gate before considering stage 004.
+
 ## CUDA image scope
 
 The first candidate needs the native `qsim_cuda` module for selected

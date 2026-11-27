@@ -233,7 +233,7 @@ def simulate(source: Path, output: Path):
     output.write_text(json.dumps({"status": "SUCCEEDED", "summary": summary, "artifact": base64.b64encode(buffer.getvalue()).decode()}))
 
 
-def simulate_qsim(request, output):
+def simulate_qsim(request, output, *, simulator_factory=None):
     """Translate data-only QASM to Cirq and run Google's CPU state-vector engine."""
     import re
     import importlib.metadata
@@ -266,7 +266,11 @@ def simulate_qsim(request, output):
         raise ValueError('Bitstrings must match the declared qubit count')
     order = request.get('bit_order', 'big')
     indices = [int(bits if order == 'big' else bits[::-1], 2) for bits in bitstrings]
-    simulator = qsimcirq.QSimSimulator(qsim_options=qsimcirq.QSimOptions(cpu_threads=2))
+    simulator = (
+        qsimcirq.QSimSimulator(qsim_options=qsimcirq.QSimOptions(cpu_threads=2))
+        if simulator_factory is None
+        else simulator_factory(qsimcirq)
+    )
     amplitudes = simulator.compute_amplitudes(circuit, indices, qubit_order=qubits)
     probabilities = np.abs(np.asarray(amplitudes, dtype=np.complex128)) ** 2
     buffer = io.BytesIO()
@@ -427,7 +431,7 @@ def simulate_aer(request, output):
     output.write_text(json.dumps(payload))
 
 
-def remote():
+def remote(*, simulator_module="qsim.worker", simulator_args=("simulate",), device_env=()):
     url = os.environ["QSIM_JOB_URL"]
     headers = {"Authorization": "Bearer " + os.environ["QSIM_JOB_TOKEN"], "Content-Type": "application/json",
                "X-WQSIM-Execution-Context": "2"}
@@ -469,12 +473,14 @@ def remote():
         source.write_text(json.dumps({'request':request,'execution_context':context} if physics else request))
         # Do not give the native simulator job credentials or controller environment.
         env = {"PATH": os.environ["PATH"], "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"}
+        env.update({key: os.environ[key] for key in device_env if key in os.environ})
         if physics:
             env = {'PATH': '/usr/bin:/bin', 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}
         streams = ({'stdin': subprocess.DEVNULL, 'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
                    if physics else {'capture_output': True})
         try:
-            process = subprocess.run([sys.executable, "-m", "qsim.worker", "simulate", str(source), str(output)],
+            process = subprocess.run([sys.executable, "-m", simulator_module, *simulator_args,
+                                      str(source), str(output)],
                                      cwd=Path(__file__).resolve().parent.parent,
                                      env=env, **streams)
         except OSError:
