@@ -66,8 +66,9 @@ TASK-037 and TASK-038 can prepare independently in their leases. Each lane must 
 - [x] A repeat on the same resource profile used OpenQASM 2 for all four cells and two seed bases, with 40 correct pairs and SkyPilot teardown verified.
 - [x] The larger dense scqubits A100 screen covered the D2048 operator and D4096/D4225 eigenpair fixtures with 15 correct eight-thread CPU/GPU pairs. All three missed the speed criterion.
 - [x] The exact staged qsim CUDA candidate passed the bit-order control and all six paired probability runs. The scheduler allocation and the native CUDA module were verified, and teardown was confirmed.
-- [ ] Complete cold and ready-worker API timings for the two designated qsim cells.
-- [ ] Full matrix evidence remains open for untested scqubits sparse and larger basis tiers, qsim sampling cells and exact-image GPU acceptance.
+- [x] Complete cold and ready-worker API timings for both designated qsim cells, including the durable queue, replay and cleanup checks.
+- [ ] Run the held-release check for the promoted CI GPU artifact before recording production GPU acceptance.
+- [ ] Full matrix evidence remains open for untested scqubits sparse and larger basis tiers and qsim sampling cells.
 - [x] Every owned allocation is reconciled. The quote-based estimate is below the cap, including the ancillary allowance. The provider invoice was unavailable through SkyPilot.
 - [x] Results and remaining qualification work are recorded for owner review.
 
