@@ -349,11 +349,13 @@ The missing CUDA cohort completed after host capacity returned. This failed
 launch is retained separately from the successful latency distributions.
 
 Interrupted SSE clients could replay the same submission and resume events
-without a new job. In a separate single-worker check, a second durable job
-stayed queued while the first used the worker, then ran on the same worker.
+without a new job. In the follow-up single-worker check, the study attempted
+dispatch of the second durable job while the first held the worker. The
+study's worker limit deferred it, and it later ran on the same worker pod.
 All timing results passed numerical and artifact checks. Refreshed SkyPilot
 status and the pod inventory confirmed removal of all 14 timing allocations,
-including the failed placement. No paid GPU was used. Keep the 26-qubit
+including the failed placement, and both allocations from the queue recheck.
+No paid GPU was used. Keep the 26-qubit
 case as the fixed release-verifier candidate and the 24-qubit case as a
 control. The next gate is the live held-release check for the promoted CI
 artifact. [Deployment plan](deployment-plan.md#canary-tasks-and-evidence)
