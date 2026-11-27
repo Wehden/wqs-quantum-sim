@@ -32,7 +32,7 @@ FROM josim-build AS physics-policy
 COPY qsim/settings.py /build/physics-settings.py
 RUN python3 -I -c "import json,runpy; p=runpy.run_path('/build/physics-settings.py')['_certified_physics_profiles']; open('/out/share/physics-policy.json','w').write(json.dumps(p,sort_keys=True))"
 
-FROM python:3.12-bookworm@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0 AS worker
+FROM python:3.12-bookworm@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0 AS worker-base
 COPY --from=josim-build /out/ /opt/josim/
 RUN useradd --uid 1000 --create-home --shell /bin/bash qsim
 COPY --from=uv /uv /usr/local/bin/uv
@@ -49,3 +49,29 @@ RUN /opt/qsim-venv/bin/python -I -c "import hashlib,json,pathlib; p=pathlib.Path
 COPY --chmod=755 deploy/worker/tail /usr/local/bin/tail
 ENV OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 CMD ["sleep", "infinity"]
+
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04@sha256:6617a625f4090c76c545a0e7d63f2e441718ef9af7f4efe7dd1242a29e289fd7 AS qsim-cuda-toolkit
+FROM python:3.12-bookworm@sha256:dbbe4ceb97851e2e5fa83798b239811f871cb743b259ba3563737349f6bcfaa0 AS qsim-cuda-build
+COPY --from=qsim-cuda-toolkit /usr/local/cuda-12.8 /usr/local/cuda-12.8
+ENV PATH="/usr/local/cuda-12.8/bin:$PATH" CUDAARCHS=86 CMAKE_BUILD_PARALLEL_LEVEL=2 CPATH=/usr/local/include/python3.12
+RUN apt-get update && apt-get install -y --no-install-recommends git g++ make && rm -rf /var/lib/apt/lists/*
+COPY deploy/qsim-cuda/build.lock /build/requirements.lock
+RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes -r /build/requirements.lock
+RUN git init /build/qsim \
+    && git -C /build/qsim fetch --depth=1 https://github.com/quantumlib/qsim.git 8d7150a7f796e8f7ebbf7587e67e80ed2674a5d0 \
+    && git -C /build/qsim checkout --detach FETCH_HEAD \
+    && test "$(git -C /build/qsim rev-parse HEAD)" = 8d7150a7f796e8f7ebbf7587e67e80ed2674a5d0
+RUN printf 'find_package(pybind11 2.13.6 EXACT CONFIG REQUIRED)\n' > /build/qsim/pybind_interface/GetPybind11.cmake
+RUN --network=none python -m pip wheel --no-build-isolation --no-deps --no-index -w /wheels /build/qsim \
+    && python -m zipfile -e /wheels/qsimcirq-0.22.1-*.whl /tmp/qsim-wheel \
+    && cuobjdump --list-elf /tmp/qsim-wheel/qsimcirq/qsim_cuda*.so | grep -q 'sm_86'
+
+FROM worker-base AS worker-qsim-cuda
+LABEL org.opencontainers.image.qsim-source=8d7150a7f796e8f7ebbf7587e67e80ed2674a5d0
+COPY qsim/qsim_cuda_canary.py /opt/qsim/qsim/
+COPY deploy/qsim-cuda/qualify.py /opt/qsim/
+RUN --mount=type=bind,from=qsim-cuda-build,source=/wheels,target=/wheels,readonly \
+    uv pip install --python /opt/qsim-venv/bin/python --no-index --no-deps --reinstall /wheels/qsimcirq-0.22.1-*.whl \
+    && uv pip check --python /opt/qsim-venv/bin/python
+
+FROM worker-base AS worker

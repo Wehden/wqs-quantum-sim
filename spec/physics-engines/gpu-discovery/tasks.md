@@ -65,7 +65,10 @@ TASK-037 and TASK-038 can prepare independently in their leases. Each lane must 
 - [x] The four-cell RTX 3060 selected-probability screen has same-worker CPU and CUDA receipts with five correct pairs per cell.
 - [x] A repeat on the same resource profile used OpenQASM 2 for all four cells and two seed bases, with 40 correct pairs and SkyPilot teardown verified.
 - [x] The larger dense scqubits A100 screen covered the D2048 operator and D4096/D4225 eigenpair fixtures with 15 correct eight-thread CPU/GPU pairs. All three missed the speed criterion.
-- [ ] Full matrix evidence remains open for untested scqubits sparse and larger basis tiers, qsim sampling cells and exact-image GPU acceptance.
+- [x] The exact staged qsim CUDA candidate passed the bit-order control and all six paired probability runs. The scheduler allocation and the native CUDA module were verified, and teardown was confirmed.
+- [x] Complete cold and ready-worker API timings for both designated qsim cells, including the durable queue, replay and cleanup checks.
+- [ ] Run the held-release check for the promoted CI GPU artifact before recording production GPU acceptance.
+- [ ] Full matrix evidence remains open for untested scqubits sparse and larger basis tiers and qsim sampling cells.
 - [x] Every owned allocation is reconciled. The quote-based estimate is below the cap, including the ancillary allowance. The provider invoice was unavailable through SkyPilot.
 - [x] Results and remaining qualification work are recorded for owner review.
 
@@ -84,3 +87,4 @@ Use current main and standalone fixtures under the task leases. Keep shared repo
 | GPU-004 | TASK-038, TASK-039, TASK-040 |
 | GPU-005 | TASK-037, TASK-038, TASK-039, TASK-040 |
 | GPU-006, GPU-007 | TASK-039, TASK-040 |
+| GPU-004, GPU-005, GPU-007, PHY-019 | [QSIM-CUDA-001 through QSIM-CUDA-004](deployment-plan.md#canary-tasks-and-evidence) |

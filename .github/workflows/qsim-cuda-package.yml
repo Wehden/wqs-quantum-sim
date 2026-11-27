@@ -1,0 +1,41 @@
+name: qsim CUDA package
+
+on:
+  pull_request:
+    paths: &package_paths
+      - '.github/workflows/qsim-cuda-package.yml'
+      - '.dockerignore'
+      - 'deploy/Dockerfile'
+      - 'deploy/qsim-cuda/**'
+      - 'deploy/physics/**'
+      - 'deploy/worker/**'
+      - 'qsim/**'
+      - 'vendor/josim/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+  push:
+    branches: [main]
+    paths: *package_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build and verify SM 8.6 worker package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Build the separate candidate worker
+        run: |
+          docker build --target worker-qsim-cuda --platform linux/amd64 \
+            --provenance=false --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t wqs-cuda-check -f deploy/Dockerfile .
+      - name: Check native modules and run the independent CPU control
+        run: |
+          docker run --rm --network none --user 1000:1000 wqs-cuda-check \
+            /opt/qsim-venv/bin/python /opt/qsim/qualify.py --check-package

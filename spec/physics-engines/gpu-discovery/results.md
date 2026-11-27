@@ -287,6 +287,79 @@ the conservative $2.50/hour ceiling plus the $3 ancillary allowance brings the
 round's planning estimate to $8.65 against the $25 cap. The provider invoice
 was unavailable through SkyPilot. Full receipts are retained privately.
 
+## Exact staged qsim CUDA image
+
+On 2026-11-27, SkyPilot launched an immutable qsim candidate built from the
+frozen source snapshot `5010a55`. The allocated RTX 3060 exposed 12 GiB of
+physical VRAM. The runtime reported about 11.63 GiB usable and 11.52 GiB free
+before simulation. The realized image digest matched the staged archive.
+Every CUDA child loaded the same native `qsimcirq.qsim_cuda` module.
+
+| OpenQASM 2 case | Correct CPU/CUDA pairs | CPU median | CUDA median | Speedup | Peak sampled VRAM |
+| --- | --- | --- | --- | --- | --- |
+| 8-qubit bit-order control | 1 | 5.89 s | 6.85 s | 0.86× | 113 MiB |
+| 24 qubits, depth 20 | 3 | 11.38 s | 6.58 s | 1.73× | 243 MiB |
+| 26 qubits, depth 60 | 3 | 75.62 s | 7.65 s | 9.89× | 627 MiB |
+
+These are fresh-child times on the same worker, using the service's CPU qsim
+options and the candidate's CUDA options. The two-seed discovery used
+different CPU options. The 24-qubit result is a useful control for this
+package, with three pairs and a different comparator from discovery. It has
+no broader admission decision. The 26-qubit case remains the fixed release
+canary candidate. The timing study measures service and provisioning delays
+separately.
+
+Initial attempts reached a SkyPilot bootstrap version mismatch, a transient
+private registry resolution failure, and a short-kernel utilization screen
+that missed activity. The successful run used a compatible worker bootstrap
+and retained device-memory and utilization samples. Numerical parity,
+matching native and image identities, bounded device memory, successful
+native job status, and refreshed SkyPilot teardown all passed. No Runpod
+allocation was requested. The hosted package and actual release gates have
+separate evidence.
+
+## Cold and ready-worker qsim API screen
+
+The isolated WQS service completed 52 successful timing trials on 2026-11-27.
+Each case and backend had three cold SkyPilot `launch` trials and ten
+ready-worker `exec` trials. The ready trials reused the same worker pod for
+their cohort and started a fresh numerical child for each request. The client
+timed POST through SSE completion and download of the verified NPZ. Cold
+trials provisioned new workers from images already present on their nodes.
+
+| OpenQASM 2 case | Worker state | CPU median / p90 | RTX 3060 median / p90 |
+| --- | --- | --- | --- |
+| 24 qubits, depth 20 | Cold | 55.60 / 58.30 s | 55.21 / 55.42 s |
+| 24 qubits, depth 20 | Ready | 15.46 / 18.64 s | 18.52 / 21.51 s |
+| 26 qubits, depth 60 | Cold | 101.65 / 107.58 s | 55.30 / 55.38 s |
+| 26 qubits, depth 60 | Ready | 64.73 / 67.85 s | 21.60 / 21.63 s |
+
+API admission medians were 3–4 ms. Median cold placement and setup took
+38–40 seconds across the two profiles. The 26-qubit case was 1.84× faster
+cold and 3.00× faster with a ready worker. The 24-qubit case had similar cold
+latency and was slower on the ready GPU worker. These are comparisons of
+the scheduled service profiles on different hosts. The same-host comparison
+above measures fresh-child performance on the exact image. The cold p90 is the
+largest of three observations and serves as screening evidence.
+
+The first attempt at the third 24-qubit CUDA cohort exhausted its placement
+window after 257 seconds. The accelerator had free logical slots, but the
+host lacked the requested CPU and RAM. The remaining CPU work ran first.
+The missing CUDA cohort completed after host capacity returned. This failed
+launch is retained separately from the successful latency distributions.
+
+Interrupted SSE clients could replay the same submission and resume events
+without a new job. In the follow-up single-worker check, the study attempted
+dispatch of the second durable job while the first held the worker. The
+study's worker limit deferred it, and it later ran on the same worker pod.
+All timing results passed numerical and artifact checks. Refreshed SkyPilot
+status and the pod inventory confirmed removal of all 14 timing allocations,
+including the failed placement, and both allocations from the queue recheck.
+No paid GPU was used. Keep the 26-qubit
+case as the fixed release-verifier candidate and the 24-qubit case as a
+control. The next gate is the live held-release check for the promoted CI
+artifact. [Deployment plan](deployment-plan.md#canary-tasks-and-evidence)
+
 ## Remaining GPU measurements
 
 The frozen 28-qubit, depth-60 qsim circuit completed one local CPU reference
@@ -305,6 +378,6 @@ terminated, with no benchmark allocation remaining, and $0.013 in estimated
 Runpod charges. Provider invoice charges remain unverified.
 
 Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
-release canary. Service-level latency, additional sampling, larger-basis GPU
-timings beyond the three completed dense cells and the exact packaged-image
-canary still need execution. [Deployment plan](deployment-plan.md)
+release canary. Additional sampling, larger-basis GPU timings beyond the
+three completed dense cells, and release-verifier acceptance still need
+execution. [Deployment plan](deployment-plan.md)
