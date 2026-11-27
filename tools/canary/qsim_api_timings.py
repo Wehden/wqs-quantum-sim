@@ -125,6 +125,8 @@ class Study:
                     raise RuntimeError("The new timing worker name is already used")
                 self.owned.add(cluster)
             else:
+                if self.controller.cluster_name(job) in self.owned:
+                    raise RuntimeError("The cold timing trial reached a placement retry")
                 with self.store.connect() as db:
                     available = db.execute(
                         "SELECT cluster FROM worker_pool WHERE job_id IS NULL AND retired=0 "
@@ -295,8 +297,9 @@ class Study:
         return row["cluster"], probability
 
     def run(self):
+        blocks = [number - 1 for number in self.args.cohort] if self.args.cohort else range(self.args.cold)
         for case in self.args.cases:
-            for block in range(self.args.cold):
+            for block in blocks:
                 arms = ("cpu", "cuda") if block % 2 == 0 else ("cuda", "cpu")
                 reference = {}
                 for arm in arms:
@@ -385,7 +388,11 @@ def main():
     parser.add_argument("--arms", nargs="+", choices=("cpu", "cuda"), default=("cpu", "cuda"))
     parser.add_argument("--cold", type=int, default=3, choices=range(1, 4))
     parser.add_argument("--ready", type=int, default=10, choices=range(11))
+    parser.add_argument("--cohort", type=int, action="append", choices=range(1, 4),
+                        help="run only this numbered cohort while preserving its ready sample count")
     args = parser.parse_args()
+    if args.cohort and (max(args.cohort) > args.cold or len(set(args.cohort)) != len(args.cohort)):
+        parser.error("Cohort indices must be distinct and within the planned cold cohorts")
     if not all(IMAGE.fullmatch(ref) for ref in (args.cpu_image, args.cuda_image)):
         parser.error("Both worker images must have explicit SHA-256 digests")
     if "cuda" in args.arms and not re.fullmatch(r"[0-9a-f]{64}", args.cuda_native_sha or ""):

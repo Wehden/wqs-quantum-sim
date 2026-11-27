@@ -75,6 +75,9 @@ and scheduler capacity before each cold cohort. The driver accepts callbacks
 from the private worker network and restricts client routes to its local
 address. The default timing matrix has three cold and ten ready samples per
 cell. Pass `--serial-queue-check` to record the separate queue trial.
+Check free host CPU and RAM alongside accelerator slots before placement.
+Retain any capacity failure and verify retirement before using `--cohort`
+to resume only a missing cohort. Record the actual order after a resume.
 Keep the JSON lines output and recheck the owned SkyPilot allocations after
 the run. The API qualification uses a disposable SQLite database and a
 synthetic invitation with a new token per run.
@@ -86,6 +89,19 @@ SkyPilot assignment, native result and retirement. The release must pass the
 existing CPU cases and fresh encrypted backup gate. The production verifier
 owns admission and reopening. An absent or mismatched GPU case fails a release
 that requests the canary. Keep normal client dispatch on the CPU policy.
+
+The GPU release must qualify the artifact produced from the eligible main CI
+run. Extend the artifact manifest with a separate worker target whose source
+SHA, archive digest and config digest are checked at publication. Bind the
+held-release context to that worker digest, the native module SHA, the
+26-qubit fixture fingerprint, the measured resource profile and the
+configured verifier identity. A replay returns the same job and context.
+One native success must include the expected device, exact image, completed
+NPZ checks, and verified worker retirement before reopening admission.
+Prove failure handling for wrong identity, fixture, digest, missing backup
+evidence and interrupted retirement. The earlier private staging receipt
+qualifies the candidate behavior. Live release acceptance needs its own
+receipt for the exact promoted artifact.
 
 Stages 001–003 use only owned temporary resources and synthetic inputs. Keep
 provider identifiers, private URLs, credentials and raw receipts out of Git.
