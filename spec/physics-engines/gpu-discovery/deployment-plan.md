@@ -24,13 +24,13 @@ target. Build the pinned qsim commit for SM 8.6 from the pinned CUDA 12.8.1
 toolkit. Lock its build inputs. Keep the regular worker as the default build
 target. The private canary accepts two fixed probability cases and an 8-qubit
 bit-order control. Its host checks exercise the normal parser and NPZ writer.
-The packaging checks confirm the
-wheel contains native CUDA, the CPU modules and their required libraries.
+The packaging checks confirm that the wheel contains native CUDA, the CPU
+modules and their required libraries.
 
 **QSIM-CUDA-002 — Qualify the candidate digest in isolation.** Save and hash
 the build artifact and record the commit and image ID. Publish the candidate to
 the approved private staging registry. Invoke that immutable digest through
-SkyPilot on one RTX 3060, with eight vCPUs, 16 GiB RAM and 30 GiB ephemeral
+SkyPilot on one RTX 3060, with eight vCPUs, 16 GB RAM and 30 GB ephemeral
 storage. Use a wall-time bound for the experiment and verify teardown. Require
 one visible device, its 12 GiB physical capacity, enough free memory, and
 successful native CUDA execution. Match each NPZ against the same-image CPU
@@ -66,6 +66,18 @@ samples are for screening. Repeat at a larger sample size before treating
 their p90 as an operational estimate. Use the existing CPU service profile
 as the primary comparator. Keep the same 1.5× and 0.5-second fresh-child
 screening thresholds and record any provisioning cost separately.
+
+Use the [timing driver](../../../tools/canary/qsim_api_timings.py) with an
+empty private state directory, the locked API and controller environments,
+the verified worker digests, and the CUDA module hash from the qualification
+receipt. Supply a preflight command that checks the current workload policy
+and scheduler capacity before each cold cohort. The driver accepts callbacks
+from the private worker network and restricts client routes to its local
+address. The default timing matrix has three cold and ten ready samples per
+cell. Pass `--serial-queue-check` to record the separate queue trial.
+Keep the JSON lines output and recheck the owned SkyPilot allocations after
+the run. The API qualification uses a disposable SQLite database and a
+synthetic invitation with a new token per run.
 
 **QSIM-CUDA-004 — Integrate the release verifier.** Once the candidate and API
 checks pass, add the held-release policy for the single fixed canary, a

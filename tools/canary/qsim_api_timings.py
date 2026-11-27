@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import signal
 import subprocess
 import sys
 from threading import Event
@@ -30,13 +31,13 @@ def emit(kind, **record):
     print(json.dumps({"kind": kind, **record}, allow_nan=False), flush=True)
 
 
-def eventually(fetch, seconds, description):
+def eventually(fetch, seconds, description, *, every=1):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         value = fetch()
         if value is not None:
             return value
-        time.sleep(1)
+        time.sleep(every)
     raise TimeoutError(description)
 
 
@@ -159,10 +160,15 @@ class Study:
         native = [row for row in pod["status"]["containerStatuses"] if row["name"] == "ray-node"]
         if len(native) != 1 or native[0]["imageID"].split("@")[-1] != self.settings.WORKER_IMAGE.split("@")[-1]:
             raise RuntimeError("The realized worker image digest differs")
+        containers = [row for row in pod["spec"]["containers"] if row["name"] == "ray-node"]
+        limits = containers[0]["resources"]["limits"]
         return {"host": pod["spec"]["nodeName"], "pod_uid": pod["metadata"]["uid"],
-                "digest": native[0]["imageID"].split("@")[-1]}
+                "digest": native[0]["imageID"].split("@")[-1], "limits": limits,
+                "pod_created_at": pod["metadata"]["creationTimestamp"]}
 
     def retire(self):
+        from sky.utils.common import StatusRefreshMode
+
         for cluster in sorted(self.owned):
             requests = self.sky.api_status(cluster_name=cluster, all_status=True)
             for request in requests:
@@ -173,7 +179,7 @@ class Study:
                 self.sky.get(self.sky.down(cluster))
             except self.sky.exceptions.ClusterDoesNotExist:
                 pass
-            if self.sky.get(self.sky.status([cluster], refresh=True)):
+            if self.sky.get(self.sky.status([cluster], refresh=StatusRefreshMode.FORCE)):
                 raise RuntimeError("Timing worker still present after retirement")
             with self.store.connect() as db:
                 db.execute("DELETE FROM worker_pool WHERE cluster=?", (cluster,))
@@ -233,11 +239,13 @@ class Study:
                     self.advance(job, driver)
                     return future.result() if future.done() else None
 
-                seen, terminal = eventually(completed, 460, "timing job did not complete")
+                seen, terminal = eventually(completed, 460, "timing job did not complete", every=3)
             except BaseException:
                 self.api.post(f"/api/jobs/{job}/cancel")
                 raise
         row = self.row(job)
+        if [event["status"] for event in seen] != ["QUEUED", "LAUNCHING", "RUNNING", "SUCCEEDED"]:
+            raise RuntimeError("The SSE stream omitted a required successful state transition")
         if row["status"] != "SUCCEEDED" or row["method"] != expected or (cluster and cluster != row["cluster"]):
             raise RuntimeError("Job status or provisioning method differs from the expected trial")
         response = self.api.get(f"/api/jobs/{job}/result")
@@ -250,8 +258,12 @@ class Study:
             np.testing.assert_array_equal(result["bitstrings"], fixture(case)["bitstrings"])
         summary = json.loads(row["summary"])
         np.testing.assert_array_equal(summary["probabilities"], probability)
-        if driver.arm == "cuda" and summary["canary_native"]["native_module"] != "qsimcirq.qsim_cuda":
-            raise RuntimeError("GPU arm lacked native CUDA proof")
+        native_backend = summary.get("canary_native")
+        if driver.arm == "cuda" and (
+            not native_backend or native_backend["native_module"] != "qsimcirq.qsim_cuda"
+            or native_backend["native_sha256"] != self.args.cuda_native_sha
+        ):
+            raise RuntimeError("GPU arm lacked the expected native CUDA proof")
 
         def native_complete():
             self.advance(job, driver)
@@ -278,6 +290,7 @@ class Study:
              sky_request_created=request[0].created_at, sky_request_finished=request[0].finished_at,
              admission_s=admitted-start, callback_to_result_s=finished-terminal,
              total_s=finished-start, events=seen, solver_s=summary["elapsed_seconds"],
+             native_backend=native_backend,
              result_sha256=hashlib.sha256(response.content).hexdigest(), **placement)
         return row["cluster"], probability
 
@@ -360,6 +373,7 @@ def main():
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cpu-image", required=True)
     parser.add_argument("--cuda-image", required=True)
+    parser.add_argument("--cuda-native-sha")
     parser.add_argument("--kube-context", required=True)
     parser.add_argument("--sky-namespace", required=True)
     parser.add_argument("--preflight", type=Path, required=True,
@@ -374,6 +388,8 @@ def main():
     args = parser.parse_args()
     if not all(IMAGE.fullmatch(ref) for ref in (args.cpu_image, args.cuda_image)):
         parser.error("Both worker images must have explicit SHA-256 digests")
+    if "cuda" in args.arms and not re.fullmatch(r"[0-9a-f]{64}", args.cuda_native_sha or ""):
+        parser.error("The CUDA arm requires the staged native module's SHA-256")
     if not any(args.listen in ipaddress.ip_network(network) for network in (
         "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
     )):
@@ -392,6 +408,11 @@ def main():
                       WQS_TIMING_LISTEN=str(args.listen))
     api_env = {key: os.environ[key] for key in ("PATH", "QSIM_DATA", "QSIM_TOKEN_FILE", "WQS_TIMING_LISTEN")}
     api_env["HOME"] = str(args.state)
+
+    def stop(_signal, _frame):
+        raise SystemExit("Timing study stopped")
+
+    signal.signal(signal.SIGTERM, stop)
     with (args.state / "api.log").open("w") as log:
         api_server = subprocess.Popen([
             str(args.api_python.absolute()), "-m", "uvicorn", "tools.canary.qsim_api_timings:private_timing_app",

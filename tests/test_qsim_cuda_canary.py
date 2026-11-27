@@ -4,16 +4,19 @@ import subprocess
 import pytest
 
 from qsim import qsim_cuda_canary as canary
+from qsim.models import Submission
 
 
 def test_frozen_canary_accepts_api_metadata_but_rejects_changed_work():
     body = canary.fixture("26q")
+    canary.verify_fixture(json.loads(Submission.model_validate(body).model_dump_json()))
     canary.verify_fixture({**body, "name": "canary", "seed": 42, "shots": 1000})
     for changed in (
         {**body, "bit_order": "little"},
         {**body, "circuit": body["circuit"] + "h q[0];"},
         {**body, "bitstrings": body["bitstrings"][::-1]},
         {**body, "backend": "cpu"},
+        {**body, "bindings": {"x": 1.0}},
     ):
         with pytest.raises(ValueError, match="frozen"):
             canary.verify_fixture(changed)

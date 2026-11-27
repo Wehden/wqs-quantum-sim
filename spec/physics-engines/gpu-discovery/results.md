@@ -287,6 +287,37 @@ the conservative $2.50/hour ceiling plus the $3 ancillary allowance brings the
 round's planning estimate to $8.65 against the $25 cap. The provider invoice
 was unavailable through SkyPilot. Full receipts are retained privately.
 
+## Exact staged qsim CUDA image
+
+On 2026-11-27, SkyPilot launched an immutable qsim candidate built from the
+frozen source snapshot `5010a55`. The allocated RTX 3060 exposed 12 GiB of
+physical VRAM. The runtime reported about 11.63 GiB usable and 11.52 GiB free
+before simulation. The realized image digest matched the staged archive.
+Every CUDA child loaded the same native `qsimcirq.qsim_cuda` module.
+
+| OpenQASM 2 case | Correct CPU/CUDA pairs | CPU median | CUDA median | Speedup | Peak sampled VRAM |
+| --- | --- | --- | --- | --- | --- |
+| 8-qubit bit-order control | 1 | 5.89 s | 6.85 s | 0.86× | 113 MiB |
+| 24 qubits, depth 20 | 3 | 11.38 s | 6.58 s | 1.73× | 243 MiB |
+| 26 qubits, depth 60 | 3 | 75.62 s | 7.65 s | 9.89× | 627 MiB |
+
+These are fresh-child times on the same worker, using the service's CPU qsim
+options and the candidate's CUDA options. The two-seed discovery used
+different CPU options. The 24-qubit result is a useful control for this
+package, with three pairs and a different comparator from discovery. It has
+no broader admission decision. The 26-qubit case remains the fixed release
+canary candidate. The timing study measures service and provisioning delays
+separately.
+
+Initial attempts reached a SkyPilot bootstrap version mismatch, a transient
+private registry resolution failure, and a short-kernel utilization screen
+that missed activity. The successful run used a compatible worker bootstrap
+and retained device-memory and utilization samples. Numerical parity,
+matching native and image identities, bounded device memory, successful
+native job status, and refreshed SkyPilot teardown all passed. No Runpod
+allocation was requested. The hosted package and actual release gates have
+separate evidence.
+
 ## Remaining GPU measurements
 
 The frozen 28-qubit, depth-60 qsim circuit completed one local CPU reference
@@ -306,5 +337,5 @@ Runpod charges. Provider invoice charges remain unverified.
 
 Keep the 26-qubit, depth-60 RTX 3060 result as a candidate for the fixed
 release canary. Service-level latency, additional sampling, larger-basis GPU
-timings beyond the three completed dense cells and the exact packaged-image
-canary still need execution. [Deployment plan](deployment-plan.md)
+timings beyond the three completed dense cells, and release-verifier
+acceptance still need execution. [Deployment plan](deployment-plan.md)
