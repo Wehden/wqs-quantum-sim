@@ -131,7 +131,8 @@ def verify_capacity(sky, infra, deadline):
         raise RuntimeError("SkyPilot resource inventory unavailable")
     nodes = sky.get(request).node_info_dict.values()
     if not any(node.is_ready and not node.is_cordoned and node.accelerator_type == "RTX3060"
-               and node.free >= 1 and node.cpu_free >= 8 and node.memory_free_gb >= 16 for node in nodes):
+               and node.free.get("accelerators_available", 0) >= 1
+               and node.cpu_free >= 8 and node.memory_free_gb >= 16 for node in nodes):
         raise RuntimeError("No RTX 3060 capacity with eight CPU cores and 16 GB host memory")
 
 

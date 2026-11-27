@@ -64,3 +64,22 @@ def test_held_verifier_checks_smoke_identity_before_any_sky_operation(monkeypatc
     release_control.control('smoke', sha, 'release-verifier')
     with pytest.raises(ValueError, match='smoke admission'):
         held_cuda.execute(None, sha, 'another-user', IMAGE, NATIVE, 'd' * 64)
+
+
+def test_capacity_requires_host_resources_as_well_as_gpu_slot(monkeypatch):
+    from types import SimpleNamespace
+    import time
+    from sky.client import sdk
+
+    monkeypatch.setattr(sdk, 'kubernetes_node_info', lambda context: 'inventory')
+    node = SimpleNamespace(is_ready=True, is_cordoned=False, accelerator_type='RTX3060',
+                           free={'accelerators_available': 2}, cpu_free=1, memory_free_gb=4)
+    sky = SimpleNamespace(
+        api_status=lambda **kw: [SimpleNamespace(status='SUCCEEDED')],
+        get=lambda request: SimpleNamespace(node_info_dict={'node': node}),
+    )
+    deadline = time.monotonic() + 10
+    with pytest.raises(RuntimeError, match='No RTX 3060 capacity'):
+        held_cuda.verify_capacity(sky, 'k8s', deadline)
+    node.cpu_free, node.memory_free_gb = 9, 20
+    held_cuda.verify_capacity(sky, 'k8s', deadline)
