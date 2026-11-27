@@ -24,7 +24,7 @@ def test_isolated_aer_result(tmp_path):
     result = run_worker(tmp_path, request('qreg q[2]; creg c[1]; creg out[1]; if(c==0) x q[1]; measure q[1]->out[0];'))
     assert result['status'] == 'SUCCEEDED', result
     summary = result['summary']
-    assert summary['engine'] == 'aer 0.17.2'
+    assert summary['engine'] == 'aer 0.18.4'
     assert summary['method'] == 'statevector' and summary['device'] == 'CPU'
     assert summary['cpu_threads'] == 1
     with np.load(io.BytesIO(base64.b64decode(result['artifact'])), allow_pickle=False) as data:

@@ -142,7 +142,7 @@ def _run_trajectories(request, model, arrays, segments, work):
 
 def _verify_runtime(solver):
     # This source-derived bound is valid only for the frozen native tableau.
-    if qt.__version__ != '5.3.1' or np.__version__ != '2.5.4':
+    if qt.__version__ != '5.3.1' or np.__version__ != '2.5.5':
         raise ValueError('execution_policy_mismatch: Lindblad runtime version')
     source = qt.__file__.rsplit('/', 1)[0] + '/solver/integrator/explicit_rk.pyx'
     try:

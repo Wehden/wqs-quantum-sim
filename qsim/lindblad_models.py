@@ -325,24 +325,20 @@ def _hermitian(matrix, pointer, *, density=False):
 
 
 # Pinned wheel/source owners used by the numerical allocation certificate.
+# NumPy's bundled OpenBLAS includes the Fortran runtime and has no separate
+# libgfortran or libquadmath dependency.
 _LINDBLAD_RUNTIME_FILES = [{'distribution': 'numpy',
-  'path': 'numpy.libs/libgfortran-83c28eba-468e71e5.so.5.0.0',
-  'sha256': 'a6a368328d02a5d8a149746f13f6268f8cc9192df5c18777b25c3c9b5ef52160'},
- {'distribution': 'numpy',
-  'path': 'numpy.libs/libquadmath-2284e583-a9307bba.so.0.0.0',
-  'sha256': '6bc3069003caec1f075be3c51ae8355332f081fa9465910c4b5724e7fe7d8ad4'},
- {'distribution': 'numpy',
-  'path': 'numpy.libs/libscipy_openblas64_-f48b354e.so',
-  'sha256': '432e1c1739731468ba305771af96773939e43016643e2d630f58cb45b6670e96'},
+  'path': 'numpy.libs/libscipy_openblas64_-4b78795a.so',
+  'sha256': 'ad494a874a8241624183202c0313c67605d648c3b3d6807d899bd6b350347472'},
  {'distribution': 'numpy',
   'path': 'numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so',
-  'sha256': 'b185dfe64b07180bedc7c15fb2735b0d0f4f4e09eb9c15bd8e67f74568aebcbf'},
+  'sha256': '1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095'},
  {'distribution': 'numpy',
   'path': 'numpy/linalg/_linalg.py',
   'sha256': '99ec3bec6f80194741a62407fbcea521a0690577105fe9f3096f156842de76a9'},
  {'distribution': 'numpy',
   'path': 'numpy/linalg/_umath_linalg.cpython-312-x86_64-linux-gnu.so',
-  'sha256': '2e075f582c3a25a21fe97a55931a0fdb22ceb84f4fce8203a5040d405ccf65ce'},
+  'sha256': 'bbb371a2756b95b972eab4127f90f470a0e801bd88879e0555fde7537fb27b1e'},
  {'distribution': 'qutip',
   'path': 'qutip/core/_brtensor.cpython-312-x86_64-linux-gnu.so',
   'sha256': '331c8816989cbecb5ad2be790a4d38d5a30f36bc5771927000b0b8d7bc5f583a'},

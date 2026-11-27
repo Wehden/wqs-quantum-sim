@@ -12,8 +12,8 @@ from packaging.requirements import Requirement
 
 
 PHYSICS_PINS = {'qutip': '5.3.1', 'scqubits': '4.3.1', 'scipy': '1.18.1'}
-EXISTING_PINS = {'numpy': '2.5.4', 'clifft': '0.12.0', 'qsimcirq': '0.22.1',
-                 'cirq-core': '1.7.0', 'qiskit': '2.6.0', 'qiskit-aer': '0.17.2',
+EXISTING_PINS = {'numpy': '2.5.5', 'clifft': '0.13.0', 'qsimcirq': '0.22.1',
+                 'cirq-core': '1.7.0', 'qiskit': '2.6.2', 'qiskit-aer': '0.18.4',
                  'qiskit-qasm3-import': '0.6.0'}
 
 
@@ -46,7 +46,7 @@ def test_physics_markers_preserve_existing_platforms_and_upstream_metadata():
         qsim_marker = requirements['qsimcirq'].marker
         assert qsim_marker is not None and qsim_marker.evaluate(environment) == (platform != 'emscripten')
     base = {Requirement(text).name: Requirement(text) for text in manifest['project']['dependencies']}
-    assert str(base['numpy'].specifier) == '==2.5.4' and base['numpy'].marker is None
+    assert str(base['numpy'].specifier) == '==2.5.5' and base['numpy'].marker is None
     assert not set(PHYSICS_PINS) & set(base)
     lock = tomllib.loads(Path('uv.lock').read_text())
     scqubits = next(package for package in lock['package'] if package['name'] == 'scqubits')

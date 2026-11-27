@@ -137,9 +137,9 @@ def test_frozen_capability_mapping_and_dependency_versions(client):
     capabilities = client.get('/api/capabilities', headers=auth()).json()
     assert isinstance(capabilities['engines'], dict)
     assert {'clifft', 'qsim', 'aer'} <= set(capabilities['engines'])
-    assert capabilities['engines']['clifft'] == {'version': '0.12.0', 'default': True}
-    assert version('clifft') == '0.12.0'
-    assert version('qiskit') == capabilities['engines']['aer']['importer']['version'] == '2.6.0'
+    assert capabilities['engines']['clifft'] == {'version': '0.13.0', 'default': True}
+    assert version('clifft') == '0.13.0'
+    assert version('qiskit') == capabilities['engines']['aer']['importer']['version'] == '2.6.2'
     assert capabilities['engines']['qsim']['input_formats'] == {
         'qasm2': ['basis_probabilities', 'sample'], 'qasm3': ['sample', 'basis_probabilities']}
     assert capabilities['engines']['aer']['input_formats'] == {'qasm2': ['sample'], 'qasm3': ['sample']}
