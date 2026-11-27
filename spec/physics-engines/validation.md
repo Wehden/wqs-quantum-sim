@@ -133,7 +133,8 @@ credentials and backup/release gates remain unchanged.
 
 ## Verified CPU release, 2026-11-25
 
-PRs #83 and #84 are on main. The current release ledger records source
+The November 25 release closed the CPU acceptance gates for PRs #83 and #84.
+Its release ledger recorded source
 `42a52154a9070c73eb16dc5820c402bc6726eeec`, fresh encrypted backup evidence
 and all 21 `cpu-physics-v1` cases with native results and cleanup. All four
 live roles matched that release, and admission was open with zero pending
@@ -142,3 +143,11 @@ digest and exact-main CI. CD attempt 2 replayed the verified record after
 recovery. This closes TASK-034 and G4 for the CPU matrix. The GPU matrix is
 empty. See the [separate discovery](gpu-discovery/results.md) for candidate
 GPU performance.
+
+## NumPy 2.5.5 release, 2026-11-26
+
+PR #90 reached main at `1e931f1ddcf5c33cc3c197031f78c7cd36b06994`.
+The release passed fresh encrypted backup and readback, four role image checks,
+and all 21 live CPU acceptance cases. Admission reopened with zero pending
+jobs. [Exact-main CI](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45934259143)
+· [Production CD](https://github.com/Wehden/wqs-quantum-sim/actions/runs/45935801212)
