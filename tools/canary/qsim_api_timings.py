@@ -114,9 +114,10 @@ class Study:
         return row
 
     def advance(self, job, task_driver):
+        """Advance a job unless the study's sole compatible worker is occupied."""
         row = self.row(job)
         if row["cleaned"]:
-            return
+            return True
         if row["status"] == "QUEUED" and row["cluster"] is None:
             verify_fixture(json.loads(row["request"]))
             if not self.owned:
@@ -128,14 +129,20 @@ class Study:
                 if self.controller.cluster_name(job) in self.owned:
                     raise RuntimeError("The cold timing trial reached a placement retry")
                 with self.store.connect() as db:
-                    available = db.execute(
-                        "SELECT cluster FROM worker_pool WHERE job_id IS NULL AND retired=0 "
-                        "AND image=? AND released>?",
-                        (self.settings.WORKER_IMAGE, time.time() - 530),
+                    workers = db.execute(
+                        "SELECT cluster, job_id, released FROM worker_pool "
+                        "WHERE retired=0 AND image=?",
+                        (self.settings.WORKER_IMAGE,),
                     ).fetchall()
-                if len(available) != 1 or available[0]["cluster"] not in self.owned:
+                if len(workers) != 1 or workers[0]["cluster"] not in self.owned:
                     raise RuntimeError("The ready timing trial lost its compatible worker")
+                worker = workers[0]
+                if worker["job_id"] is not None:
+                    return False
+                if worker["released"] is None or worker["released"] <= time.time() - 530:
+                    raise RuntimeError("The ready timing trial's worker lease expired")
         self.controller.advance(task_driver, row)
+        return True
 
     def event_frames(self, job, after):
         with self.api.stream("GET", f"/api/jobs/{job}/events", headers={"Last-Event-ID": str(after)}) as reply:
@@ -339,12 +346,15 @@ class Study:
             second = queued
             with self.store.connect() as db:
                 db.execute("INSERT INTO job_dispatch(job_id) VALUES(?)", (queued,))
+            if self.advance(queued, driver):
+                raise RuntimeError("The study dispatched a second job to a busy worker")
             pending = self.row(queued)
             if pending["status"] != "QUEUED" or pending["launch_id"] is not None:
                 raise RuntimeError("The second timing job bypassed the single-worker study queue")
             self.measure(driver, case, first, "", start, accepted, "exec", cluster, False, kind="queue_sample")
             self.measure(driver, case, queued, key, queued_at, admitted, "exec", cluster, False, kind="queue_sample")
-            emit("serial_queue", arm=arm, cluster=cluster, first=first, second=queued)
+            emit("serial_queue", arm=arm, cluster=cluster, first=first, second=queued,
+                 deferred_while_occupied=True)
         except BaseException:
             for job in (first, second):
                 if job:

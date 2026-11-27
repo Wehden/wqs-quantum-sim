@@ -1,10 +1,14 @@
 import json
+import sqlite3
 import subprocess
+import time
+from types import SimpleNamespace
 
 import pytest
 
 from qsim import qsim_cuda_canary as canary
 from qsim.models import Submission
+from tools.canary.qsim_api_timings import Study
 
 
 def test_frozen_canary_accepts_api_metadata_but_rejects_changed_work():
@@ -55,3 +59,32 @@ def test_canary_requires_one_empty_twelve_gib_3060(monkeypatch, device, process,
     else:
         with pytest.raises(RuntimeError):
             canary.check_device()
+
+
+def test_timing_dispatch_defers_second_job_while_worker_is_occupied():
+    request = json.dumps(canary.fixture("24q"))
+    row = {"cleaned": 0, "status": "QUEUED", "cluster": None, "request": request}
+    advanced = []
+    with sqlite3.connect(":memory:") as db:
+        db.row_factory = sqlite3.Row
+        db.execute(
+            "CREATE TABLE worker_pool("
+            "cluster TEXT, job_id TEXT, released REAL, retired INTEGER, image TEXT)"
+        )
+        db.execute("INSERT INTO worker_pool VALUES('worker-one','first',NULL,0,'image')")
+        study = Study.__new__(Study)
+        study.row = lambda _job: row
+        study.owned = {"worker-one"}
+        study.settings = SimpleNamespace(WORKER_IMAGE="image")
+        study.store = SimpleNamespace(connect=lambda: db)
+        study.controller = SimpleNamespace(
+            cluster_name=lambda job: "worker-" + job,
+            advance=lambda driver, job_row: advanced.append((driver, job_row)),
+        )
+
+        assert study.advance("second", "driver") is False
+        assert advanced == []
+
+        db.execute("UPDATE worker_pool SET job_id=NULL,released=?", (time.time(),))
+        assert study.advance("second", "driver") is True
+        assert advanced == [("driver", row)]
