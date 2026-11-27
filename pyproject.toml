@@ -3,33 +3,33 @@ name = "qsim"
 version = "0.1.0"
 description = "Authenticated Clifft simulation service orchestrated by SkyPilot"
 requires-python = ">=3.12,<3.13"
-dependencies = ["fastapi==0.149.0", "httpx==0.28.1", "pyyaml==6.0.3", "cryptography==50.0.2", "numpy==2.5.4"]
+dependencies = ["fastapi==0.165.0", "httpx==0.28.1", "pyyaml==6.0.4", "cryptography==50.0.2", "numpy==2.5.5"]
 
 [project.optional-dependencies]
 backup = [
     "bech32==1.2.0",
-    "boto3==1.43.114",
+    "boto3==1.44.10",
     "jsonschema==4.26.0",
-    "numpy==2.5.4",
+    "numpy==2.5.5",
 ]
 worker = [
-    "clifft==0.12.0",
-    "numpy==2.5.4",
+    "clifft==0.13.0",
+    "numpy==2.5.5",
     "ply==3.11",
     # Upstream publishes no Emscripten distribution.
     "qsimcirq==0.22.1; sys_platform != 'emscripten'",
-    "qiskit==2.6.0",
-    "qiskit-aer==0.17.2",
+    "qiskit==2.6.2",
+    "qiskit-aer==0.18.4",
     "qiskit-qasm3-import==0.6.0",
     "qutip==5.3.1; sys_platform == 'linux'",
     "scqubits==4.3.1; sys_platform == 'linux'",
     "scipy==1.18.1; sys_platform == 'linux'",
 ]
-controller = ["skypilot[kubernetes]==0.14.0"]
+controller = ["skypilot[kubernetes]==0.14.3"]
 
 [dependency-groups]
 dev = [
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "jsonschema==4.26.0",
     "pytest-xdist==3.8.0",
 ]
