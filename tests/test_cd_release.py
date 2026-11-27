@@ -711,7 +711,7 @@ def test_held_cuda_respects_backup_smoke_and_open_order(tmp_path, services, monk
 def test_one_shot_cuda_mode_selects_only_designated_head_and_its_merge(monkeypatch):
     candidate = 'a'*40
     other = 'b'*40
-    monkeypatch.setattr(release, 'run', lambda *args: f'{other} {candidate}')
+    monkeypatch.setattr(release, 'run', lambda *args: f'tree header\nparent {other}\nparent {candidate}\n\nmessage')
     assert release.cuda_requested(candidate, candidate)
     assert release.cuda_requested(SHA, candidate)
     assert not release.cuda_requested(SHA, other)

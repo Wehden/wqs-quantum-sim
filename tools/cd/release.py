@@ -73,7 +73,8 @@ def cuda_requested(sha, planned_head):
         return False
     if not re.fullmatch(r'[0-9a-f]{40}', planned_head):
         raise ValueError('Full CUDA canary PR head required')
-    parents = run(['git', 'show', '-s', '--format=%P', sha]).split()
+    headers = run(['git', 'cat-file', 'commit', sha]).split('\n\n', 1)[0]
+    parents = [line.removeprefix('parent ') for line in headers.splitlines() if line.startswith('parent ')]
     return sha == planned_head or (len(parents) == 2 and parents[1] == planned_head)
 
 
