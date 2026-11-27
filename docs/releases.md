@@ -215,6 +215,38 @@ guarantee against stalled storage or runner failure. Per-stage deadlines remain
 unchanged; simulations still have no execution deadline. Interrupted rollouts
 retain the recovery behavior below.
 
+## Held qsim CUDA canary
+
+For the fixed 26-qubit canary, set `WQS_HELD_GPU_CANARY` to the full,
+reviewed pull-request head SHA. Use a merge commit so the CI and CD workflows
+can verify that it is the second parent of the release SHA. CI builds and
+archives the CUDA worker together with its native module hash. CD publishes
+the checked artifact by immutable digest. New releases use the normal CPU
+path unless their commit matches the designated head.
+
+Before the merge, read the live Laminar placement dashboard, the current
+cluster workload policy, and SkyPilot's capacity inventory. Set
+`WQS_GPU_PREFLIGHT` to the observation as
+`unix_seconds:catalog_sha256:policy_commit_sha`. The runner validates its
+age before the hold and before the GPU launch. The controller also checks
+live SkyPilot host and accelerator capacity immediately before scheduling.
+Refresh the observation before merging if CI may outlast the two-hour window.
+
+The deployer verifies the fresh backup, establishes the held smoke identity,
+and invokes the protected controller command. The controller persists the
+release SHA, image digest, fixture digest, and native module hash before
+submitting the fixed GPU job. It reuses a verified receipt for the same
+context and refuses a second launch after an uncertain attempt. The
+26-qubit job runs on one RTX 3060 and compares its NPZ against the archived
+CPU reference. The verifier requires native SkyPilot success and confirmed
+retirement before running the existing CPU suite and reopening admission.
+The exact-release receipt records both results. The GPU command has no
+client-facing submission route.
+
+Remove the two one-shot variables after verification. For a failed or
+interrupted attempt, reconcile the private `held-cuda-<sha>.json` journal
+through the recorded SkyPilot authority before release recovery.
+
 ## Failure and operator recovery
 
 For the recovery procedure and a verified end-to-end record, see

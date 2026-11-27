@@ -15,7 +15,7 @@ import numpy as np
 from qsim.qsim_cuda_canary import CASES, check_device, fixture
 
 
-def solve(case, arm, directory):
+def solve(case, arm, directory, *, export=False):
     source = directory / "input.json"
     output = directory / "result.json"
     source.write_text(json.dumps(fixture(case), sort_keys=True))
@@ -65,25 +65,38 @@ def solve(case, arm, directory):
         np.testing.assert_allclose(probabilities, expected, atol=2e-6, rtol=0)
     peak_vram_mib = max((memory for memory, _ in telemetry), default=0)
     peak_utilization = max((utilization for _, utilization in telemetry), default=0)
-    print(json.dumps({
+    receipt = {
         "case": case, "arm": arm, "fresh_s": elapsed,
         "worker_s": response["summary"]["elapsed_seconds"],
         "peak_vram_mib": peak_vram_mib, "peak_utilization": peak_utilization,
         "fixture_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
         "artifact_sha256": hashlib.sha256(artifact).hexdigest(), **native,
-    }, sort_keys=True), flush=True)
+    }
     # NVML reports utilization over a device-dependent sampling interval.
     # A short circuit can finish between samples. Use native identity and the
     # completed, CPU-matched result as the execution proof, and retain both
     # telemetry readings for diagnostics.
     if arm == "cuda" and not 0 < peak_vram_mib <= 12 * 1024 * 0.75:
         raise ValueError("The CUDA run did not meet its sampled VRAM checks")
+    if export:
+        receipt["artifact"] = response["artifact"]
+        print("WQS_CUDA_RELEASE " + json.dumps(receipt, sort_keys=True), flush=True)
+    else:
+        print(json.dumps(receipt, sort_keys=True), flush=True)
     return probabilities
 
 
 def main():
     if os.getuid() != 1000:
         raise RuntimeError("Run the qualification as the image's qsim user")
+    if sys.argv[1:] == ["--held-release"]:
+        cgroup = Path("/sys/fs/cgroup")
+        quota, period = map(int, (cgroup / "cpu.max").read_text().split())
+        if quota < 8 * period or int((cgroup / "memory.max").read_text()) < 16_000_000_000:
+            raise RuntimeError("Assigned host CPU or memory limit does not meet the CUDA profile")
+        with tempfile.TemporaryDirectory() as directory:
+            solve("26q", "cuda", Path(directory), export=True)
+        return
     if sys.argv[1:] == ["--check-package"]:
         import qsimcirq
 
