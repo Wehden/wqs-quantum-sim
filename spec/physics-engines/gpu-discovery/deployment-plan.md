@@ -98,6 +98,10 @@ held-release context to that worker digest, the native module SHA, the
 configured verifier identity. A replay returns the same job and context.
 One native success must include the expected device, exact image, completed
 NPZ checks, and verified worker retirement before reopening admission.
+The production verifier invokes the fixed case through the protected
+controller command. It keeps the CUDA receipt beside the existing CPU
+acceptance record and uses the configured smoke identity while admission
+is held. Client circuit submissions continue through the public API.
 Prove failure handling for wrong identity, fixture, digest, missing backup
 evidence and interrupted retirement. The earlier private staging receipt
 qualifies the candidate behavior. Live release acceptance needs its own

@@ -54,6 +54,8 @@ jobs:
           RELEASE_SHA: ${{ needs.gate.outputs.sha }}
           CI_RUN: ${{ github.event.workflow_run.id }}
           RELEASE_CONFIG: ${{ vars.WQS_RELEASE_CONFIG }}
+          WQS_HELD_GPU_CANARY: ${{ vars.WQS_HELD_GPU_CANARY }}
+          WQS_GPU_PREFLIGHT: ${{ vars.WQS_GPU_PREFLIGHT }}
         run: python3 tools/cd/release.py deploy --sha "$RELEASE_SHA" --run-id "$CI_RUN" --config "$RELEASE_CONFIG"
       - name: Retain sanitized receipt
         if: always()

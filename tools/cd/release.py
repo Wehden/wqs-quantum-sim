@@ -15,6 +15,7 @@ import urllib.request
 
 REPOSITORY = 'Wehden/wqs-quantum-sim'
 TARGETS = ('api', 'controller', 'worker')
+CUDA_TARGET = 'worker-qsim-cuda'
 ROLES = {'api': 'api', 'admin': 'api', 'controller': 'controller', 'observer': 'controller'}
 
 
@@ -66,6 +67,16 @@ def current(sha):
     return github('git/ref/heads/main')['object']['sha'] == sha
 
 
+def cuda_requested(sha, planned_head):
+    """Select a single reviewed head and the merge commit that introduces it."""
+    if not planned_head:
+        return False
+    if not re.fullmatch(r'[0-9a-f]{40}', planned_head):
+        raise ValueError('Full CUDA canary PR head required')
+    parents = run(['git', 'show', '-s', '--format=%P', sha]).split()
+    return sha == planned_head or (len(parents) == 2 and parents[1] == planned_head)
+
+
 def gate(event):
     if eligible(event) and current(event['workflow_run']['head_sha']):
         return event['workflow_run']['head_sha']
@@ -115,9 +126,12 @@ def verify_loaded_content(actual, expected, sha):
         raise ValueError('Loaded image content mismatch')
 
 
-def validate_bundle(root, sha):
+def validate_bundle(root, sha, cuda_canary=False):
+    if (root / (CUDA_TARGET + '.json')).exists() != cuda_canary or (
+            (root / (CUDA_TARGET + '.tar')).exists() != cuda_canary):
+        raise ValueError('CUDA artifact must match the requested release mode')
     result = {}
-    for target in TARGETS:
+    for target in (*TARGETS, CUDA_TARGET) if cuda_canary else TARGETS:
         record = json.loads((root / (target + '.json')).read_text())
         if (record['schema'] != 1 or record['source_sha'] != sha or record['target'] != target
                 or record['archive'] != target + '.tar' or record['platform'] != 'linux/amd64'
@@ -133,6 +147,8 @@ def validate_bundle(root, sha):
             raise ValueError('Image config identity mismatch')
         if config.get('config', {}).get('Labels', {}).get('org.opencontainers.image.revision') != sha:
             raise ValueError('Image source mismatch')
+        if target == CUDA_TARGET and not re.fullmatch(r'[0-9a-f]{64}', record.get('native_sha256', '')):
+            raise ValueError('Missing CI CUDA module identity')
         result[target] = record
     return result
 
@@ -320,13 +336,27 @@ class Deployer:
         self.kube('patch', 'deployment', mapping['deployment'], '--type=strategic', '-p', json.dumps(patch))
         self.kube('rollout', 'status', 'deployment/' + mapping['deployment'], '--timeout=300s', timeout=320)
 
-    def deploy(self, root, sha, run_id):
+    def cuda_canary(self, sha, image, native_sha, preflight):
+        role = self.config['roles']['controller']
+        result = json.loads(self.kube(
+            'exec', 'deployment/' + role['deployment'], '-c', role['container'], '--',
+            'timeout', '--kill-after=10s', '630s', 'python', '-m', 'qsim.held_cuda',
+            '--sha', sha, '--owner', self.config['smoke_owner'], '--image', image,
+            '--native-sha', native_sha, '--catalog-sha', preflight['catalog_sha256'], timeout=660,
+        ))
+        verify_cuda_acceptance(result, sha, self.config['smoke_owner'], image, native_sha)
+        if result.get('catalog_sha256') != preflight['catalog_sha256']:
+            raise ValueError('CUDA scheduler preflight identity mismatch')
+        result['preflight'] = preflight
+        return result
+
+    def deploy(self, root, sha, run_id, *, cuda_preflight=None):
         if not re.fullmatch('[0-9a-f]{40}', sha) or not str(run_id).isdigit():
             raise ValueError('Invalid release identity')
         ci_run = github('actions/runs/' + str(run_id))
         if not eligible({'repository': {'full_name': REPOSITORY}, 'workflow_run': ci_run}) or ci_run['head_sha'] != sha:
             raise ValueError('Successful exact-main push CI required')
-        records = validate_bundle(root, sha)
+        records = validate_bundle(root, sha, cuda_canary=cuda_preflight is not None)
         state_dir = Path(self.config['state_dir'])
         state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         with (state_dir / 'lock').open('w') as lock:
@@ -338,6 +368,11 @@ class Deployer:
                     raise ValueError('Prior deployment requires operator recovery')
                 if previous['sha'] == sha:
                     verify_acceptance(previous['acceptance'], sha, worker_image=previous['images']['worker'], smoke_owner=self.config['smoke_owner'])
+                    if bool(previous.get('cuda_canary')) != (cuda_preflight is not None):
+                        raise ValueError('Release already verified in another mode')
+                    if cuda_preflight is not None:
+                        verify_cuda_acceptance(previous['cuda_canary'], sha, self.config['smoke_owner'],
+                                               previous['images'][CUDA_TARGET], records[CUDA_TARGET]['native_sha256'])
                     return previous
             if not current(sha):
                 raise ValueError('Release superseded')
@@ -346,6 +381,8 @@ class Deployer:
             state = self.control('status', sha)
             if state['protocol'] != 1 or state['release']:
                 raise ValueError('Bootstrap missing or admission already held')
+            if cuda_preflight is not None:
+                validate_cuda_preflight(cuda_preflight)
             receipt = {'schema': 1, 'sha': sha, 'ci_run': str(run_id), 'status': 'preparing',
                        'started': time.time(), 'previous': self.capture(), 'artifacts': records}
             write_record(receipt_path, receipt)
@@ -373,6 +410,16 @@ class Deployer:
                     self.apply(role, receipt['images'], sha)
                 # Only the private verifier's identity may submit during acceptance.
                 self.control('smoke', sha)
+                if cuda_preflight is not None:
+                    receipt['status'] = 'cuda_canary'
+                    write_record(receipt_path, receipt)
+                    receipt['cuda_canary'] = self.cuda_canary(
+                        sha, receipt['images'][CUDA_TARGET], records[CUDA_TARGET]['native_sha256'],
+                        validate_cuda_preflight(cuda_preflight),
+                    )
+                    self.wait_drain(sha)
+                    receipt['status'] = 'deploying'
+                    write_record(receipt_path, receipt)
                 verification = json.loads(run(self.config['verify_command'], 600, env=evidence_env))
                 verify_acceptance(verification, sha, worker_image=receipt['images']['worker'], smoke_owner=self.config['smoke_owner'])
                 receipt['acceptance'] = verification
@@ -388,7 +435,7 @@ class Deployer:
             except BaseException:
                 failed_stage=receipt['status']
                 receipt['status'] = 'failed'
-                if failed_stage in ('holding','deploying','acceptance_passed','verified'):
+                if failed_stage in ('holding','deploying','cuda_canary','acceptance_passed','verified'):
                     # Reconcile an uncertain open acknowledgement or final
                     # receipt failure without cancelling any accepted jobs.
                     try:
@@ -399,6 +446,35 @@ class Deployer:
                 write_record(receipt_path, receipt)
                 write_record(state_dir / (sha + '.json'), receipt)
                 raise
+
+
+def validate_cuda_preflight(value):
+    match = re.fullmatch(r'([0-9]{10}):([0-9a-f]{64}):([0-9a-f]{40})', value)
+    if match is None or not 0 <= time.time() - int(match[1]) <= 7200:
+        raise ValueError('Current live placement catalog and policy receipt required')
+    return {'observed_at': int(match[1]), 'catalog_sha256': match[2], 'policy_revision': match[3]}
+
+
+def verify_cuda_acceptance(receipt, sha, owner, image, native_sha):
+    context, result = receipt.get('context', {}), receipt.get('result', {})
+    placed = receipt.get('placed', {})
+    if (receipt.get('status') != 'verified' or receipt.get('native_status') != 'SUCCEEDED'
+            or receipt.get('retired') is not True or receipt.get('cluster') != 'wqs-cuda-' + sha[:20]
+            or type(receipt.get('native_job_id')) is not int or receipt['native_job_id'] < 1
+            or not receipt.get('launch_request') or not receipt.get('down_request')
+            or placed.get('nodes') != 1 or placed.get('accelerators') != {'RTX3060': 1}
+            or any(type(placed.get(key)) not in (int, float) or not minimum <= placed[key] < float('inf')
+                   for key, minimum in (('cpus', 8), ('memory_gb', 16)))
+            or context.get('sha') != sha or context.get('owner') != owner
+            or context.get('worker_image') != image or context.get('native_sha256') != native_sha
+            or result.get('native_sha256') != native_sha or result.get('native_module') != 'qsimcirq.qsim_cuda'
+            or result.get('fixture_sha256') != context.get('fixture_sha256')
+            or result.get('case') != '26q' or result.get('arm') != 'cuda'
+            or result.get('mathematics_verified') is not True
+            or not all(re.fullmatch(r'[0-9a-f]{64}', value or '') for value in (
+                receipt.get('catalog_sha256'), result.get('artifact_sha256'), result.get('reference_sha256'),
+                result.get('fixture_sha256')))):
+        raise ValueError('Complete held CUDA acceptance required')
 
 
 CIRCUIT_CASES = {'clifft_stim', 'clifft_qasm2_probability', 'qsim_qasm2_sample',
@@ -504,7 +580,7 @@ def publish_version(config, sha, version):
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['gate', 'deploy', 'record'])
+    parser.add_argument('action', choices=['gate', 'deploy', 'record', 'gpu-plan'])
     parser.add_argument('--sha')
     parser.add_argument('--version')
     parser.add_argument('--run-id')
@@ -516,14 +592,21 @@ def main():
             sha = gate(json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text()))
             with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
                 out.write('sha=' + sha + '\n')
+        elif args.action == 'gpu-plan':
+            print('true' if cuda_requested(args.sha, os.environ.get('WQS_HELD_GPU_CANARY')) else 'false')
         else:
             config = json.loads(args.config.read_text())
             if args.action == 'record':
                 publish_version(config, args.sha, args.version)
                 return
-            receipt = Deployer(config).deploy(args.artifacts, args.sha, args.run_id)
+            cuda_preflight = (os.environ.get('WQS_GPU_PREFLIGHT', '')
+                              if cuda_requested(args.sha, os.environ.get('WQS_HELD_GPU_CANARY')) else None)
+            receipt = Deployer(config).deploy(args.artifacts, args.sha, args.run_id, cuda_preflight=cuda_preflight)
             # Public receipt intentionally excludes private image names and inventory.
-            Path('release-receipt.json').write_text(json.dumps({k: receipt[k] for k in ('schema', 'sha', 'ci_run', 'status')}) + '\n')
+            public = {k: receipt[k] for k in ('schema', 'sha', 'ci_run', 'status')}
+            if 'cuda_canary' in receipt:
+                public['held_cuda_verified'] = True
+            Path('release-receipt.json').write_text(json.dumps(public) + '\n')
     except BootstrapRequiredError:
         raise SystemExit('Release blocked [bootstrap_required]: bootstrap verification required; '
                          'complete and record bootstrap acceptance before promotion') from None

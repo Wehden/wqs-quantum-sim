@@ -12,7 +12,7 @@ def checksum(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def export(target, image, sha):
+def export(target, image, sha, native_sha=None):
     root = Path('build/release')
     root.mkdir(parents=True, exist_ok=True)
     archive = root / (target + '.tar')
@@ -20,11 +20,14 @@ def export(target, image, sha):
     info = json.loads(subprocess.check_output(['docker', 'image', 'inspect', image]))[0]
     assert info['Config']['Labels']['org.opencontainers.image.revision'] == sha
     config_digest, _ = archive_config(archive, image)
-    (root / (target + '.json')).write_text(json.dumps({
+    manifest = {
         'schema': 1, 'source_sha': sha, 'target': target, 'archive': archive.name,
         'archive_sha256': checksum(archive), 'image_id': info['Id'],
         'config_digest': config_digest, 'image_ref': image,
-        'platform': info['Os'] + '/' + info['Architecture']}, indent=2) + '\n')
+        'platform': info['Os'] + '/' + info['Architecture']}
+    if native_sha is not None:
+        manifest['native_sha256'] = native_sha
+    (root / (target + '.json')).write_text(json.dumps(manifest, indent=2) + '\n')
 
 
 if __name__ == '__main__':

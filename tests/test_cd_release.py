@@ -46,8 +46,8 @@ def evidence():
     return result
 
 
-def bundle(tmp_path):
-    for target in release.TARGETS:
+def bundle(tmp_path, cuda=False):
+    for target in (*release.TARGETS, release.CUDA_TARGET) if cuda else release.TARGETS:
         image = 'wqs-release-ci:' + target + '-' + SHA
         cfg = {'os': 'linux', 'architecture': 'amd64', 'rootfs': {'type': 'layers', 'diff_ids': ['sha256:'+'c'*64]},
                'config': {'Labels': {'org.opencontainers.image.revision': SHA}, 'Cmd': ['test']}}
@@ -61,7 +61,7 @@ def bundle(tmp_path):
         (tmp_path/(target+'.json')).write_text(json.dumps({'schema': 1, 'source_sha': SHA, 'target': target,
             'platform': 'linux/amd64', 'image_id': 'sha256:'+'b'*64, 'archive': target+'.tar',
             'image_ref': image, 'config_digest': 'sha256:'+hashlib.sha256(payload).hexdigest(),
-            'archive_sha256': digest}))
+            'archive_sha256': digest, **({'native_sha256': 'd'*64} if target == release.CUDA_TARGET else {})}))
     return tmp_path
 
 
@@ -123,7 +123,7 @@ class Fake(release.Deployer):
 
     def publish(self, root, records, sha):
         self.calls.append('publish')
-        return {t: 'registry.example.invalid/'+t+'@sha256:'+'b'*64 for t in release.TARGETS}
+        return {t: 'registry.example.invalid/'+t+'@sha256:'+'b'*64 for t in records}
 
     def capture(self):
         return {role: {'image': 'old'} for role in release.ROLES}
@@ -658,3 +658,71 @@ def test_capture_preserves_api_worker_image_for_recovery(tmp_path,monkeypatch):
                 {'name':'QSIM_PHYSICS_ENABLED','value':'0'}]}]}}}})
     monkeypatch.setattr(deploy,'kube',kube)
     assert deploy.capture()['api']=={'image':'prior-role','worker_image':image,'physics_enabled':'0'}
+
+
+def test_held_cuda_acceptance_requires_opt_in_artifact_identity(tmp_path):
+    root = bundle(tmp_path)
+    with pytest.raises(ValueError, match='release mode'):
+        release.validate_bundle(root, SHA, cuda_canary=True)
+    bundle(root, cuda=True)
+    with pytest.raises(ValueError, match='release mode'):
+        release.validate_bundle(root, SHA)
+    assert release.validate_bundle(root, SHA, cuda_canary=True)[release.CUDA_TARGET]['native_sha256'] == 'd'*64
+
+
+@pytest.mark.parametrize('failure', [None, 'backup', 'cuda'])
+def test_held_cuda_respects_backup_smoke_and_open_order(tmp_path, services, monkeypatch, failure):
+    deploy = Fake(config(tmp_path))
+    calls = deploy.calls
+
+    def run(args, *a, **kw):
+        if args == ['backup']:
+            calls.append('backup')
+            if failure == 'backup':
+                raise RuntimeError('backup failed')
+            return json.dumps({'evidence_type': 'creation_result', 'created': True,
+                               'backup_id': kw['env']['WQS_BACKUP_SET_ID']})
+        calls.append('cpu-acceptance')
+        return json.dumps(evidence())
+
+    def canary(*args):
+        assert deploy.held
+        calls.append('cuda-acceptance')
+        if failure == 'cuda':
+            raise RuntimeError('cuda failed')
+        return {'status': 'verified'}
+
+    monkeypatch.setattr(release, 'run', run)
+    preflight = f"{int(release.time.time())}:{'a'*64}:{'b'*40}"
+    monkeypatch.setattr(deploy, 'cuda_canary', canary)
+    root = bundle(tmp_path, cuda=True)
+    if failure:
+        with pytest.raises(RuntimeError, match=failure):
+            deploy.deploy(root, SHA, '123', cuda_preflight=preflight)
+        assert deploy.held and 'open' not in calls and 'cpu-acceptance' not in calls
+        assert ('cuda-acceptance' in calls) == (failure == 'cuda')
+    else:
+        receipt = deploy.deploy(root, SHA, '123', cuda_preflight=preflight)
+        assert receipt['cuda_canary']['status'] == 'verified'
+        assert [call for call in calls if call in ('backup', 'smoke', 'cuda-acceptance', 'cpu-acceptance', 'open')] == [
+            'backup', 'smoke', 'cuda-acceptance', 'cpu-acceptance', 'open']
+
+
+def test_one_shot_cuda_mode_selects_only_designated_head_and_its_merge(monkeypatch):
+    candidate = 'a'*40
+    other = 'b'*40
+    monkeypatch.setattr(release, 'run', lambda *args: f'{other} {candidate}')
+    assert release.cuda_requested(candidate, candidate)
+    assert release.cuda_requested(SHA, candidate)
+    assert not release.cuda_requested(SHA, other)
+    assert not release.cuda_requested(SHA, '')
+    with pytest.raises(ValueError):
+        release.cuda_requested(SHA, 'true')
+
+
+def test_stale_cuda_preflight_cannot_open_a_release_hold(tmp_path, services):
+    deploy = Fake(config(tmp_path))
+    old = f"{int(release.time.time() - 7201)}:{'a'*64}:{'b'*40}"
+    with pytest.raises(ValueError, match='placement catalog'):
+        deploy.deploy(bundle(tmp_path, cuda=True), SHA, '123', cuda_preflight=old)
+    assert not deploy.held and 'publish' not in deploy.calls
