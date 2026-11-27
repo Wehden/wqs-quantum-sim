@@ -1,6 +1,6 @@
 # Requirements amendment
 
-**Status:** Approved for discovery on 2026-11-22. Extends the discovery evidence required by PHY-011, PHY-015 and PHY-017. Existing production requirements remain authoritative. [Parent requirements](../requirements.md)
+**Status:** Approved for discovery on 2026-11-22. Extends the discovery evidence required by PHY-011, PHY-015, PHY-017 and PHY-019. Existing production requirements remain authoritative. [Parent requirements](../requirements.md)
 
 | ID | EARS requirement | Acceptance evidence |
 | --- | --- | --- |
