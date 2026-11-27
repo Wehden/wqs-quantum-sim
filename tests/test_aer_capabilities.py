@@ -34,8 +34,8 @@ def test_aer_native_condition_capability(name, language, body, expected):
 
 
 def test_combined_native_pins():
-    expected = {"clifft": "0.12.0", "qsimcirq": "0.22.1", "cirq-core": "1.7.0",
-                "qiskit": "2.6.0", "qiskit-aer": "0.17.2", "qiskit-qasm3-import": "0.6.0"}
+    expected = {"clifft": "0.13.0", "qsimcirq": "0.22.1", "cirq-core": "1.7.0",
+                "qiskit": "2.6.2", "qiskit-aer": "0.18.4", "qiskit-qasm3-import": "0.6.0"}
     assert {name: version(name) for name in expected} == expected
 
 

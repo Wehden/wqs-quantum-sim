@@ -179,3 +179,23 @@ valid only for their original scope.
 The [validation ledger](../validation.md) records requirement coverage and the
 remaining exact-release/real-SkyPilot/backup obligations. Qualification tests do
 not open production admission.
+
+## NumPy 2.5.5 requalification
+
+The Linux x86_64 CPython 3.12 wheel updates OpenBLAS and both NumPy extension
+modules in the worker certificates. The bundled OpenBLAS now statically
+links the Fortran routines it needs and drops libquadmath. The other
+certificate files match the previous hashes. The scqubits export certificate
+binds the updated native identity.
+[NumPy OpenBLAS change](https://github.com/numpy/numpy/pull/33100)
+
+Regenerate both lockfiles with the repository's uv 0.11.6. The root
+lock retains the Linux dependency markers checked by CI and resolves the
+same package versions and distribution hashes as the Dependabot update.
+
+Use `bash tools/ci/check-worker.sh` to run the packaged-worker proof. It
+checks numerical results, frozen workspace bounds, and the largest admitted
+memory cases in two-vCPU, 4 GiB containers. Numerical child processes retain
+the 3 GiB address-space limit. The joined tests exercise the real API and
+worker package with synthetic placement. The normal release drains accepted
+jobs before switching images and verifies the new image in live acceptance.

@@ -11,14 +11,14 @@ if TYPE_CHECKING:
 
 # Frozen Linux CPython 3.12 x86_64 implementation; workers verify every file.
 _CPU_CERTIFICATE = {'algorithm': 'scipy-dsyevr-zheevr-subset',
- 'digest': '531974791bde44c9f6bb29e85fe042e785e1315326e8c0288c788ad38ab4991d',
+ 'digest': '567e0f04a53d83fd252f70e23568519cf08ca7c455c720b1b14065f0d6e167d0',
  'lapack_workspace': {'dsyevr': [33, 10], 'zheevr': [33, 24, 10]},
- 'native_hashes': {'numpy.libs/libscipy_openblas64_-f48b354e.so': {'sha256': '432e1c1739731468ba305771af96773939e43016643e2d630f58cb45b6670e96',
-                                                                   'size': 24325657},
-                   'numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so': {'sha256': 'b185dfe64b07180bedc7c15fb2735b0d0f4f4e09eb9c15bd8e67f74568aebcbf',
-                                                                                     'size': 10637297},
-                   'numpy/linalg/_umath_linalg.cpython-312-x86_64-linux-gnu.so': {'sha256': '2e075f582c3a25a21fe97a55931a0fdb22ceb84f4fce8203a5040d405ccf65ce',
-                                                                                  'size': 235897},
+ 'native_hashes': {'numpy.libs/libscipy_openblas64_-4b78795a.so': {'sha256': 'ad494a874a8241624183202c0313c67605d648c3b3d6807d899bd6b350347472',
+                                                                   'size': 23848649},
+                   'numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so': {'sha256': '1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095',
+                                                                                     'size': 10617201},
+                   'numpy/linalg/_umath_linalg.cpython-312-x86_64-linux-gnu.so': {'sha256': 'bbb371a2756b95b972eab4127f90f470a0e801bd88879e0555fde7537fb27b1e',
+                                                                                  'size': 233137},
                    'scipy.libs/libscipy_openblas-5f890258.so': {'sha256': '2a5b4c1a6311873c59132b2ceaaf3c26258a17350b7cd27ea8782a47e3322981',
                                                                 'size': 25094609},
                    'scipy/linalg/_flapack.cpython-312-x86_64-linux-gnu.so': {'sha256': '00fc3e3414d7f42f023d5ba1f1b616d3d81da8da0f5cc6b17279af70be963b9c',
@@ -50,11 +50,11 @@ _CPU_CERTIFICATE = {'algorithm': 'scipy-dsyevr-zheevr-subset',
                                                    'size': 47458},
                    'scqubits/core/transmon.py': {'sha256': '5e6ecc5e9230734cb6a68c3b4edb67c8dcb76dd41e4b6e8957020c1459bbe30c',
                                                  'size': 32375}},
- 'versions': {'numpy': '2.5.4', 'qutip': '5.3.1', 'scipy': '1.18.1', 'scqubits': '4.3.1'}}
+ 'versions': {'numpy': '2.5.5', 'qutip': '5.3.1', 'scipy': '1.18.1', 'scqubits': '4.3.1'}}
 
 
 _EXPORT_CERTIFICATE = {'revision': 'scqubits-export-shared-eigensystem-v1',
- 'native_certificate': '531974791bde44c9f6bb29e85fe042e785e1315326e8c0288c788ad38ab4991d',
+ 'native_certificate': '567e0f04a53d83fd252f70e23568519cf08ca7c455c720b1b14065f0d6e167d0',
  'adapter_sha256': '05ad5fc4f87e804fe24fb3e12e2076006fadd359486f904cd727454c8f19b8a9',
  'representation': {'python': 'CPython 3.12',
                     'pointer_bytes': 8,
@@ -65,7 +65,7 @@ _EXPORT_CERTIFICATE = {'revision': 'scqubits-export-shared-eigensystem-v1',
  'energy_arrays': 'shifted result plus angle vector and real diagonal before complex conversion',
  'operator_workspace': 'one sequential constructor/validation/transform; all numeric and JSON '
                        'results retained',
- 'digest': '04bb1ae263260aed485690d89509c4c00846e5af7d55149e4b0ded344d98540a'}
+ 'digest': '360187da4a6810636bdc01777d73baff6971deccddf681a516ffdb5e1128211b'}
 
 
 def _finite(value):

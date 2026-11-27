@@ -288,8 +288,8 @@ sources = {
     "scipy.linalg._matfuncs": "72da5780b458ecf9f78fd75662fa28c95cb14b66c4faf1327891be009830a1b6",
     "scipy.linalg._flapack": "00fc3e3414d7f42f023d5ba1f1b616d3d81da8da0f5cc6b17279af70be963b9c",
     "scipy.linalg._internal_matfuncs": "e98f03e852b7acf316c6a6d2294360ed2fb98ee4b1e9c8eccffd123f9c1dc74f",
-    "numpy._core._multiarray_umath": "b185dfe64b07180bedc7c15fb2735b0d0f4f4e09eb9c15bd8e67f74568aebcbf",
-    "numpy.linalg._umath_linalg": "2e075f582c3a25a21fe97a55931a0fdb22ceb84f4fce8203a5040d405ccf65ce",
+    "numpy._core._multiarray_umath": "1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095",
+    "numpy.linalg._umath_linalg": "bbb371a2756b95b972eab4127f90f470a0e801bd88879e0555fde7537fb27b1e",
     'numpy.lib._twodim_base_impl': 'a11d0bdecd5064dae7aca1ecbc3fdb9ff0eacae4cdfa8ed1a644ac0bb4a58fe6',
     'numpy.lib._shape_base_impl': 'b550d0cc5e7efe46dc1c77f0286330fcb4100fcbbeb98f41aa9127c2c44e01ec',
     'numpy._core.numeric': 'feb150554b4879d4df7bd0a4ab7b1a6b818de7ba994ed0c73583fee177533417',
@@ -302,8 +302,8 @@ for module, expected in sources.items():
 import scipy
 blas = Path(scipy.__file__).parent.parent / "scipy.libs" / "libscipy_openblas-5f890258.so"
 assert hashlib.sha256(blas.read_bytes()).hexdigest() == "2a5b4c1a6311873c59132b2ceaaf3c26258a17350b7cd27ea8782a47e3322981"
-numpy_blas = Path(scipy.__file__).parent.parent / "numpy.libs" / "libscipy_openblas64_-f48b354e.so"
-assert hashlib.sha256(numpy_blas.read_bytes()).hexdigest() == "432e1c1739731468ba305771af96773939e43016643e2d630f58cb45b6670e96"
+numpy_blas = Path(scipy.__file__).parent.parent / "numpy.libs" / "libscipy_openblas64_-4b78795a.so"
+assert hashlib.sha256(numpy_blas.read_bytes()).hexdigest() == "ad494a874a8241624183202c0313c67605d648c3b3d6807d899bd6b350347472"
 '''
     subprocess.run([sys.executable, '-c', code], check=True,
                    env={**os.environ, 'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1',
@@ -383,7 +383,7 @@ def test_certificate_covers_complete_largest_shape_and_transport(qubit, operatio
     assert charges['parent_child_handoff'] == 2*plan.result.callback_upper_bytes
     assert charges['npz_serialization_buffers'] == 4*plan.result.npz_upper_bytes
     assert plan.peak_bytes == sum(charges.values()) < 2*1024**3
-    assert plan.coefficient_plan['certificate'] == '531974791bde44c9f6bb29e85fe042e785e1315326e8c0288c788ad38ab4991d'
+    assert plan.coefficient_plan['certificate'] == '567e0f04a53d83fd252f70e23568519cf08ca7c455c720b1b14065f0d6e167d0'
 
 
 def test_certificate_digest_binds_policy_versions_sources_and_workspace():
@@ -393,7 +393,7 @@ def test_certificate_digest_binds_policy_versions_sources_and_workspace():
     encoded = json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()
     assert hashlib.sha256(encoded).hexdigest() == _CPU_CERTIFICATE['digest']
     assert _CPU_CERTIFICATE['versions'] == {
-        'numpy': '2.5.4', 'scipy': '1.18.1', 'scqubits': '4.3.1', 'qutip': '5.3.1'}
+        'numpy': '2.5.5', 'scipy': '1.18.1', 'scqubits': '4.3.1', 'qutip': '5.3.1'}
     assert all('/' in name and len(item['sha256']) == 64 and item['size'] > 0
                for group in ('source_hashes', 'native_hashes')
                for name, item in _CPU_CERTIFICATE[group].items())
